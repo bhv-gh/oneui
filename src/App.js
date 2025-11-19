@@ -1464,100 +1464,19 @@ const calculateNextOccurrence = (task) => {
 
 // --- Main App Component ---
 export default function TaskTreeApp() {
-  const today = getTodayDateString();
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayString = yesterday.toISOString().split('T')[0];
-
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowString = tomorrow.toISOString().split('T')[0];
-
-  const twoDaysAgo = new Date();
-  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-  const twoDaysAgoString = twoDaysAgo.toISOString().split('T')[0];
-
   const initialData = [
     {
-      id: 'root-1',
-      text: 'Launch Marketing Website',
-      isCompleted: false,
-      isExpanded: true,
-      fields: [ { id: 'f1', label: 'Team', value: 'Marketing' } ],
-      children: [
-        {
-          id: 'c-1',
-          text: 'Plan Content Strategy',
-          isCompleted: true,
-          isExpanded: false,
-          completionDate: yesterdayString,
-          fields: [{id: 'f2', label: 'Pomodoros', value: '4'}],
-          children: [
-            { id: 'gc-1', text: 'Keyword Research', isCompleted: true, isExpanded: false, children: [], completionDate: yesterdayString },
-            { id: 'gc-2', text: 'Outline Blog Posts', isCompleted: true, isExpanded: false, children: [], completionDate: yesterdayString },
-          ]
-        },
-        {
-          id: 'c-2',
-          text: 'Design Mockups',
-          isCompleted: false,
-          isExpanded: true,
-          scheduledDate: today,
-          children: [
-            { id: 'gc-3', text: 'Homepage Design', isCompleted: false, isExpanded: false, children: [], scheduledDate: today },
-            { id: 'gc-4', text: 'About Page Design', isCompleted: false, isExpanded: false, children: [], scheduledDate: today },
-          ]
-        },
-        {
-          id: 'c-3',
-          text: 'Develop Website',
-          isCompleted: false,
-          isExpanded: true,
-          scheduledDate: tomorrowString,
-          children: [
-            { id: 'gc-5', text: 'Setup React Project', isCompleted: false, isExpanded: false, children: [], scheduledDate: tomorrowString },
-            { id: 'gc-6', text: 'Build Component Library', isCompleted: false, isExpanded: false, children: [], scheduledDate: tomorrowString },
-          ]
-        },
-      ]
-    },
-    {
-      id: 'root-2',
-      text: 'Personal Tasks',
+      id: 'root-welcome',
+      text: 'Welcome to Flow!',
       isCompleted: false,
       isExpanded: true,
       fields: [],
       children: [
         {
-          id: 'p-1',
-          text: 'Book flight tickets',
-          isCompleted: true,
+          id: 'sub-1',
+          text: 'Click on me to edit',
+          isCompleted: false,
           isExpanded: false,
-          completionDate: twoDaysAgoString,
-          fields: [{id: 'p-f1', label: 'Pomodoros', value: '1'}],
-          children: []
-        },
-        {
-          id: 'p-2',
-          text: 'Reply to important emails',
-          isCompleted: false,
-          isExpanded: true,
-          // This is an overdue task as it has no completion date and a past scheduled date
-          scheduledDate: yesterdayString, 
-          timeRemaining: 1200, // Example of a paused timer
-          timerMode: 'pomodoro',
-          children: []
-        },
-        {
-          id: 'p-3',
-          text: 'Workout session',
-          isCompleted: false,
-          isExpanded: true,
-          scheduledDate: today,
-          recurrence: {
-            frequency: 'daily',
-            interval: 1,
-          },
           children: []
         },
       ]
