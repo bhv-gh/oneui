@@ -13,7 +13,7 @@ import {
   Settings2,
   ListPlus
 } from 'lucide-react';
-import { Play, Pause, TimerReset, BrainCircuit, Coffee, XCircle, CalendarDays, CalendarPlus, Save, Trash, Pencil } from 'lucide-react';
+import { Play, Pause, TimerReset, BrainCircuit, Coffee, XCircle, CalendarDays, CalendarPlus, Save, Trash, Pencil, UploadCloud, DownloadCloud } from 'lucide-react';
 import Fuse from 'fuse.js';
 import { DayPicker } from 'react-day-picker';
 import { format, parseISO, isToday } from 'date-fns';
@@ -748,6 +748,53 @@ const DeleteModal = ({ isOpen, onClose, onConfirm }) => {
   );
 };
 
+// --- Component: Settings Modal ---
+const SettingsModal = ({ isOpen, onClose, onExport, onImport }) => {
+  const importFileRef = useRef(null);
+
+  if (!isOpen) return null;
+
+  const handleImportClick = () => {
+    importFileRef.current.click();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-lg font-semibold text-slate-100">Settings</h3>
+          <button onClick={onClose} className="p-1 text-slate-500 hover:text-white rounded-full">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="space-y-4">
+          <button
+            onClick={onExport}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
+          >
+            <DownloadCloud size={18} />
+            <span>Export Data</span>
+          </button>
+          <button
+            onClick={handleImportClick}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
+          >
+            <UploadCloud size={18} />
+            <span>Import Data</span>
+          </button>
+          <input
+            type="file"
+            ref={importFileRef}
+            className="hidden"
+            accept=".json"
+            onChange={onImport}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Component: Logs View ---
 const LogsView = ({ logs, selectedDate, onAddManualLog, onEditLog, onDeleteLog, onUpdateLogTime, onInteractionChange }) => {
   const hours = Array.from({ length: 24 }, (_, i) => i); // 0 to 23
@@ -956,7 +1003,7 @@ const LogsView = ({ logs, selectedDate, onAddManualLog, onEditLog, onDeleteLog, 
   }, [logs, selectedDate]);
 
   return (
-    <div className="flex-1 p-8 md:p-12 pt-24 overflow-y-auto animate-in fade-in duration-300">
+    <div className="flex-1 px-8 md:px-12 pb-8 overflow-y-auto animate-in fade-in duration-300">
       <h2 className="text-2xl font-bold text-slate-200 mb-6">
         Activity Log for {format(validDateForLogs, 'MMMM d, yyyy')}
       </h2>
@@ -1212,6 +1259,7 @@ export default function TaskTreeApp() {
   const [activeSession, setActiveSession] = useState(null); // { taskId: string, startTime: Date }
   const [manualLogModal, setManualLogModal] = useState(null); // { startTime, endTime } or { logToEdit }
 
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isTimelineInteracting, setIsTimelineInteracting] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [highlightedTaskId, setHighlightedTaskId] = useState(null);
@@ -1410,6 +1458,62 @@ export default function TaskTreeApp() {
       document.body.classList.remove('user-select-none');
     };
   }, [isDragging, isTimelineInteracting]);
+
+  // --- Import/Export Logic ---
+  const handleExport = () => {
+    try {
+      const stateToExport = {
+        treeData: treeData,
+        logs: logs,
+      };
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(stateToExport, null, 2));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute("href", dataStr);
+      downloadAnchorNode.setAttribute("download", `flow-backup-${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchorNode); // required for firefox
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+    } catch (error) {
+      console.error("Export failed:", error);
+      alert("Failed to export data.");
+    }
+  };
+
+  const handleImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!window.confirm("Are you sure you want to import? This will override all your current tasks and logs.")) {
+      e.target.value = null; // Reset file input
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const importedState = JSON.parse(event.target.result);
+        if (importedState.treeData && Array.isArray(importedState.logs)) {
+          setTreeData(importedState.treeData);
+          // Revive date objects from strings
+          const revivedLogs = importedState.logs.map(log => ({
+            ...log,
+            startTime: new Date(log.startTime),
+            endTime: new Date(log.endTime)
+          }));
+          setLogs(revivedLogs);
+          alert("Data imported successfully!");
+        } else {
+          alert("Import failed: Invalid file format.");
+        }
+      } catch (error) {
+        console.error("Import failed:", error);
+        alert("Import failed: Could not parse the file.");
+      } finally {
+        e.target.value = null; // Reset file input
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // --- Search Logic ---
   const flattenedTree = useMemo(() => {
@@ -1831,66 +1935,75 @@ export default function TaskTreeApp() {
       <SearchOverlay query={searchQuery} resultCount={searchResults.length} currentIndex={searchIndex} />
 
       {/* Main Content Area */}
-      {activeTab === 'today' && (
-        <div
-          data-canvas-area
-          className={`flex-1 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} animate-in fade-in duration-300`}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUpOrLeave}
-          onMouseLeave={handleMouseUpOrLeave}
-        >
-          <div 
-            className="min-w-max min-h-full p-20 flex justify-center items-start origin-top-left"
-            style={{ transform: `scale(${scale}) translate(${pan.x}px, ${pan.y}px)`, transition: isDragging ? 'none' : 'transform 0.2s' }}
+      <div className="pt-24 flex-1 flex flex-col">
+        {activeTab === 'today' && (
+          <div
+            data-canvas-area
+            className={`flex-1 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} animate-in fade-in duration-300`}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUpOrLeave}
+            onMouseLeave={handleMouseUpOrLeave}
           >
-            <div className="flex gap-16">
-               {displayedTreeData.map(node => (
-                 <TreeNode 
-                   key={node.id} 
-                   node={node} 
-                   onUpdate={handleUpdate} 
-                   onAdd={handleAddSubtask} 
-                   onRequestDelete={handleRequestDelete}
-                   allFieldKeys={allFieldKeys}
-                   onStartFocus={handleStartFocus}
-                   focusedTaskId={focusedTaskId}
-                   isTimerActive={isTimerActive}
-                   isSearching={isSearching}
-                   highlightedTaskId={highlightedTaskId}
-                 />
-               ))}
-               
-               {/* Add Root Placeholder - only on Today view */}
-               {selectedDate >= getTodayDateString() && (
-                 <button 
-                   onClick={handleAddRoot}
-                   className="w-64 h-24 rounded-2xl border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-600 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all"
-                 >
-                   <div className="flex flex-col items-center gap-2">
-                     <Plus size={24} />
-                     <span className="font-medium">New Root</span>
-                   </div>
-                 </button>
-               )}
-               {displayedTreeData.length === 0 && selectedDate !== getTodayDateString() && (
-                   <div className="text-slate-600">
-                     {selectedDate < getTodayDateString() ? "No tasks were completed on this day." : "No tasks scheduled for this day."}
-                   </div>
-               )}
+            <div 
+              className="min-w-max min-h-full p-20 flex justify-center items-start origin-top-left"
+              style={{ transform: `scale(${scale}) translate(${pan.x}px, ${pan.y}px)`, transition: isDragging ? 'none' : 'transform 0.2s' }}
+            >
+              <div className="flex gap-16">
+                 {displayedTreeData.map(node => (
+                   <TreeNode 
+                     key={node.id} 
+                     node={node} 
+                     onUpdate={handleUpdate} 
+                     onAdd={handleAddSubtask} 
+                     onRequestDelete={handleRequestDelete}
+                     allFieldKeys={allFieldKeys}
+                     onStartFocus={handleStartFocus}
+                     focusedTaskId={focusedTaskId}
+                     isTimerActive={isTimerActive}
+                     isSearching={isSearching}
+                     highlightedTaskId={highlightedTaskId}
+                   />
+                 ))}
+                 
+                 {/* Add Root Placeholder - only on Today view */}
+                 {selectedDate >= getTodayDateString() && (
+                   <button 
+                     onClick={handleAddRoot}
+                     className="w-64 h-24 rounded-2xl border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-600 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all"
+                   >
+                     <div className="flex flex-col items-center gap-2">
+                       <Plus size={24} />
+                       <span className="font-medium">New Root</span>
+                     </div>
+                   </button>
+                 )}
+                 {displayedTreeData.length === 0 && selectedDate !== getTodayDateString() && (
+                     <div className="text-slate-600">
+                       {selectedDate < getTodayDateString() ? "No tasks were completed on this day." : "No tasks scheduled for this day."}
+                     </div>
+                 )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      {activeTab === 'logs' && <LogsView 
-        logs={logs} 
-        selectedDate={selectedDate} 
-        onAddManualLog={(times) => setManualLogModal(times)}
-        onEditLog={(log) => setManualLogModal({ logToEdit: log })}
-        onDeleteLog={handleDeleteLog}
-        onUpdateLogTime={handleUpdateLogTime}
-        onInteractionChange={setIsTimelineInteracting}
-      />}
+        )}
+        {activeTab === 'logs' && <LogsView 
+          logs={logs} 
+          selectedDate={selectedDate} 
+          onAddManualLog={(times) => setManualLogModal(times)}
+          onEditLog={(log) => setManualLogModal({ logToEdit: log })}
+          onDeleteLog={handleDeleteLog}
+          onUpdateLogTime={handleUpdateLogTime}
+          onInteractionChange={setIsTimelineInteracting}
+        />}
+      </div>
+
+      <SettingsModal 
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onExport={handleExport}
+        onImport={handleImport}
+      />
     </div>
   );
 }
