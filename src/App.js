@@ -769,7 +769,7 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
 };
 
 // --- Component: Full Screen Focus View ---
-const FocusView = ({ task, timerProps, onExit }) => {
+const FocusView = ({ task, timerProps, onExit, appState }) => {
   if (!task) return null;
 
   const { 
@@ -793,8 +793,15 @@ const FocusView = ({ task, timerProps, onExit }) => {
     longBreak: { icon: Coffee, label: 'Long Break' },
   };
 
+  const backgroundClasses = {
+    focusing: 'bg-slate-950', 
+    break: 'bg-sky-950',      // Dark blue for break
+    paused: 'bg-emerald-950',   
+    idle: 'bg-emerald-950',     
+  };
+
   return (
-    <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col items-center justify-center p-8 animate-in fade-in duration-300">
+    <div className={`fixed inset-0 z-[200] flex flex-col items-center justify-center p-8 animate-in fade-in duration-300 transition-colors duration-1000 ${backgroundClasses[appState]}`}>
       <button onClick={onExit} className="absolute top-6 right-6 text-slate-600 hover:text-slate-300 transition-colors">
         <XCircle size={32} />
       </button>
@@ -2027,9 +2034,26 @@ export default function TaskTreeApp() {
     };
   }, [isDragging]);
 
+  // Determine the current app state for dynamic background
+  let appState = 'idle';
+  if (focusedTask) {
+    if (isTimerActive) {
+      appState = timerMode === 'pomodoro' ? 'focusing' : 'break';
+    } else {
+      // If a task is focused but the timer isn't active, it's 'paused'.
+      appState = 'paused';
+    }
+  }
+
+  const backgroundClasses = {
+    idle: 'bg-slate-900',
+    focusing: 'bg-emerald-950',
+    break: 'bg-sky-950',
+    paused: 'bg-slate-950',
+  };
 
   if (focusedTask) {
-    return <FocusView task={focusedTask} timerProps={timerProps} onExit={handleExitFocus} />;
+    return <FocusView task={focusedTask} timerProps={timerProps} onExit={handleExitFocus} appState={appState} />;
   }
 
   // Check if the modal should be open and if its date values are valid.
@@ -2085,7 +2109,7 @@ export default function TaskTreeApp() {
   const isSearching = searchQuery.length > 0;
 
   return (
-    <div className="h-screen w-screen bg-slate-950 text-slate-200 font-sans overflow-hidden flex flex-col">
+    <div className={`h-screen w-screen text-slate-200 font-sans overflow-hidden flex flex-col transition-colors duration-1000 ${backgroundClasses[appState]}`}>
       {/* Delete Modal */}
       <DeleteModal 
         isOpen={!!deleteTargetId} 
