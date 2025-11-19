@@ -1613,8 +1613,13 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
 
       {/* Actions */}
       <div className="flex items-center gap-2">
-        {task.recurrence && <Repeat size={14} className="text-cyan-500" />}
-        {task.scheduledDate && <CalendarDays size={14} className="text-slate-500" />}
+        {task.recurrence && <div className="flex items-center gap-1 text-cyan-500" title="Recurring"><Repeat size={14} /></div>}
+        {task.scheduledDate && (
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-800/50 px-2 py-1 rounded-md">
+            <CalendarDays size={14} />
+            <span>{task.scheduledDate}</span>
+          </div>
+        )}
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
           <button
             onClick={(e) => { e.stopPropagation(); setIsSchedulePickerOpen(o => !o); }}
