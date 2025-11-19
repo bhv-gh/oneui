@@ -12,10 +12,12 @@ import {
   Settings2,
   ListPlus
 } from 'lucide-react';
-import { Play, Pause, TimerReset, BrainCircuit, Coffee, XCircle, CalendarDays, CalendarPlus, Save, Trash, Pencil, UploadCloud, DownloadCloud, Repeat, GitMerge, LayoutGrid, AlertTriangle } from 'lucide-react';
+import { Play, Pause, TimerReset, BrainCircuit, Coffee, XCircle, CalendarDays, CalendarPlus, Save, Trash, Pencil, UploadCloud, DownloadCloud, Repeat, GitMerge, LayoutGrid, AlertTriangle, Lightbulb, HelpCircle } from 'lucide-react';
 import Fuse from 'fuse.js';
 import { DayPicker } from 'react-day-picker';
 import { format, parseISO, isToday, addDays, addWeeks, addMonths, differenceInDays, differenceInCalendarWeeks, differenceInMonths, startOfToday } from 'date-fns';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import 'react-day-picker/dist/style.css'; // It's good practice to keep this for base styles
 
 const POMODORO_TIME = 25 * 60;
@@ -26,7 +28,7 @@ const LONG_BREAK_TIME = 15 * 60;
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 // --- Component: Custom Styled Datalist Input ---
-const CustomDatalistInput = ({ value, onChange, options, placeholder }) => {
+const CustomDatalistInput = ({ value, onChange, options, placeholder, onKeyDown }) => {
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef(null);
 
@@ -57,6 +59,7 @@ const CustomDatalistInput = ({ value, onChange, options, placeholder }) => {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => setIsOpen(true)}
+        onKeyDown={onKeyDown}
         placeholder={placeholder}
         className="w-full bg-slate-950/50 text-xs text-slate-400 border border-slate-800 rounded px-2 py-1 focus:border-emerald-500/50 focus:outline-none transition-colors"
       />
@@ -361,15 +364,26 @@ const RecurrenceEditor = ({ recurrence, onSave, onClose }) => {
 
 
 // --- Component: Task Card (The actual node content) ---
-const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, isHighlighted, highlightedRef }) => {
+const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, isHighlighted, highlightedRef, treeData }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showFields, setShowFields] = useState(false);
   const inputRef = useRef(null);
-  const [showIncompleteWarning, setShowIncompleteWarning] = useState(false);
+  const [incompleteWarning, setIncompleteWarning] = useState(null);
   const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false);
   const [isRecurrenceEditorOpen, setIsRecurrenceEditorOpen] = useState(false);
   const schedulePickerRef = useRef(null);
   const recurrenceEditorRef = useRef(null);
+
+  // This is a helper function that needs access to the top-level state.
+  // Instead of passing the function, we pass the data it needs (`treeData`).
+  const findNodeRecursive = (nodes, id) => {
+    for (const node of nodes) {
+      if (node.id === id) return node;
+      const found = findNodeRecursive(node.children || [], id);
+      if (found) return found;
+    }
+    return null;
+  };
 
   // Focus when created empty
   useEffect(() => {
@@ -467,14 +481,34 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
               onClick={(e) => {
                 e.stopPropagation();
                 // If trying to complete a parent task
-                if (!node.isCompleted && node.children.length > 0) {
-                  const allChildrenDone = node.children.every(child => child.isCompleted);
+                // Use originalChildrenCount to check for ALL children, not just visible ones.
+                if (!node.isCompleted && node.originalChildrenCount > 0) {
+                  // We need to find the node in the full tree to check its real children's status.
+                  const fullNode = findNodeRecursive(treeData, node.id);
+                  const allChildrenDone = fullNode.children.every(child => child.isCompleted);
                   if (!allChildrenDone) {
-                    setShowIncompleteWarning(true);
-                    setTimeout(() => setShowIncompleteWarning(false), 3000); // Hide after 3 seconds
+                    const incompleteChildren = fullNode.children.filter(child => !child.isCompleted);
+                    const today = startOfToday();
+
+                    // Check if there are any incomplete tasks that are due today or are overdue/unscheduled.
+                    const hasActionableTasks = incompleteChildren.some(
+                      child => !child.scheduledDate || parseISO(child.scheduledDate) <= today
+                    );
+
+                    let warningMessage = 'Complete all subtasks first.';
+                    // Only show the "Next up" message if ALL incomplete tasks are in the future.
+                    if (!hasActionableTasks) {
+                      const futureTasks = incompleteChildren.filter(child => child.scheduledDate).sort((a, b) => parseISO(a.scheduledDate) - parseISO(b.scheduledDate));
+                      const nextTask = futureTasks[0];
+                      warningMessage = `Next up: "${nextTask.text}" on ${nextTask.scheduledDate}.`;
+                    }
+
+                    setIncompleteWarning(warningMessage);
+                    setTimeout(() => setIncompleteWarning(null), 3000); // Hide after 3 seconds
                     return; // Prevent completion
                   }
                 }
+
                 // Proceed with update if it's being un-completed, has no children, or all children are done.
                 onUpdate(node.id, { isCompleted: !node.isCompleted, isExpanded: false });
               }}
@@ -487,9 +521,9 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
             >
               <Check size={12} strokeWidth={4} />
             </button>
-            {showIncompleteWarning && (
+            {incompleteWarning && (
               <div className="absolute top-1/2 -right-2 transform translate-x-full -translate-y-1/2 w-max bg-slate-800 text-slate-200 text-xs px-3 py-1.5 rounded-lg shadow-lg z-20 animate-in fade-in slide-in-from-left-2 duration-200">
-                Complete all subtasks first.
+                {incompleteWarning}
               </div>
             )}
           </div>
@@ -557,6 +591,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                     value={field.label}
                     onChange={(newValue) => handleUpdateField(field.id, 'label', newValue)}
                     options={allFieldKeys}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
                     placeholder="Label"
                   />
                   <span className="text-slate-600 text-xs">:</span>
@@ -564,6 +599,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                     type="text"
                     value={field.value}
                     onChange={(e) => handleUpdateField(field.id, 'value', e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
                     placeholder="Value"
                     className="flex-1 bg-slate-950/50 text-xs text-slate-200 border border-slate-800 rounded px-2 py-1 focus:border-emerald-500/50 focus:outline-none transition-colors"
                   />
@@ -718,7 +754,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
 };
 
 // --- Component: Recursive Tree Node ---
-const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, highlightedTaskId, highlightedRef }) => {
+const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, highlightedTaskId, highlightedRef, treeData }) => {
   const hasChildren = node.children.length > 0;
 
   return (
@@ -735,6 +771,7 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
         isSearching={isSearching}
         isHighlighted={node.id === highlightedTaskId}
         highlightedRef={highlightedRef}
+        treeData={treeData} // Pass down the full tree data
       />
       
       {/* Children Container */}
@@ -776,6 +813,7 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 isSearching={isSearching}
                 highlightedTaskId={highlightedTaskId}
                 highlightedRef={highlightedRef}
+                treeData={treeData} // And pass it down recursively
               />
             </div>
           ))}
@@ -1294,6 +1332,164 @@ const LogsView = ({ logs, selectedDate, onAddManualLog, onEditLog, onDeleteLog, 
   );
 };
 
+// --- Component: Rich Text Note (for Memory View) ---
+const RichTextNote = ({ note, onUpdate, onDelete }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [content, setContent] = useState(note.text);
+
+  const handleSave = () => {
+    onUpdate(note.id, content);
+    setIsEditing(false);
+  };
+
+  // Custom toolbar options for a cleaner look
+  const quillModules = {
+    toolbar: [
+      [{ 'header': [1, 2, 3, false] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{'list': 'ordered'}, {'list': 'bullet'}],
+      ['link'],
+      ['clean']
+    ],
+  };
+
+  if (isEditing) {
+    return (
+      <div className="bg-slate-900/50 rounded-xl p-4 group relative animate-in fade-in duration-200">
+        <ReactQuill 
+          theme="snow" 
+          value={content} 
+          onChange={setContent}
+          modules={quillModules}
+          className="rich-text-editor" // Custom class for styling
+        />
+        <div className="flex justify-end gap-2 mt-3">
+          <button onClick={() => setIsEditing(false)} className="px-3 py-1 text-xs rounded-md text-slate-300 hover:bg-slate-700">Cancel</button>
+          <button onClick={handleSave} className="px-3 py-1 text-xs rounded-md bg-emerald-600 text-white hover:bg-emerald-700">Save</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      onClick={() => setIsEditing(true)} 
+      className="bg-slate-900/50 rounded-xl p-4 group relative cursor-pointer hover:bg-slate-800/50 transition-colors"
+    >
+      <div 
+        className="prose prose-invert prose-sm max-w-none"
+        dangerouslySetInnerHTML={{ __html: note.text }} 
+      />
+      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button onClick={(e) => { e.stopPropagation(); setIsEditing(true); }} className="p-1 text-slate-500 hover:text-emerald-400"><Pencil size={14} /></button>
+        <button onClick={(e) => { e.stopPropagation(); onDelete(note.id); }} className="p-1 text-slate-500 hover:text-rose-400"><Trash2 size={14} /></button>
+      </div>
+    </div>
+  );
+};
+
+
+// --- Component: Memory View ---
+const MemoryView = ({ memoryData, onUpdate, searchQuery }) => {
+  const { notes, qas } = memoryData;
+
+  const handleAddNote = () => {
+    const newNote = { id: generateId(), text: 'New Note...' };
+    onUpdate({ ...memoryData, notes: [...notes, newNote] });
+  };
+
+  const handleUpdateNote = (id, newText) => {
+    const updatedNotes = notes.map(note => note.id === id ? { ...note, text: newText } : note);
+    onUpdate({ ...memoryData, notes: updatedNotes });
+  };
+
+  const handleDeleteNote = (id) => {
+    onUpdate({ ...memoryData, notes: notes.filter(note => note.id !== id) });
+  };
+
+  const handleAddQA = () => {
+    const newQA = { id: generateId(), question: 'New Question?', answer: 'Answer...' };
+    onUpdate({ ...memoryData, qas: [...qas, newQA] });
+  };
+
+  const handleUpdateQA = (id, field, value) => {
+    const updatedQAs = qas.map(qa => qa.id === id ? { ...qa, [field]: value } : qa);
+    onUpdate({ ...memoryData, qas: updatedQAs });
+  };
+
+  const handleDeleteQA = (id) => {
+    onUpdate({ ...memoryData, qas: qas.filter(qa => qa.id !== id) });
+  };
+
+  const EditableField = ({ value, onChange }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [text, setText] = useState(value);
+
+    const handleBlur = () => {
+      setIsEditing(false);
+      onChange(text);
+    };
+
+    if (isEditing) {
+      return (
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={handleBlur}
+          autoFocus
+          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        />
+      );
+    }
+    return <div onClick={() => setIsEditing(true)} className="w-full p-2 cursor-text whitespace-pre-wrap">{value}</div>;
+  };
+
+  return (
+    <div className="flex-1 overflow-y-auto p-8 animate-in fade-in duration-300 space-y-12">
+      {/* Notes Section */}
+      <div>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-slate-200 flex items-center gap-2"><Lightbulb /> Notes</h2>
+          <button onClick={handleAddNote} className="px-4 py-2 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Note</button>
+        </div>
+        <div className="space-y-4">
+          {notes.map(note => (
+            <RichTextNote 
+              key={note.id} 
+              note={note} 
+              onUpdate={handleUpdateNote} onDelete={handleDeleteNote} />
+          ))}
+        </div>
+      </div>
+
+      {/* Q&A Section */}
+      <div>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-slate-200 flex items-center gap-2"><HelpCircle /> Q & A</h2>
+          <button onClick={handleAddQA} className="px-4 py-2 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Q&A</button>
+        </div>
+        <div className="space-y-4">
+          {qas.map(qa => (
+            <div key={qa.id} className="bg-slate-900/50 rounded-xl p-4 group relative space-y-2">
+              <div>
+                <label className="text-xs text-slate-400 font-bold">Q:</label>
+                <EditableField value={qa.question} onChange={(val) => handleUpdateQA(qa.id, 'question', val)} />
+              </div>
+              <div className="border-t border-slate-800 pt-2">
+                <label className="text-xs text-slate-400 font-bold">A:</label>
+                <EditableField value={qa.answer} onChange={(val) => handleUpdateQA(qa.id, 'answer', val)} />
+              </div>
+              <button onClick={() => handleDeleteQA(qa.id)} className="absolute top-2 right-2 p-1 text-slate-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Component: Task List Item (for List View) ---
 const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete }) => {
   const isCompleted = task.isCompleted && !task.recurrence;
@@ -1695,7 +1891,7 @@ export default function TaskTreeApp() {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
-  
+
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(getTodayDateString);
   const [activeTab, setActiveTab] = useState('today'); // 'today' or 'logs'
@@ -1705,7 +1901,7 @@ export default function TaskTreeApp() {
   const [timeRemaining, setTimeRemaining] = useState(POMODORO_TIME);
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [pomodoroCount, setPomodoroCount] = useState(0);
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [logs, setLogs] = useState(() => {
     try {
@@ -1729,6 +1925,18 @@ export default function TaskTreeApp() {
   const [manualLogModal, setManualLogModal] = useState(null); // { startTime, endTime } or { logToEdit }
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [memoryData, setMemoryData] = useState(() => {
+    try {
+      const savedJSON = localStorage.getItem('flowAppMemoryV1');
+      if (savedJSON) {
+        return JSON.parse(savedJSON);
+      }
+    } catch (e) {
+      console.error("Failed to load memory data from localStorage:", e);
+    }
+    return { notes: [], qas: [] }; // Default structure
+  });
+
   const [isTimelineInteracting, setIsTimelineInteracting] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [highlightedTaskId, setHighlightedTaskId] = useState(null);
@@ -1740,6 +1948,7 @@ export default function TaskTreeApp() {
 
   const highlightedNodeRef = useRef(null);
   const datePickerRef = useRef(null);
+
   const highlightTimeoutRef = useRef(null);
 
   const findNodeRecursive = (nodes, id) => {
@@ -1753,7 +1962,7 @@ export default function TaskTreeApp() {
     }
     return null;
   };
-  
+
   // Logic helpers
   const updateNodeRecursive = (nodes, id, updates) => {
     return nodes.map(node => {
@@ -1796,12 +2005,21 @@ export default function TaskTreeApp() {
   // Core actions
   const handleUpdate = (id, updates) => {
     let newUpdates = { ...updates };
+    let shouldResetChildren = false;
+
     if (newUpdates.isCompleted === true) {
       newUpdates.completionDate = getTodayDateString();
       const task = findNodeRecursive(treeData, id);
+
+      // If the task is a recurring parent, we need to reset its children.
       if (task?.recurrence) {
         const nextDate = calculateNextOccurrence(task, getTodayDateString());
         newUpdates = { ...newUpdates, isCompleted: false, scheduledDate: nextDate ? format(nextDate, 'yyyy-MM-dd') : null };
+        
+        // If it has children, flag that they need to be reset.
+        if (task.children && task.children.length > 0) {
+          shouldResetChildren = true;
+        }
       }
     }
 
@@ -1809,6 +2027,15 @@ export default function TaskTreeApp() {
       // First, apply the initial update (e.g., completing the child task)
       let updatedTree = updateNodeRecursive(prevData, id, newUpdates);
 
+      // If children need to be reset (for a recurring parent)
+      if (shouldResetChildren) {
+        const parentNode = findNodeRecursive(updatedTree, id);
+        if (parentNode && parentNode.children) {
+          for (const child of parentNode.children) {
+            updatedTree = updateNodeRecursive(updatedTree, child.id, { isCompleted: false, completionDate: null });
+          }
+        }
+      }
       // Now, check if this update should trigger a parent completion
       if (newUpdates.isCompleted) {
         const parent = findParentNode(updatedTree, id);
@@ -1869,11 +2096,12 @@ export default function TaskTreeApp() {
 
   const filterTreeByScheduledDate = (nodes, date) => {
     return nodes.map(node => {
+      const originalChildrenCount = node.children?.length || 0;
       const children = node.children ? filterTreeByScheduledDate(node.children, date) : [];
       const hasScheduledChildren = children.some(c => c !== null);
 
       if ((node.scheduledDate === date || isDateAnOccurrence(node, date)) || hasScheduledChildren) {
-        return { ...node, children, isExpanded: hasScheduledChildren };
+        return { ...node, children, isExpanded: hasScheduledChildren, originalChildrenCount };
       }
       return null;
     }).filter(node => node !== null);
@@ -1881,17 +2109,24 @@ export default function TaskTreeApp() {
 
   const filterForTodayView = (nodes, today) => {
     return nodes.map(node => { 
+      const originalChildrenCount = node.children?.length || 0;
+      // Recursively filter children first.
       const visibleChildren = node.children ? filterForTodayView(node.children, today) : [];
 
-      // A task is relevant for today if it's not completed AND its scheduled date is not in the future.
-      const isTaskRelevant = !node.isCompleted && (!node.scheduledDate || node.scheduledDate <= today);
+      // Condition 1: Is the task itself actionable today?
+      // An actionable task is not completed AND is either unscheduled or scheduled for today or earlier.
+      const isTaskActionable = !node.isCompleted && (!node.scheduledDate || (node.scheduledDate && node.scheduledDate <= today));
 
-      // A task is also relevant if it was completed today.
+      // Condition 2: Was the task completed today? We still want to see today's accomplishments.
       const wasCompletedToday = node.completionDate === today;
 
-      // Keep the node if it's relevant, was completed today, or has visible children.
-      if (isTaskRelevant || wasCompletedToday || visibleChildren.length > 0) {
-        return { ...node, children: visibleChildren, isExpanded: (isTaskRelevant || wasCompletedToday) ? node.isExpanded : true };
+      // Condition 3: Does this task have any descendants that are visible?
+      const hasVisibleDescendants = visibleChildren.length > 0;
+
+      // The node should be kept if it's actionable itself, was completed today, or serves as a parent for other visible tasks.
+      if (isTaskActionable || wasCompletedToday || hasVisibleDescendants) {
+        // Return the node, but with its children trimmed to only the visible ones.
+        return { ...node, children: visibleChildren, originalChildrenCount };
       }
       return null;
     }).filter(node => node !== null);
@@ -1901,7 +2136,7 @@ export default function TaskTreeApp() {
     const today = getTodayDateString();
     if (selectedDate < today) return filterTreeByCompletionDate(treeData, selectedDate);
     if (selectedDate > today) return filterTreeByScheduledDate(treeData, selectedDate);
-    // For today, show relevant tasks (not completed and not scheduled for the future).
+    // For today, show relevant tasks (not completed and not scheduled for the future) and add originalChildrenCount.
     return filterForTodayView(treeData, today);
   }, [treeData, selectedDate]);
 
@@ -1930,45 +2165,66 @@ export default function TaskTreeApp() {
     return Array.from(keys);
   }, [treeData]);
 
+  // We need access to the full treeData inside the TaskCard's onClick handler.
+  // Since passing it down is complex, we can define a helper here that has access to the `treeData` state.
+  const findNodeInFullTree = (nodeId) => {
+    return findNodeRecursive(treeData, nodeId);
+  };
+  // To avoid passing the whole function down, we can just use the treeData state directly in the handler.
+  // The below code is a placeholder for the logic now implemented directly in the TaskCard's onClick.
+
   // --- Suggestions Logic ---
   const suggestedTasks = useMemo(() => {
-    const today = startOfToday();
-    let overdueTasks = [];
-    let pendingTodayTasks = [];
+    const todayStr = getTodayDateString();
 
-    const findTasks = (nodes) => {
-      for (const node of nodes) {
-        // A task is a candidate for suggestion if it's not completed AND has a non-empty name.
-        if (!node.isCompleted && node.text && node.text.trim() !== '') {
-          if (node.scheduledDate && parseISO(node.scheduledDate) < today) {
-            overdueTasks.push(node);
-          } else {
-            pendingTodayTasks.push(node);
-          }
-        }
-        if (node.children) {
-          findTasks(node.children);
-        }
-      }
-    };
-
-    findTasks(treeData);
-
-    // Sort overdue tasks by scheduled date, oldest first
-    overdueTasks.sort((a, b) => parseISO(a.scheduledDate) - parseISO(b.scheduledDate));
-
-    let suggestions = overdueTasks;
-
-    // If not enough overdue tasks, supplement with random pending tasks
-    if (suggestions.length < 3) {
-      // Shuffle pending tasks to get random ones
-      const shuffledPending = pendingTodayTasks.sort(() => 0.5 - Math.random());
-      const needed = 3 - suggestions.length;
-      suggestions = [...suggestions, ...shuffledPending.slice(0, needed)];
+    // No suggestions for past dates.
+    if (selectedDate < todayStr) {
+      return [];
     }
 
-    return suggestions.slice(0, 3); // Ensure we only return up to 3
-  }, [treeData]);
+    let tasksForSelectedDate = [];
+    let overdueTasks = [];
+    let otherPendingTasks = [];
+
+    const findTasksRecursive = (nodes) => {
+      nodes.forEach(node => {
+        if (node.isCompleted || !node.text || node.text.trim() === '') {
+          // Skip completed or empty tasks
+        } else if (node.scheduledDate === selectedDate || isDateAnOccurrence(node, selectedDate)) {
+          tasksForSelectedDate.push(node);
+        } else if (selectedDate === todayStr && node.scheduledDate && node.scheduledDate < todayStr) {
+          overdueTasks.push(node);
+        } else if (selectedDate === todayStr && !node.scheduledDate) {
+          otherPendingTasks.push(node);
+        }
+
+        if (node.children) {
+          findTasksRecursive(node.children);
+        }
+      });
+    };
+
+    findTasksRecursive(treeData);
+
+    // If viewing a future date, only show tasks for that day.
+    if (selectedDate > todayStr) {
+      return tasksForSelectedDate.slice(0, 3);
+    }
+
+    // If viewing today, build the prioritized list.
+    if (selectedDate === todayStr) {
+      // 1. Prioritize overdue tasks, oldest first.
+      overdueTasks.sort((a, b) => parseISO(a.scheduledDate) - parseISO(b.scheduledDate));
+      // 2. Add tasks scheduled for today.
+      // 3. Fill the rest with other pending tasks (shuffled for variety).
+      const shuffledPending = otherPendingTasks.sort(() => 0.5 - Math.random());
+
+      const suggestions = [...overdueTasks, ...tasksForSelectedDate, ...shuffledPending];
+      return suggestions.slice(0, 3);
+    }
+
+    return []; // Default to no suggestions
+  }, [treeData, selectedDate]);
 
   const handleSuggestionClick = (taskId) => {
     // Clear any existing timeout to prevent it from clearing a newer highlight.
@@ -1992,6 +2248,15 @@ export default function TaskTreeApp() {
       console.error("Failed to save logs to localStorage:", e);
     }
   }, [logs]);
+
+  useEffect(() => {
+    localStorage.setItem('flowAppMemoryV1', JSON.stringify(memoryData));
+  }, [memoryData]);
+
+  // Clear search query when switching tabs for a cleaner experience
+  useEffect(() => {
+    setSearchQuery('');
+  }, [activeTab]);
 
   // Close date picker on outside click
   useEffect(() => {
@@ -2024,6 +2289,7 @@ export default function TaskTreeApp() {
       const stateToExport = {
         treeData: treeData,
         logs: logs,
+        memoryData: memoryData,
       };
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(stateToExport, null, 2));
       const downloadAnchorNode = document.createElement('a');
@@ -2051,6 +2317,9 @@ export default function TaskTreeApp() {
     reader.onload = (event) => {
       try {
         const importedState = JSON.parse(event.target.result);
+        if (importedState.memoryData) {
+          setMemoryData(importedState.memoryData);
+        }
         if (importedState.treeData && Array.isArray(importedState.logs)) {
           setTreeData(importedState.treeData);
           // Revive date objects from strings
@@ -2079,7 +2348,12 @@ export default function TaskTreeApp() {
     const list = [];
     const traverse = (nodes) => {
       nodes.forEach(node => {
-        list.push({ id: node.id, text: node.text });
+        // Combine task text and all field labels/values into one string for searching.
+        const fieldsText = (node.fields || [])
+          .map(field => `${field.label || ''} ${field.value || ''}`)
+          .join(' ');
+
+        list.push({ id: node.id, text: node.text, searchableText: `${node.text || ''} ${fieldsText}` });
         if (node.children) traverse(node.children);
       });
     };
@@ -2087,16 +2361,35 @@ export default function TaskTreeApp() {
     return list;
   }, [displayedTreeData]);
 
+  const memorySearchCorpus = useMemo(() => {
+    const notes = memoryData.notes.map(n => ({ type: 'note', id: n.id, text: n.text }));
+    const qas = memoryData.qas.map(qa => ({ type: 'qa', id: qa.id, text: `${qa.question} ${qa.answer}` }));
+    return [...notes, ...qas];
+  }, [memoryData]);
+
   const fuse = useMemo(() => new Fuse(flattenedTree, {
-    keys: ['text'],
+    keys: ['searchableText'],
     includeScore: true,
     threshold: 0.4,
   }), [flattenedTree]); // Re-create fuse instance when visible tasks change
 
+  const memoryFuse = useMemo(() => new Fuse(memorySearchCorpus, {
+    keys: ['text'],
+    includeScore: true,
+    threshold: 0.4,
+  }), [memorySearchCorpus]);
+
   // This effect runs when the query changes to update the search results.
   useEffect(() => {
     if (searchQuery) {
-      const results = fuse.search(searchQuery);
+      let results;
+      if (activeTab === 'memory') {
+        results = memoryFuse.search(searchQuery);
+        // For memory, we don't have a highlight/scroll, so we just filter the view.
+        // The filtering will happen inside the MemoryView component.
+      } else {
+        results = fuse.search(searchQuery);
+      }
       setSearchResults(results);
       setSearchIndex(0); // Reset to the first result whenever the query changes
     } else {
@@ -2104,7 +2397,7 @@ export default function TaskTreeApp() {
       setHighlightedTaskId(null);
     }
   }, [searchQuery, fuse]);
-
+  
   // This effect runs when the highlighted node is rendered to the DOM, and it handles centering.
   useEffect(() => {
     if (highlightedNodeRef.current) {
@@ -2160,15 +2453,17 @@ export default function TaskTreeApp() {
       }
 
       // Handle search query modifications
-      if (e.key === 'Backspace') setSearchQuery(q => q.slice(0, -1));
-      else if (e.key === 'Escape') setSearchQuery('');
-      else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) setSearchQuery(q => q + e.key);
+      if (activeTab === 'today') {
+        if (e.key === 'Backspace') setSearchQuery(q => q.slice(0, -1));
+        else if (e.key === 'Escape') setSearchQuery('');
+        else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) setSearchQuery(q => q + e.key);
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
     // Dependencies are needed so the handler has the latest searchResults and searchIndex
-  }, [searchResults, searchIndex]);
+  }, [searchResults, searchIndex, activeTab]);
 
   // --- Timer Logic ---
   useEffect(() => {
@@ -2430,6 +2725,29 @@ export default function TaskTreeApp() {
     }
   `;
 
+  // Custom styles to make ReactQuill match the app's theme
+  const quillStyle = `
+    .rich-text-editor .ql-toolbar {
+      border-radius: 8px 8px 0 0;
+      border-color: #334155; /* slate-700 */
+    }
+    .rich-text-editor .ql-container {
+      border-radius: 0 0 8px 8px;
+      border-color: #334155; /* slate-700 */
+      color: #cbd5e1; /* slate-300 */
+      min-height: 150px;
+    }
+    .rich-text-editor .ql-editor {
+      font-size: 14px;
+    }
+    .rich-text-editor .ql-snow .ql-stroke {
+      stroke: #94a3b8; /* slate-400 */
+    }
+    .rich-text-editor .ql-snow .ql-picker-label {
+      color: #94a3b8; /* slate-400 */
+    }
+  `;
+
   if (focusedTask) {
     return <FocusView task={focusedTask} timerProps={timerProps} onExit={handleExitFocus} appState={appState} />;
   }
@@ -2489,6 +2807,7 @@ export default function TaskTreeApp() {
   return (
     <div className={`h-screen w-screen text-slate-200 font-sans overflow-hidden flex flex-col transition-colors duration-1000 ${backgroundClasses[appState]}`}>
       <style>{scrollbarHideStyle}</style>
+      <style>{quillStyle}</style>
 
       {/* Delete Modal */}
       <DeleteModal 
@@ -2508,6 +2827,7 @@ export default function TaskTreeApp() {
           <div className="flex gap-1 rounded-lg bg-slate-900/80 p-1 border border-slate-800 backdrop-blur-sm">
             <button onClick={() => setActiveTab('today')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'today' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Today</button>
             <button onClick={() => setActiveTab('logs')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'logs' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Logs</button>
+            <button onClick={() => setActiveTab('memory')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'memory' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Memory</button>
           </div>
           <button 
             onClick={() => setIsSettingsOpen(true)}
@@ -2593,6 +2913,7 @@ export default function TaskTreeApp() {
                         isTimerActive={isTimerActive}
                         isSearching={isSearching}
                         highlightedTaskId={highlightedTaskId}
+                        treeData={treeData} // Pass the full tree data
                         highlightedRef={highlightedNodeRef}
                       />
                     ))}
@@ -2645,6 +2966,22 @@ export default function TaskTreeApp() {
             );
           })()
         )}
+        {activeTab === 'memory' && (() => {
+          const memoryResults = isSearching ? memoryFuse.search(searchQuery).map(r => r.item) : [...memoryData.notes, ...memoryData.qas];
+          const filteredNotes = memoryResults.filter(item => 'text' in item && !('question' in item));
+          const filteredQAs = memoryResults.filter(item => 'question' in item);
+
+          return (
+            <MemoryView
+              searchQuery={searchQuery}
+              memoryData={{
+                notes: isSearching ? filteredNotes : memoryData.notes,
+                qas: isSearching ? filteredQAs : memoryData.qas,
+              }}
+              onUpdate={setMemoryData}
+            />
+          );
+        })()}
         {activeTab === 'logs' && <LogsView 
           logs={logs} 
           selectedDate={selectedDate} 
