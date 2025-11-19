@@ -13,7 +13,7 @@ import {
   Settings2,
   ListPlus
 } from 'lucide-react';
-import { Play, Pause, TimerReset, BrainCircuit, Coffee, XCircle, CalendarDays, CalendarPlus, Save, Trash, Pencil, UploadCloud, DownloadCloud, Repeat } from 'lucide-react';
+import { Play, Pause, TimerReset, BrainCircuit, Coffee, XCircle, CalendarDays, CalendarPlus, Save, Trash, Pencil, UploadCloud, DownloadCloud, Repeat, GitMerge, LayoutGrid } from 'lucide-react';
 import Fuse from 'fuse.js';
 import { DayPicker } from 'react-day-picker';
 import { format, parseISO, isToday, addDays, addWeeks, addMonths, differenceInDays, differenceInCalendarWeeks, differenceInMonths } from 'date-fns';
@@ -939,6 +939,8 @@ const LogsView = ({ logs, selectedDate, onAddManualLog, onEditLog, onDeleteLog, 
 
   const dateForLogs = parseISO(selectedDate);
   const timelineRef = useRef(null);
+  const scrollContainerRef = useRef(null);
+  const [currentTimeTop, setCurrentTimeTop] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [interaction, setInteraction] = useState(null); // { type: 'move' | 'resize-top' | 'resize-bottom', logId: string, initialY: number, initialStartTime: Date, initialEndTime: Date }
 
@@ -947,9 +949,39 @@ const LogsView = ({ logs, selectedDate, onAddManualLog, onEditLog, onDeleteLog, 
 
   const [dragStartTime, setDragStartTime] = useState(null);
   const [dragCurrentY, setDragCurrentY] = useState(null);
+  const [processedLogs, setProcessedLogs] = useState([]);
 
   // Ensure dateForLogs is a valid Date object, falling back to today if invalid
   const validDateForLogs = isNaN(dateForLogs.getTime()) ? new Date() : dateForLogs;
+
+  // Effect to calculate and update the current time indicator's position
+  useEffect(() => {
+    const calculateTop = () => {
+      const now = new Date();
+      const startOfDay = new Date(now).setHours(0, 0, 0, 0);
+      const totalDayMilliseconds = 24 * 60 * 60 * 1000;
+      const elapsedMilliseconds = now.getTime() - startOfDay;
+      return (elapsedMilliseconds / totalDayMilliseconds) * 100;
+    };
+
+    setCurrentTimeTop(calculateTop());
+
+    const interval = setInterval(() => {
+      setCurrentTimeTop(calculateTop());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Effect to scroll the timeline to the current time on initial render
+  useEffect(() => {
+    if (scrollContainerRef.current && selectedDate === getTodayDateString()) {
+      const container = scrollContainerRef.current;
+      const scrollPosition = (currentTimeTop / 100) * container.scrollHeight;
+      // Scroll to center the current time line in the viewport
+      container.scrollTop = scrollPosition - (container.clientHeight / 2);
+    }
+  }, [currentTimeTop, selectedDate]); // Run when component mounts or date changes to today
 
   const getPositionAndHeight = (startTime, endTime) => {
     const startOfDay = new Date(startTime).setHours(0, 0, 0, 0);
@@ -1085,56 +1117,65 @@ const LogsView = ({ logs, selectedDate, onAddManualLog, onEditLog, onDeleteLog, 
     setTempLog(log); // Set the initial log for temporary updates
   };
 
-  const processedLogs = useMemo(() => {
+  // This effect recalculates the layout of logs whenever the logs themselves or the selected date change.
+  useEffect(() => {
     const dailyLogs = logs.filter(log => {
-    const isValidLog = log.startTime instanceof Date && !isNaN(log.startTime) && log.endTime instanceof Date && !isNaN(log.endTime);
-    if (!isValidLog) return false;
-    return format(log.startTime, 'yyyy-MM-dd') === selectedDate;
-  }).sort((a, b) => a.startTime - b.startTime);
+      const isValidLog = log.startTime instanceof Date && !isNaN(log.startTime) && log.endTime instanceof Date && !isNaN(log.endTime);
+      if (!isValidLog) return false;
+      return format(log.startTime, 'yyyy-MM-dd') === selectedDate;
+    }).sort((a, b) => a.startTime - b.startTime);
 
+    if (dailyLogs.length === 0) {
+      setProcessedLogs([]);
+      return;
+    }
+
+    // This algorithm determines how to stack overlapping logs side-by-side.
     const columns = [];
-    const processed = [];
+    const logsWithColumnData = [];
 
     dailyLogs.forEach(log => {
       let placed = false;
-      // Find the first column where this log can fit
       for (let i = 0; i < columns.length; i++) {
         if (log.startTime >= columns[i]) {
-          processed.push({ ...log, col: i });
+          logsWithColumnData.push({ ...log, col: i });
           columns[i] = log.endTime;
           placed = true;
           break;
         }
       }
-      // If it didn't fit in any existing column, create a new one
       if (!placed) {
-        processed.push({ ...log, col: columns.length });
+        logsWithColumnData.push({ ...log, col: columns.length });
         columns.push(log.endTime);
       }
     });
 
-    // Now determine the width and left offset for each log based on total columns
-    return processed.map(log => {
-      const overlapping = processed.filter(otherLog =>
+    const finalProcessedLogs = logsWithColumnData.map(log => {
+      const overlapping = logsWithColumnData.filter(otherLog =>
         log.id !== otherLog.id &&
         log.startTime < otherLog.endTime &&
         log.endTime > otherLog.startTime
       );
 
-      const maxCols = overlapping.reduce((max, ol) => Math.max(max, ol.col), log.col) + 1;
+      const concurrentCols = overlapping.reduce((max, ol) => Math.max(max, ol.col), log.col) + 1;
 
       return {
         ...log,
         display: {
-          width: `${100 / maxCols}%`,
-          left: `${(log.col / maxCols) * 100}%`,
+          width: `${100 / concurrentCols}%`,
+          left: `${(log.col / concurrentCols) * 100}%`,
         }
       };
     });
+
+    setProcessedLogs(finalProcessedLogs);
   }, [logs, selectedDate]);
 
   return (
-    <div className="flex-1 px-8 md:px-12 pb-8 overflow-y-auto animate-in fade-in duration-300">
+    <div 
+      ref={scrollContainerRef} // This ref is for scrolling to current time
+      className="flex-1 h-0 px-8 md:px-12 pb-8 overflow-y-auto animate-in fade-in duration-300"
+    >
       <h2 className="text-2xl font-bold text-slate-200 mb-6">
         Activity Log for {format(validDateForLogs, 'MMMM d, yyyy')}
       </h2>
@@ -1160,6 +1201,16 @@ const LogsView = ({ logs, selectedDate, onAddManualLog, onEditLog, onDeleteLog, 
           {hours.map(hour => (
             <div key={hour} className="h-24 border-t border-slate-800/80"></div>
           ))}
+
+          {/* Current Time Indicator */}
+          {selectedDate === getTodayDateString() && (
+            <div 
+              className="absolute w-full h-px bg-rose-400 z-10"
+              style={{ top: `${currentTimeTop}%` }}
+            >
+              <div className="absolute -left-1.5 -top-1.5 w-3 h-3 bg-rose-400 rounded-full border-2 border-slate-900"></div>
+            </div>
+          )}
 
           {/* Log Entries */}
           {processedLogs.map(log => {
@@ -1225,6 +1276,116 @@ const LogsView = ({ logs, selectedDate, onAddManualLog, onEditLog, onDeleteLog, 
     </div>
   );
 };
+
+// --- Component: Task List Item (for List View) ---
+const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd }) => {
+  const isCompleted = task.isCompleted && !task.recurrence;
+  const indentationStyle = {
+    // 1rem base padding + 1.5rem for each level of nesting
+    paddingLeft: `${1 + path.length * 1.5}rem` 
+  };
+
+  return (
+    <div 
+      className={`flex items-center gap-4 px-4 py-3 rounded-lg transition-colors group ${isCompleted ? 'opacity-50' : ''} hover:bg-slate-800/50`}
+      style={indentationStyle}
+    >
+      {/* Checkbox */}
+      <button 
+        onClick={(e) => {
+          e.stopPropagation();
+          onUpdate(task.id, { isCompleted: !task.isCompleted });
+        }}
+        className={`flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full border transition-all duration-300 ${
+          task.isCompleted 
+            ? 'bg-emerald-500 border-emerald-500 text-white' 
+            : 'border-slate-500 text-transparent group-hover:border-emerald-400'
+        }`}
+      >
+        <Check size={12} strokeWidth={4} />
+      </button>
+
+      {/* Task Info */}
+      <div className="flex-1 min-w-0">
+        {path.length > 0 && (
+          <div className="text-xs text-slate-500 truncate">
+            {path.join(' / ')}
+          </div>
+        )}
+        <p className={`font-medium text-slate-200 truncate ${isCompleted ? 'line-through' : ''}`}>
+          {task.text || "Untitled Task"}
+        </p>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-2">
+        {task.recurrence && <Repeat size={14} className="text-cyan-500" />}
+        {task.scheduledDate && <CalendarDays size={14} className="text-slate-500" />}
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={(e) => { e.stopPropagation(); onAdd(task.id); }}
+            className="p-2 rounded-md text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+            title="Add Subtask"
+          >
+            <Plus size={16} />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onStartFocus(task.id); }}
+            className="p-2 rounded-md text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+            title="Focus on this task"
+          >
+            <Play size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Component: List View ---
+const ListView = ({ tasks, onUpdate, onStartFocus, onAdd }) => {
+  const flattenedTasks = useMemo(() => {
+    const flatten = (nodes, path = []) => {
+      let list = [];
+      for (const node of nodes) {
+        // We only want to display leaf nodes or tasks that are relevant themselves
+        // For simplicity in list view, let's show all nodes.
+        list.push({ task: node, path });
+        if (node.children) {
+          list = list.concat(flatten(node.children, [...path, node.text || "Untitled"]));
+        }
+      }
+      return list;
+    };
+    return flatten(tasks);
+  }, [tasks]);
+
+  if (flattenedTasks.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-slate-600">
+        No tasks for this view.
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8 animate-in fade-in duration-300">
+      <div className="max-w-4xl mx-auto space-y-1">
+        {flattenedTasks.map(({ task, path }) => (
+          <TaskListItem 
+            key={task.id}
+            task={task}
+            path={path}
+            onUpdate={onUpdate}
+            onStartFocus={onStartFocus}
+            onAdd={onAdd}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
 
 const getTodayDateString = () => {
   const today = new Date();
@@ -1469,6 +1630,10 @@ export default function TaskTreeApp() {
   const [searchResults, setSearchResults] = useState([]);
   const [highlightedTaskId, setHighlightedTaskId] = useState(null);
   const [searchIndex, setSearchIndex] = useState(0);
+
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem('flowAppViewMode') || 'tree';
+  });
 
   const highlightedNodeRef = useRef(null);
   const datePickerRef = useRef(null);
@@ -1875,8 +2040,8 @@ export default function TaskTreeApp() {
         startTime: activeSession.startTime,
         endTime: endTime,
       };
-      // Only create log if it's longer than a few seconds
-      if (endTime.getTime() - activeSession.startTime.getTime() > 3000) {
+      // Only create log if it's longer than 5 minutes
+      if (endTime.getTime() - activeSession.startTime.getTime() > 5 * 60 * 1000) {
         setLogs(prevLogs => [...prevLogs, newLog]);
       }
       setActiveSession(null);
@@ -1926,7 +2091,7 @@ export default function TaskTreeApp() {
           startTime: activeSession.startTime,
           endTime: endTime,
         };
-        if (endTime.getTime() - activeSession.startTime.getTime() > 3000) {
+        if (endTime.getTime() - activeSession.startTime.getTime() > 5 * 60 * 1000) {
           setLogs(prevLogs => [...prevLogs, newLog]);
         }
         setActiveSession(null);
@@ -1993,6 +2158,7 @@ export default function TaskTreeApp() {
   const handleDeleteLog = (logId) => {
     setLogs(prevLogs => prevLogs.filter(log => log.id !== logId));
   };
+
 
   const handleUpdateLogTime = (logId, newStartTime, newEndTime) => {
     setLogs(prevLogs => prevLogs.map(log => log.id === logId ? { ...log, startTime: newStartTime, endTime: newEndTime } : log).sort((a, b) => a.startTime - b.startTime));
@@ -2137,6 +2303,17 @@ export default function TaskTreeApp() {
           </button>
         </div>
 
+        {activeTab === 'today' && (
+          <div className="flex items-center gap-1 rounded-lg bg-slate-900/80 p-1 border border-slate-800 backdrop-blur-sm pointer-events-auto">
+            <button onClick={() => setViewMode('tree')} className={`p-2 rounded-md transition-colors ${viewMode === 'tree' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`} title="Tree View">
+              <GitMerge size={18} />
+            </button>
+            <button onClick={() => setViewMode('list')} className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`} title="List View">
+              <LayoutGrid size={18} />
+            </button>
+          </div>
+        )}
+
         <div className="pointer-events-auto flex gap-2 bg-slate-900/90 backdrop-blur p-2 rounded-xl border border-slate-800">
           <button onClick={() => setScale(s => Math.max(0.5, s - 0.1))} className="p-2 hover:bg-white/10 rounded-lg"><Minimize size={18} /></button>
           <span className="flex items-center px-2 text-sm font-mono text-slate-400">{Math.round(scale * 100)}%</span>
@@ -2169,8 +2346,8 @@ export default function TaskTreeApp() {
       <SearchOverlay query={searchQuery} resultCount={searchResults.length} currentIndex={searchIndex} />
 
       {/* Main Content Area */}
-      <div className="pt-24 flex-1 flex flex-col">
-        {activeTab === 'today' && (
+      <div className="pt-24 flex-1 flex flex-col min-h-0">
+        {activeTab === 'today' && viewMode === 'tree' && (
           <div
             data-canvas-area
             className={`flex-1 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} animate-in fade-in duration-300`}
@@ -2221,6 +2398,23 @@ export default function TaskTreeApp() {
               </div>
             </div>
           </div>
+        )}
+        {activeTab === 'today' && viewMode === 'list' && (
+          (() => {
+            // If searching, filter the displayed data. Otherwise, show all of it.
+            const listTasks = isSearching 
+              ? searchResults.map(result => findNodeRecursive(displayedTreeData, result.item.id)).filter(Boolean)
+              : displayedTreeData;
+
+            return (
+              <ListView 
+                tasks={listTasks}
+                onUpdate={handleUpdate}
+                onStartFocus={handleStartFocus}
+                onAdd={handleAddSubtask}
+              />
+            );
+          })()
         )}
         {activeTab === 'logs' && <LogsView 
           logs={logs} 
