@@ -1278,18 +1278,82 @@ const LogsView = ({ logs, selectedDate, onAddManualLog, onEditLog, onDeleteLog, 
 };
 
 // --- Component: Task List Item (for List View) ---
-const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd }) => {
+const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete }) => {
   const isCompleted = task.isCompleted && !task.recurrence;
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false);
+  const [isRecurrenceEditorOpen, setIsRecurrenceEditorOpen] = useState(false);
+  const inputRef = useRef(null);
+  const schedulePickerRef = useRef(null);
+  const recurrenceEditorRef = useRef(null);
+
   const indentationStyle = {
     // 1rem base padding + 1.5rem for each level of nesting
     paddingLeft: `${1 + path.length * 1.5}rem` 
   };
 
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isEditing]);
+
+  // Close popovers on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (schedulePickerRef.current && !schedulePickerRef.current.contains(event.target)) {
+        setIsSchedulePickerOpen(false);
+      }
+      if (recurrenceEditorRef.current && !recurrenceEditorRef.current.contains(event.target)) {
+        setIsRecurrenceEditorOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      setIsEditing(false);
+    }
+  };
+
+  const handleScheduleSelect = (date) => {
+    const newScheduledDate = date ? format(date, 'yyyy-MM-dd') : null;
+    onUpdate(task.id, { scheduledDate: newScheduledDate });
+    setIsSchedulePickerOpen(false);
+  };
+
+  const handleRecurrenceSave = (newRecurrence) => {
+    onUpdate(task.id, { recurrence: newRecurrence });
+    setIsRecurrenceEditorOpen(false);
+  };
+
   return (
     <div 
-      className={`flex items-center gap-4 px-4 py-3 rounded-lg transition-colors group ${isCompleted ? 'opacity-50' : ''} hover:bg-slate-800/50`}
+      className={`relative flex items-center gap-4 px-4 py-3 rounded-lg transition-colors group ${isCompleted ? 'opacity-50' : ''} hover:bg-slate-800/50`}
       style={indentationStyle}
     >
+      {/* Schedule Picker Popover */}
+      {isSchedulePickerOpen && (
+        <div ref={schedulePickerRef} className="absolute top-full right-4 mt-2 z-30 animate-in fade-in duration-100">
+          <CustomDatePicker
+            selected={task.scheduledDate ? parseISO(task.scheduledDate) : undefined}
+            onSelect={handleScheduleSelect}
+          />
+        </div>
+      )}
+      {/* Recurrence Editor Popover */}
+      {isRecurrenceEditorOpen && (
+        <div ref={recurrenceEditorRef} className="absolute top-full right-4 mt-2 z-30 animate-in fade-in duration-100">
+          <RecurrenceEditor
+            recurrence={task.recurrence}
+            onSave={handleRecurrenceSave}
+            onClose={() => setIsRecurrenceEditorOpen(false)}
+          />
+        </div>
+      )}
+
       {/* Checkbox */}
       <button 
         onClick={(e) => {
@@ -1312,22 +1376,59 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd }) => {
             {path.join(' / ')}
           </div>
         )}
-        <p className={`font-medium text-slate-200 truncate ${isCompleted ? 'line-through' : ''}`}>
-          {task.text || "Untitled Task"}
-        </p>
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={task.text}
+            onChange={(e) => onUpdate(task.id, { text: e.target.value })}
+            onBlur={() => setIsEditing(false)}
+            onKeyDown={handleKeyDown}
+            className="bg-transparent text-slate-200 font-medium w-full outline-none border-b border-emerald-500/50"
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <p 
+            onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+            className={`font-medium text-slate-200 truncate cursor-text ${isCompleted ? 'line-through' : ''}`}
+          >
+            {task.text || "Untitled Task"}
+          </p>
+        )}
       </div>
 
       {/* Actions */}
       <div className="flex items-center gap-2">
         {task.recurrence && <Repeat size={14} className="text-cyan-500" />}
         {task.scheduledDate && <CalendarDays size={14} className="text-slate-500" />}
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <button
+            onClick={(e) => { e.stopPropagation(); setIsSchedulePickerOpen(o => !o); }}
+            className="p-2 rounded-md text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+            title="Schedule Task"
+          >
+            <CalendarPlus size={16} />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setIsRecurrenceEditorOpen(o => !o); }}
+            className="p-2 rounded-md text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+            title="Set Recurrence"
+          >
+            <Repeat size={16} />
+          </button>
           <button
             onClick={(e) => { e.stopPropagation(); onAdd(task.id); }}
             className="p-2 rounded-md text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
             title="Add Subtask"
           >
             <Plus size={16} />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onRequestDelete(task.id); }}
+            className="p-2 rounded-md text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+            title="Delete Task"
+          >
+            <Trash2 size={16} />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onStartFocus(task.id); }}
@@ -1343,7 +1444,7 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd }) => {
 };
 
 // --- Component: List View ---
-const ListView = ({ tasks, onUpdate, onStartFocus, onAdd }) => {
+const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAddRoot, selectedDate }) => {
   const flattenedTasks = useMemo(() => {
     const flatten = (nodes, path = []) => {
       let list = [];
@@ -1362,8 +1463,20 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd }) => {
 
   if (flattenedTasks.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center text-slate-600">
-        No tasks for this view.
+      <div className="flex-1 flex items-center justify-center">
+        {selectedDate < getTodayDateString() ? (
+          <div className="text-slate-600">No tasks were completed on this day.</div>
+        ) : (
+          <button 
+            onClick={onAddRoot}
+            className="w-64 h-24 rounded-2xl border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-600 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all"
+          >
+            <div className="flex flex-col items-center gap-2">
+              <Plus size={24} />
+              <span className="font-medium">Add a Task</span>
+            </div>
+          </button>
+        )}
       </div>
     );
   }
@@ -1379,6 +1492,7 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd }) => {
             onUpdate={onUpdate}
             onStartFocus={onStartFocus}
             onAdd={onAdd}
+            onRequestDelete={onRequestDelete}
           />
         ))}
       </div>
@@ -1426,40 +1540,53 @@ const isDateAnOccurrence = (task, targetDateStr) => {
   }
 };
 
-const calculateNextOccurrence = (task) => {
+const calculateNextOccurrence = (task, completionDateStr) => {
   if (!task.recurrence || !task.scheduledDate) return null;
 
   const { frequency, interval, daysOfWeek } = task.recurrence;
-  const currentScheduledDate = parseISO(task.scheduledDate);
+  const completionDate = completionDateStr ? parseISO(completionDateStr) : new Date();
+  let nextDate = parseISO(task.scheduledDate);
 
-  switch (frequency) {
-    case 'daily':
-      return addDays(currentScheduledDate, interval);
-    case 'weekly': {
-      if (!daysOfWeek || daysOfWeek.length === 0) return addWeeks(currentScheduledDate, interval);
-      
-      let nextDate = new Date(currentScheduledDate);
-      const sortedDays = [...daysOfWeek].sort();
-      
-      // Find the next valid day in the current week
-      for (let i = 0; i < 7; i++) {
-        nextDate = addDays(currentScheduledDate, i + 1);
-        if (sortedDays.includes(nextDate.getDay())) {
-          return nextDate;
+  // This loop "catches up" the task by advancing its date until it's past the completion date.
+  while (nextDate <= completionDate) {
+    switch (frequency) {
+      case 'daily':
+        nextDate = addDays(nextDate, interval);
+        break;
+      case 'weekly': {
+        if (!daysOfWeek || daysOfWeek.length === 0) {
+          nextDate = addWeeks(nextDate, interval);
+          break;
         }
+        
+        let potentialNextDate = new Date(nextDate);
+        const sortedDays = [...daysOfWeek].sort();
+        let foundNext = false;
+
+        // Look for the next valid day, starting from the day after the current `nextDate`
+        for (let i = 1; i <= 7; i++) {
+          potentialNextDate = addDays(nextDate, i);
+          if (sortedDays.includes(potentialNextDate.getDay())) {
+            nextDate = potentialNextDate;
+            foundNext = true;
+            break;
+          }
+        }
+        // If no valid day is found in the next 7 days, jump by the interval
+        if (!foundNext) {
+          nextDate = addWeeks(nextDate, interval);
+        }
+        break;
       }
-      // If no valid day in the current week, jump to the first valid day of the next interval week
-      nextDate = addWeeks(currentScheduledDate, interval);
-      while (!sortedDays.includes(nextDate.getDay())) {
-        nextDate = addDays(nextDate, 1);
-      }
-      return nextDate;
+      case 'monthly':
+        nextDate = addMonths(nextDate, interval);
+        break;
+      default:
+        // If frequency is unknown, break the loop to prevent an infinite loop
+        return null;
     }
-    case 'monthly':
-      return addMonths(currentScheduledDate, interval);
-    default:
-      return null;
   }
+  return nextDate;
 };
 
 // --- Main App Component ---
@@ -1614,7 +1741,7 @@ export default function TaskTreeApp() {
     if (newUpdates.isCompleted === true) {
       const task = findNodeRecursive(treeData, id);
       if (task?.recurrence) {
-        const nextDate = calculateNextOccurrence(task);
+        const nextDate = calculateNextOccurrence(task, getTodayDateString());
         newUpdates = { ...newUpdates, isCompleted: false, scheduledDate: nextDate ? format(nextDate, 'yyyy-MM-dd') : null };
         // Optionally, you could create a separate, completed instance here for logging.
         // For now, we just advance the date.
@@ -2279,41 +2406,50 @@ export default function TaskTreeApp() {
               className="min-w-max min-h-full p-20 flex justify-center items-start origin-top-left"
               style={{ transform: `scale(${scale}) translate(${pan.x}px, ${pan.y}px)`, transition: isDragging ? 'none' : 'transform 0.2s' }}
             >
-              <div className="flex gap-16">
-                 {displayedTreeData.map(node => (
-                   <TreeNode 
-                     key={node.id} 
-                     node={node} 
-                     onUpdate={handleUpdate} 
-                     onAdd={handleAddSubtask} 
-                     onRequestDelete={handleRequestDelete}
-                     allFieldKeys={allFieldKeys}
-                     onStartFocus={handleStartFocus}
-                     focusedTaskId={focusedTaskId}
-                     isTimerActive={isTimerActive}
-                     isSearching={isSearching}
-                     highlightedTaskId={highlightedTaskId}
-                     highlightedRef={highlightedNodeRef}
-                   />
-                 ))}
-                 
-                 {/* Add Root Placeholder - only on Today view */}
-                 {selectedDate >= getTodayDateString() && (
-                   <button 
-                     onClick={handleAddRoot}
-                     className="w-64 h-24 rounded-2xl border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-600 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all"
-                   >
-                     <div className="flex flex-col items-center gap-2">
-                       <Plus size={24} />
-                       <span className="font-medium">New Root</span>
-                     </div>
-                   </button>
-                 )}
-                 {displayedTreeData.length === 0 && selectedDate !== getTodayDateString() && (
-                     <div className="text-slate-600">
-                       {selectedDate < getTodayDateString() ? "No tasks were completed on this day." : "No tasks scheduled for this day."}
-                     </div>
-                 )}
+              <div className="flex gap-16 items-start">
+                {displayedTreeData.length > 0 ? (
+                  <>
+                    {displayedTreeData.map(node => (
+                      <TreeNode 
+                        key={node.id} 
+                        node={node} 
+                        onUpdate={handleUpdate} 
+                        onAdd={handleAddSubtask} 
+                        onRequestDelete={handleRequestDelete}
+                        allFieldKeys={allFieldKeys}
+                        onStartFocus={handleStartFocus}
+                        focusedTaskId={focusedTaskId}
+                        isTimerActive={isTimerActive}
+                        isSearching={isSearching}
+                        highlightedTaskId={highlightedTaskId}
+                        highlightedRef={highlightedNodeRef}
+                      />
+                    ))}
+                    {selectedDate >= getTodayDateString() && (
+                      <button onClick={handleAddRoot} className="w-64 h-24 rounded-2xl border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-600 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all">
+                        <div className="flex flex-col items-center gap-2">
+                          <Plus size={24} />
+                          <span className="font-medium">New Root</span>
+                        </div>
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  // Empty state: show a message or a button to add a task
+                  selectedDate < getTodayDateString() ? (
+                    <div className="text-slate-600">No tasks were completed on this day.</div>
+                  ) : (
+                    <button 
+                      onClick={handleAddRoot}
+                      className="w-64 h-24 rounded-2xl border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-600 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all"
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <Plus size={24} />
+                        <span className="font-medium">Add a Task</span>
+                      </div>
+                    </button>
+                  )
+                )}
               </div>
             </div>
           </div>
@@ -2331,6 +2467,9 @@ export default function TaskTreeApp() {
                 onUpdate={handleUpdate}
                 onStartFocus={handleStartFocus}
                 onAdd={handleAddSubtask}
+                onRequestDelete={handleRequestDelete}
+                onAddRoot={handleAddRoot}
+                selectedDate={selectedDate}
               />
             );
           })()
