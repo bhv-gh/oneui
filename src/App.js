@@ -1369,7 +1369,7 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd }) => {
   }
 
   return (
-    <div className="p-8 animate-in fade-in duration-300">
+    <div className="flex-1 overflow-y-auto p-8 animate-in fade-in duration-300">
       <div className="max-w-4xl mx-auto space-y-1">
         {flattenedTasks.map(({ task, path }) => (
           <TaskListItem 
