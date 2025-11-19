@@ -8,15 +8,14 @@ import {
   ChevronUp,
   Maximize,
   Minimize,
-  AlertTriangle,
   X,
   Settings2,
   ListPlus
 } from 'lucide-react';
-import { Play, Pause, TimerReset, BrainCircuit, Coffee, XCircle, CalendarDays, CalendarPlus, Save, Trash, Pencil, UploadCloud, DownloadCloud, Repeat, GitMerge, LayoutGrid } from 'lucide-react';
+import { Play, Pause, TimerReset, BrainCircuit, Coffee, XCircle, CalendarDays, CalendarPlus, Save, Trash, Pencil, UploadCloud, DownloadCloud, Repeat, GitMerge, LayoutGrid, AlertTriangle } from 'lucide-react';
 import Fuse from 'fuse.js';
 import { DayPicker } from 'react-day-picker';
-import { format, parseISO, isToday, addDays, addWeeks, addMonths, differenceInDays, differenceInCalendarWeeks, differenceInMonths } from 'date-fns';
+import { format, parseISO, isToday, addDays, addWeeks, addMonths, differenceInDays, differenceInCalendarWeeks, differenceInMonths, startOfToday } from 'date-fns';
 import 'react-day-picker/dist/style.css'; // It's good practice to keep this for base styles
 
 const POMODORO_TIME = 25 * 60;
@@ -366,6 +365,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
   const [isEditing, setIsEditing] = useState(false);
   const [showFields, setShowFields] = useState(false);
   const inputRef = useRef(null);
+  const [showIncompleteWarning, setShowIncompleteWarning] = useState(false);
   const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false);
   const [isRecurrenceEditorOpen, setIsRecurrenceEditorOpen] = useState(false);
   const schedulePickerRef = useRef(null);
@@ -461,21 +461,38 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
         `}
       >
         <div className="flex items-start gap-3">
-          {/* Checkbox */}
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              onUpdate(node.id, { isCompleted: !node.isCompleted });
-            }}
-            className={`
-              mt-1 flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full border transition-all duration-300
-              ${node.isCompleted 
-                ? 'bg-emerald-500 border-emerald-500 text-white' 
-                : 'border-slate-500 text-transparent hover:border-emerald-400'}
-            `}
-          >
-            <Check size={12} strokeWidth={4} />
-          </button>
+          {/* Checkbox with Tooltip Wrapper */}
+          <div className="relative flex-shrink-0">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                // If trying to complete a parent task
+                if (!node.isCompleted && node.children.length > 0) {
+                  const allChildrenDone = node.children.every(child => child.isCompleted);
+                  if (!allChildrenDone) {
+                    setShowIncompleteWarning(true);
+                    setTimeout(() => setShowIncompleteWarning(false), 3000); // Hide after 3 seconds
+                    return; // Prevent completion
+                  }
+                }
+                // Proceed with update if it's being un-completed, has no children, or all children are done.
+                onUpdate(node.id, { isCompleted: !node.isCompleted, isExpanded: false });
+              }}
+              className={`
+                mt-1 flex items-center justify-center w-5 h-5 rounded-full border transition-all duration-300
+                ${node.isCompleted 
+                  ? 'bg-emerald-500 border-emerald-500 text-white' 
+                  : 'border-slate-500 text-transparent hover:border-emerald-400'}
+              `}
+            >
+              <Check size={12} strokeWidth={4} />
+            </button>
+            {showIncompleteWarning && (
+              <div className="absolute top-1/2 -right-2 transform translate-x-full -translate-y-1/2 w-max bg-slate-800 text-slate-200 text-xs px-3 py-1.5 rounded-lg shadow-lg z-20 animate-in fade-in slide-in-from-left-2 duration-200">
+                Complete all subtasks first.
+              </div>
+            )}
+          </div>
 
           {/* Indicator for currently running timer */}
           {isCurrentlyRunningInFocus && (
@@ -1331,6 +1348,7 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
 
   return (
     <div 
+      data-task-id={task.id}
       className={`relative flex items-center gap-4 px-4 py-3 rounded-lg transition-colors group ${isCompleted ? 'opacity-50' : ''} hover:bg-slate-800/50`}
       style={indentationStyle}
     >
@@ -1482,7 +1500,7 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAdd
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 animate-in fade-in duration-300">
+    <div data-list-view-container className="flex-1 overflow-y-auto p-8 animate-in fade-in duration-300">
       <div className="max-w-4xl mx-auto space-y-1">
         {flattenedTasks.map(({ task, path }) => (
           <TaskListItem 
@@ -1494,6 +1512,31 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAdd
             onAdd={onAdd}
             onRequestDelete={onRequestDelete}
           />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// --- Component: Suggestion Bar ---
+const SuggestionBar = ({ suggestions, onSuggestionClick }) => {
+  if (suggestions.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 pointer-events-auto flex items-center gap-2 bg-slate-900/80 p-1.5 border border-slate-800 backdrop-blur-sm rounded-xl">
+      <span className="text-xs text-slate-400 px-2 font-medium">Suggestions:</span>
+      <div className="flex items-center gap-1">
+        {suggestions.map(task => (
+          <button 
+            key={task.id}
+            onClick={() => onSuggestionClick(task.id)}
+            className="px-3 py-1 text-xs text-slate-300 bg-slate-800/50 rounded-md hover:bg-slate-700 hover:text-white transition-colors truncate max-w-xs"
+            title={task.text}
+          >
+            {task.text}
+          </button>
         ))}
       </div>
     </div>
@@ -1589,6 +1632,19 @@ const calculateNextOccurrence = (task, completionDateStr) => {
   return nextDate;
 };
 
+const findParentNode = (nodes, childId) => {
+  for (const node of nodes) {
+    if (node.children.some(child => child.id === childId)) {
+      return node;
+    }
+    const foundParent = findParentNode(node.children, childId);
+    if (foundParent) {
+      return foundParent;
+    }
+  }
+  return null;
+};
+
 // --- Main App Component ---
 export default function TaskTreeApp() {
   const initialData = [
@@ -1653,6 +1709,7 @@ export default function TaskTreeApp() {
   const [searchQuery, setSearchQuery] = useState('');
   const [logs, setLogs] = useState(() => {
     try {
+      // eslint-disable-next-line
       const savedLogsJSON = localStorage.getItem('flowAppLogsV1');
       if (savedLogsJSON) {
         const parsedLogs = JSON.parse(savedLogsJSON);
@@ -1683,6 +1740,7 @@ export default function TaskTreeApp() {
 
   const highlightedNodeRef = useRef(null);
   const datePickerRef = useRef(null);
+  const highlightTimeoutRef = useRef(null);
 
   const findNodeRecursive = (nodes, id) => {
     if (!nodes) return null;
@@ -1739,18 +1797,42 @@ export default function TaskTreeApp() {
   const handleUpdate = (id, updates) => {
     let newUpdates = { ...updates };
     if (newUpdates.isCompleted === true) {
+      newUpdates.completionDate = getTodayDateString();
       const task = findNodeRecursive(treeData, id);
       if (task?.recurrence) {
         const nextDate = calculateNextOccurrence(task, getTodayDateString());
         newUpdates = { ...newUpdates, isCompleted: false, scheduledDate: nextDate ? format(nextDate, 'yyyy-MM-dd') : null };
-        // Optionally, you could create a separate, completed instance here for logging.
-        // For now, we just advance the date.
       }
-      newUpdates.completionDate = getTodayDateString();
     }
-    setTreeData(prev => updateNodeRecursive(prev, id, newUpdates));
+
+    setTreeData(prevData => {
+      // First, apply the initial update (e.g., completing the child task)
+      let updatedTree = updateNodeRecursive(prevData, id, newUpdates);
+
+      // Now, check if this update should trigger a parent completion
+      if (newUpdates.isCompleted) {
+        const parent = findParentNode(updatedTree, id);
+        if (parent && !parent.isCompleted) {
+          // Find the parent in the updated tree to check its children
+          const updatedParent = findNodeRecursive(updatedTree, parent.id);
+          const allChildrenCompleted = updatedParent.children.every(child => child.isCompleted);
+          if (allChildrenCompleted) {
+            // If all children are done, complete the parent as well
+            updatedTree = updateNodeRecursive(updatedTree, parent.id, { isCompleted: true, completionDate: getTodayDateString(), isExpanded: false });
+          }
+        }
+      }
+      return updatedTree;
+    });
   };
-  const handleAddSubtask = (parentId) => setTreeData(prev => addNodeRecursive(prev, parentId));
+  const handleAddSubtask = (parentId) => {
+    setTreeData(prev => {
+      // First, add the new subtask node, which also expands the parent.
+      const treeWithNewNode = addNodeRecursive(prev, parentId);
+      // Then, ensure the parent is marked as not completed, as it now has a new subtask.
+      return updateNodeRecursive(treeWithNewNode, parentId, { isCompleted: false, completionDate: null });
+    });
+  };
 
   const handleUpdateField = (nodeId, fieldId, key, newValue) => {
     setTreeData(prevTreeData => {
@@ -1798,22 +1880,19 @@ export default function TaskTreeApp() {
   };
 
   const filterForTodayView = (nodes, today) => {
-    return nodes.map(node => {
-      // For recurring tasks, if they are completed, we treat them as not completed for display purposes
-      // because they will just advance to the next date.
-      const isVisiblyCompleted = node.isCompleted && !node.recurrence;
-
+    return nodes.map(node => { 
       const visibleChildren = node.children ? filterForTodayView(node.children, today) : [];
 
       // A task is relevant for today if it's not completed AND its scheduled date is not in the future.
       const isTaskRelevant = !node.isCompleted && (!node.scheduledDate || node.scheduledDate <= today);
 
-      // Keep the node if it's relevant itself, or if it's a parent to any relevant children.
-      if (isTaskRelevant || visibleChildren.length > 0) {
-        if (isVisiblyCompleted) return null; // Hide tasks that are truly completed.
-        return { ...node, children: visibleChildren, isExpanded: isTaskRelevant ? node.isExpanded : true };
-      }
+      // A task is also relevant if it was completed today.
+      const wasCompletedToday = node.completionDate === today;
 
+      // Keep the node if it's relevant, was completed today, or has visible children.
+      if (isTaskRelevant || wasCompletedToday || visibleChildren.length > 0) {
+        return { ...node, children: visibleChildren, isExpanded: (isTaskRelevant || wasCompletedToday) ? node.isExpanded : true };
+      }
       return null;
     }).filter(node => node !== null);
   };
@@ -1851,6 +1930,57 @@ export default function TaskTreeApp() {
     return Array.from(keys);
   }, [treeData]);
 
+  // --- Suggestions Logic ---
+  const suggestedTasks = useMemo(() => {
+    const today = startOfToday();
+    let overdueTasks = [];
+    let pendingTodayTasks = [];
+
+    const findTasks = (nodes) => {
+      for (const node of nodes) {
+        // A task is a candidate for suggestion if it's not completed AND has a non-empty name.
+        if (!node.isCompleted && node.text && node.text.trim() !== '') {
+          if (node.scheduledDate && parseISO(node.scheduledDate) < today) {
+            overdueTasks.push(node);
+          } else {
+            pendingTodayTasks.push(node);
+          }
+        }
+        if (node.children) {
+          findTasks(node.children);
+        }
+      }
+    };
+
+    findTasks(treeData);
+
+    // Sort overdue tasks by scheduled date, oldest first
+    overdueTasks.sort((a, b) => parseISO(a.scheduledDate) - parseISO(b.scheduledDate));
+
+    let suggestions = overdueTasks;
+
+    // If not enough overdue tasks, supplement with random pending tasks
+    if (suggestions.length < 3) {
+      // Shuffle pending tasks to get random ones
+      const shuffledPending = pendingTodayTasks.sort(() => 0.5 - Math.random());
+      const needed = 3 - suggestions.length;
+      suggestions = [...suggestions, ...shuffledPending.slice(0, needed)];
+    }
+
+    return suggestions.slice(0, 3); // Ensure we only return up to 3
+  }, [treeData]);
+
+  const handleSuggestionClick = (taskId) => {
+    // Clear any existing timeout to prevent it from clearing a newer highlight.
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current);
+    }
+    setHighlightedTaskId(taskId);
+    // Set a new timeout to clear the highlight after 3 seconds.
+    highlightTimeoutRef.current = setTimeout(() => {
+      setHighlightedTaskId(null);
+    }, 3000);
+  };
   useEffect(() => {
     localStorage.setItem('taskTreeGraphDataV2', JSON.stringify(treeData));
   }, [treeData]);
@@ -1992,6 +2122,19 @@ export default function TaskTreeApp() {
       }));
     }
   }, [highlightedTaskId, scale]); // Run only when the highlighted task ID changes
+
+  // This effect handles scrolling to a highlighted task in LIST VIEW.
+  useEffect(() => {
+    if (viewMode === 'list' && highlightedTaskId) {
+      const listContainer = document.querySelector('[data-list-view-container]');
+      const taskElement = listContainer?.querySelector(`[data-task-id="${highlightedTaskId}"]`);
+      if (taskElement) {
+        taskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+    // We only want this to run when the highlighted task changes, not when the view mode changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightedTaskId]);
 
   useEffect(() => {
     setHighlightedTaskId(searchResults.length > 0 ? searchResults[searchIndex]?.item.id : null);
@@ -2234,6 +2377,19 @@ export default function TaskTreeApp() {
     setIsDragging(false);
   };
 
+  const handleWheel = (e) => {
+    // This prevents the default browser behavior for horizontal two-finger swipes
+    // on a trackpad, which is typically to navigate back or forward in history.
+    // We only prevent it when horizontal scroll is the primary action.
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      e.preventDefault();
+    }
+
+    setPan(prevPan => ({
+      x: prevPan.x - e.deltaX / scale,
+      y: prevPan.y - e.deltaY / scale,
+    }));
+  };
   // This effect will manage the user-select style during canvas panning
   useEffect(() => {
     if (isDragging) {
@@ -2263,6 +2419,16 @@ export default function TaskTreeApp() {
     break: 'bg-sky-950',
     paused: 'bg-slate-950',
   };
+
+  const scrollbarHideStyle = `
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  `;
 
   if (focusedTask) {
     return <FocusView task={focusedTask} timerProps={timerProps} onExit={handleExitFocus} appState={appState} />;
@@ -2322,6 +2488,8 @@ export default function TaskTreeApp() {
 
   return (
     <div className={`h-screen w-screen text-slate-200 font-sans overflow-hidden flex flex-col transition-colors duration-1000 ${backgroundClasses[appState]}`}>
+      <style>{scrollbarHideStyle}</style>
+
       {/* Delete Modal */}
       <DeleteModal 
         isOpen={!!deleteTargetId} 
@@ -2389,6 +2557,8 @@ export default function TaskTreeApp() {
         </div>
       </div>
 
+      {activeTab === 'today' && <SuggestionBar suggestions={suggestedTasks} onSuggestionClick={handleSuggestionClick} />}
+
       <SearchOverlay query={searchQuery} resultCount={searchResults.length} currentIndex={searchIndex} />
 
       {/* Main Content Area */}
@@ -2396,9 +2566,10 @@ export default function TaskTreeApp() {
         {activeTab === 'today' && viewMode === 'tree' && (
           <div
             data-canvas-area
-            className={`flex-1 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} animate-in fade-in duration-300`}
+            className={`no-scrollbar flex-1 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} animate-in fade-in duration-300 overflow-auto`}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
+            onWheel={handleWheel}
             onMouseUp={handleMouseUpOrLeave}
             onMouseLeave={handleMouseUpOrLeave}
           >
