@@ -13,10 +13,10 @@ import {
   Settings2,
   ListPlus
 } from 'lucide-react';
-import { Play, Pause, TimerReset, BrainCircuit, Coffee, XCircle, CalendarDays, CalendarPlus, Save, Trash, Pencil, UploadCloud, DownloadCloud } from 'lucide-react';
+import { Play, Pause, TimerReset, BrainCircuit, Coffee, XCircle, CalendarDays, CalendarPlus, Save, Trash, Pencil, UploadCloud, DownloadCloud, Repeat } from 'lucide-react';
 import Fuse from 'fuse.js';
 import { DayPicker } from 'react-day-picker';
-import { format, parseISO, isToday } from 'date-fns';
+import { format, parseISO, isToday, addDays, addWeeks, addMonths, differenceInDays, differenceInCalendarWeeks, differenceInMonths } from 'date-fns';
 import 'react-day-picker/dist/style.css'; // It's good practice to keep this for base styles
 
 const POMODORO_TIME = 25 * 60;
@@ -274,14 +274,102 @@ const SearchOverlay = ({ query, resultCount, currentIndex }) => {
   );
 };
 
+// --- Component: Recurrence Editor ---
+const RecurrenceEditor = ({ recurrence, onSave, onClose }) => {
+  const [freq, setFreq] = useState(recurrence?.frequency || 'weekly');
+  const [interval, setInterval] = useState(recurrence?.interval || 1);
+  const [daysOfWeek, setDaysOfWeek] = useState(recurrence?.daysOfWeek || []);
+
+  const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+  const handleDayToggle = (dayIndex) => {
+    setDaysOfWeek(prev => 
+      prev.includes(dayIndex) ? prev.filter(d => d !== dayIndex) : [...prev, dayIndex]
+    );
+  };
+
+  const handleSave = () => {
+    onSave({
+      frequency: freq,
+      interval: Math.max(1, interval), // Ensure interval is at least 1
+      daysOfWeek: freq === 'weekly' ? daysOfWeek : undefined,
+    });
+    onClose();
+  };
+
+  const handleRemove = () => {
+    onSave(null); // Pass null to remove recurrence
+    onClose();
+  };
+
+  return (
+    <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-64 p-4 space-y-4">
+      <div>
+        <label className="text-xs text-slate-400">Frequency</label>
+        <div className="flex bg-slate-800 rounded-md p-1 mt-1">
+          {['daily', 'weekly', 'monthly'].map(f => (
+            <button key={f} onClick={() => setFreq(f)} className={`flex-1 text-xs capitalize py-1 rounded ${freq === f ? 'bg-slate-600 text-white' : 'text-slate-300'}`}>
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs text-slate-400">Repeat Every</label>
+        <div className="flex items-center gap-2 mt-1">
+          <input 
+            type="number"
+            value={interval}
+            onChange={(e) => setInterval(parseInt(e.target.value, 10))}
+            className="w-16 bg-slate-800 rounded-md p-2 text-center text-sm"
+            min="1"
+          />
+          <span className="text-sm text-slate-300">{freq === 'daily' ? 'day(s)' : freq === 'weekly' ? 'week(s)' : 'month(s)'}</span>
+        </div>
+      </div>
+
+      {freq === 'weekly' && (
+        <div>
+          <label className="text-xs text-slate-400">Repeat On</label>
+          <div className="flex justify-between gap-1 mt-2">
+            {weekDays.map((day, index) => (
+              <button 
+                key={index}
+                onClick={() => handleDayToggle(index)}
+                className={`w-7 h-7 text-xs rounded-full transition-colors ${daysOfWeek.includes(index) ? 'bg-emerald-500 text-white' : 'bg-slate-800 hover:bg-slate-700'}`}
+              >
+                {day}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2 pt-3 border-t border-slate-800">
+        <button onClick={handleSave} className="w-full bg-emerald-600 text-white rounded-md py-2 text-sm font-semibold hover:bg-emerald-700">
+          Save
+        </button>
+        {recurrence && (
+          <button onClick={handleRemove} className="w-full text-slate-400 text-xs hover:text-rose-400">
+            Remove Recurrence
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 
 // --- Component: Task Card (The actual node content) ---
-const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, isHighlighted }) => {
+const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, isHighlighted, highlightedRef }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showFields, setShowFields] = useState(false);
   const inputRef = useRef(null);
   const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false);
+  const [isRecurrenceEditorOpen, setIsRecurrenceEditorOpen] = useState(false);
   const schedulePickerRef = useRef(null);
+  const recurrenceEditorRef = useRef(null);
 
   // Focus when created empty
   useEffect(() => {
@@ -295,6 +383,16 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
     const handleClickOutside = (event) => {
       if (schedulePickerRef.current && !schedulePickerRef.current.contains(event.target)) {
         setIsSchedulePickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (recurrenceEditorRef.current && !recurrenceEditorRef.current.contains(event.target)) {
+        setIsRecurrenceEditorOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -341,6 +439,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
 
   return (
     <div 
+      ref={isHighlighted ? highlightedRef : null}
       data-task-id={node.id}
       className={`
         relative flex flex-col items-center w-72 transition-all duration-300 group z-10
@@ -354,11 +453,11 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
       <div 
         className={`
           relative w-full bg-slate-900/90 backdrop-blur-md border rounded-2xl p-3 shadow-xl transition-all duration-300
-          ${node.isCompleted 
-            ? 'border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]' 
-            : 'border-slate-700 hover:border-slate-500 hover:shadow-2xl hover:shadow-emerald-500/5'
-          }
-          ${isHighlighted ? 'border-cyan-400 shadow-[0_0_25px_rgba(56,189,248,0.4)]' : (hasPausedTimer && !isCurrentlyRunningInFocus ? 'border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)] animate-border-pulse' : '')}
+          ${isHighlighted 
+            ? 'border-cyan-400 shadow-[0_0_25px_rgba(56,189,248,0.4)]' 
+            : hasPausedTimer && !isCurrentlyRunningInFocus 
+              ? 'border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)] animate-border-pulse' 
+              : (node.isCompleted ? 'border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'border-slate-700 hover:border-slate-500 hover:shadow-2xl hover:shadow-emerald-500/5')}
         `}
       >
         <div className="flex items-start gap-3">
@@ -487,6 +586,11 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
           <div className="mt-2 text-xs flex items-center gap-1.5 text-slate-500"><CalendarDays size={12} /><span>{node.scheduledDate}</span></div>
         )}
 
+        {/* Recurrence Info Display */}
+        {node.recurrence && (
+          <div className="mt-1 text-xs flex items-center gap-1.5 text-cyan-500"><Repeat size={12} /><span>Recurring</span></div>
+        )}
+
         {/* Footer Actions & Info */}
         <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-800">
           {/* Collapse Toggle */}
@@ -556,6 +660,24 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 </div>
               )}
             </div>
+            <div className="relative" ref={recurrenceEditorRef}>
+              <button
+                onClick={(e) => { e.stopPropagation(); setIsRecurrenceEditorOpen(!isRecurrenceEditorOpen); }}
+                className="p-1 text-slate-400 hover:text-cyan-400 hover:bg-cyan-400/10 rounded-md transition-colors"
+                title="Set Recurrence"
+              >
+                <Repeat size={14} />
+              </button>
+              {isRecurrenceEditorOpen && (
+                <div className="absolute bottom-full right-0 mb-2 z-30 animate-in fade-in duration-100">
+                  <RecurrenceEditor
+                    recurrence={node.recurrence}
+                    onSave={(newRecurrence) => onUpdate(node.id, { recurrence: newRecurrence })}
+                    onClose={() => setIsRecurrenceEditorOpen(false)}
+                  />
+                </div>
+              )}
+            </div>
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -579,7 +701,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
 };
 
 // --- Component: Recursive Tree Node ---
-const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, highlightedTaskId }) => {
+const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, highlightedTaskId, highlightedRef }) => {
   const hasChildren = node.children.length > 0;
 
   return (
@@ -595,6 +717,7 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
         isTimerActive={isTimerActive}
         isSearching={isSearching}
         isHighlighted={node.id === highlightedTaskId}
+        highlightedRef={highlightedRef}
       />
       
       {/* Children Container */}
@@ -635,6 +758,7 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 isTimerActive={isTimerActive}
                 isSearching={isSearching}
                 highlightedTaskId={highlightedTaskId}
+                highlightedRef={highlightedRef}
               />
             </div>
           ))}
@@ -1100,6 +1224,76 @@ const getTodayDateString = () => {
   return today.toISOString().split('T')[0]; // YYYY-MM-DD format
 };
 
+const isDateAnOccurrence = (task, targetDateStr) => {
+  if (!task.recurrence || !task.scheduledDate) return false;
+
+  const { frequency, interval, daysOfWeek } = task.recurrence;
+  const startDate = parseISO(task.scheduledDate);
+  const targetDate = parseISO(targetDateStr);
+
+  if (targetDate < startDate) return false;
+
+  switch (frequency) {
+    case 'daily': {
+      const diff = differenceInDays(targetDate, startDate);
+      return diff >= 0 && diff % interval === 0;
+    }
+    case 'weekly': {
+      if (!daysOfWeek || !daysOfWeek.includes(targetDate.getDay())) {
+        return false;
+      }
+      // Check if the week difference is a multiple of the interval
+      const diffWeeks = differenceInCalendarWeeks(targetDate, startDate, { weekStartsOn: 1 }); // Assuming Monday start
+      return diffWeeks >= 0 && diffWeeks % interval === 0;
+    }
+    case 'monthly': {
+      if (targetDate.getDate() !== startDate.getDate()) {
+        return false; // Must be same day of the month
+      }
+      const diffMonths = differenceInMonths(targetDate, startDate);
+      return diffMonths >= 0 && diffMonths % interval === 0;
+    }
+    default:
+      return false;
+  }
+};
+
+const calculateNextOccurrence = (task) => {
+  if (!task.recurrence || !task.scheduledDate) return null;
+
+  const { frequency, interval, daysOfWeek } = task.recurrence;
+  const currentScheduledDate = parseISO(task.scheduledDate);
+
+  switch (frequency) {
+    case 'daily':
+      return addDays(currentScheduledDate, interval);
+    case 'weekly': {
+      if (!daysOfWeek || daysOfWeek.length === 0) return addWeeks(currentScheduledDate, interval);
+      
+      let nextDate = new Date(currentScheduledDate);
+      const sortedDays = [...daysOfWeek].sort();
+      
+      // Find the next valid day in the current week
+      for (let i = 0; i < 7; i++) {
+        nextDate = addDays(currentScheduledDate, i + 1);
+        if (sortedDays.includes(nextDate.getDay())) {
+          return nextDate;
+        }
+      }
+      // If no valid day in the current week, jump to the first valid day of the next interval week
+      nextDate = addWeeks(currentScheduledDate, interval);
+      while (!sortedDays.includes(nextDate.getDay())) {
+        nextDate = addDays(nextDate, 1);
+      }
+      return nextDate;
+    }
+    case 'monthly':
+      return addMonths(currentScheduledDate, interval);
+    default:
+      return null;
+  }
+};
+
 // --- Main App Component ---
 export default function TaskTreeApp() {
   const today = getTodayDateString();
@@ -1192,6 +1386,10 @@ export default function TaskTreeApp() {
           isCompleted: false,
           isExpanded: true,
           scheduledDate: today,
+          recurrence: {
+            frequency: 'daily',
+            interval: 1,
+          },
           children: []
         },
       ]
@@ -1265,6 +1463,7 @@ export default function TaskTreeApp() {
   const [highlightedTaskId, setHighlightedTaskId] = useState(null);
   const [searchIndex, setSearchIndex] = useState(0);
 
+  const highlightedNodeRef = useRef(null);
   const datePickerRef = useRef(null);
 
   const findNodeRecursive = (nodes, id) => {
@@ -1320,8 +1519,17 @@ export default function TaskTreeApp() {
 
   // Core actions
   const handleUpdate = (id, updates) => {
-    const newUpdates = { ...updates };
-    if (newUpdates.isCompleted === true) newUpdates.completionDate = getTodayDateString();
+    let newUpdates = { ...updates };
+    if (newUpdates.isCompleted === true) {
+      const task = findNodeRecursive(treeData, id);
+      if (task?.recurrence) {
+        const nextDate = calculateNextOccurrence(task);
+        newUpdates = { ...newUpdates, isCompleted: false, scheduledDate: nextDate ? format(nextDate, 'yyyy-MM-dd') : null };
+        // Optionally, you could create a separate, completed instance here for logging.
+        // For now, we just advance the date.
+      }
+      newUpdates.completionDate = getTodayDateString();
+    }
     setTreeData(prev => updateNodeRecursive(prev, id, newUpdates));
   };
   const handleAddSubtask = (parentId) => setTreeData(prev => addNodeRecursive(prev, parentId));
@@ -1364,7 +1572,7 @@ export default function TaskTreeApp() {
       const children = node.children ? filterTreeByScheduledDate(node.children, date) : [];
       const hasScheduledChildren = children.some(c => c !== null);
 
-      if (node.scheduledDate === date || hasScheduledChildren) {
+      if ((node.scheduledDate === date || isDateAnOccurrence(node, date)) || hasScheduledChildren) {
         return { ...node, children, isExpanded: hasScheduledChildren };
       }
       return null;
@@ -1373,7 +1581,10 @@ export default function TaskTreeApp() {
 
   const filterForTodayView = (nodes, today) => {
     return nodes.map(node => {
-      // Recursively filter children first.
+      // For recurring tasks, if they are completed, we treat them as not completed for display purposes
+      // because they will just advance to the next date.
+      const isVisiblyCompleted = node.isCompleted && !node.recurrence;
+
       const visibleChildren = node.children ? filterForTodayView(node.children, today) : [];
 
       // A task is relevant for today if it's not completed AND its scheduled date is not in the future.
@@ -1381,7 +1592,7 @@ export default function TaskTreeApp() {
 
       // Keep the node if it's relevant itself, or if it's a parent to any relevant children.
       if (isTaskRelevant || visibleChildren.length > 0) {
-        // If the task itself isn't relevant, but it has relevant children, show it as an expanded container.
+        if (isVisiblyCompleted) return null; // Hide tasks that are truly completed.
         return { ...node, children: visibleChildren, isExpanded: isTaskRelevant ? node.isExpanded : true };
       }
 
@@ -1546,34 +1757,27 @@ export default function TaskTreeApp() {
     }
   }, [searchQuery, fuse]);
 
-  // This effect runs when the search results or the selected index change, handling BOTH highlighting and centering.
+  // This effect runs when the highlighted node is rendered to the DOM, and it handles centering.
   useEffect(() => {
-    if (searchResults.length > 0 && searchIndex < searchResults.length) {
-      const highlightedResultId = searchResults[searchIndex].item.id;
-      setHighlightedTaskId(highlightedResultId);
+    if (highlightedNodeRef.current) {
+      const canvas = document.querySelector('[data-canvas-area]');
+      const nodeElement = highlightedNodeRef.current;
+      const canvasRect = canvas.getBoundingClientRect();
+      const nodeRect = nodeElement.getBoundingClientRect();
+      
+      const targetX = (canvasRect.width / 2) - (nodeRect.width / 2) - (nodeRect.left - canvasRect.left);
+      const targetY = (canvasRect.height / 2) - (nodeRect.height / 2) - (nodeRect.top - canvasRect.top);
 
-      // Use a timeout to ensure the DOM has updated with the highlighted task before we measure it.
-      // This is a robust way to handle centering after a state change that affects the DOM.
-      setTimeout(() => {
-        const canvas = document.querySelector('[data-canvas-area]');
-        const nodeElement = document.querySelector(`[data-task-id="${highlightedResultId}"]`);
-        if (canvas && nodeElement) {
-          const canvasRect = canvas.getBoundingClientRect();
-          const nodeRect = nodeElement.getBoundingClientRect();
-          
-          const targetX = (canvasRect.width / 2) - (nodeRect.width / 2) - (nodeRect.left - canvasRect.left);
-          const targetY = (canvasRect.height / 2) - (nodeRect.height / 2) - (nodeRect.top - canvasRect.top);
-
-          setPan(prevPan => ({
-            x: prevPan.x + targetX / scale,
-            y: prevPan.y + targetY / scale,
-          }));
-        }
-      }, 0);
-    } else {
-      setHighlightedTaskId(null);
+      setPan(prevPan => ({
+        x: prevPan.x + targetX / scale,
+        y: prevPan.y + targetY / scale,
+      }));
     }
-  }, [searchIndex, searchResults, scale]);
+  }, [highlightedTaskId, scale]); // Run only when the highlighted task ID changes
+
+  useEffect(() => {
+    setHighlightedTaskId(searchResults.length > 0 ? searchResults[searchIndex]?.item.id : null);
+  }, [searchIndex, searchResults]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -1901,6 +2105,12 @@ export default function TaskTreeApp() {
             <button onClick={() => setActiveTab('today')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'today' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Today</button>
             <button onClick={() => setActiveTab('logs')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'logs' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Logs</button>
           </div>
+          <button 
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-2 rounded-lg text-slate-400 hover:bg-white/10"
+          >
+            <Settings2 size={18} />
+          </button>
         </div>
 
         <div className="pointer-events-auto flex gap-2 bg-slate-900/90 backdrop-blur p-2 rounded-xl border border-slate-800">
@@ -1963,6 +2173,7 @@ export default function TaskTreeApp() {
                      isTimerActive={isTimerActive}
                      isSearching={isSearching}
                      highlightedTaskId={highlightedTaskId}
+                     highlightedRef={highlightedNodeRef}
                    />
                  ))}
                  
