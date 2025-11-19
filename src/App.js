@@ -423,7 +423,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
             }}
             className={`
               p-1 rounded-md transition-colors flex-shrink-0
-              ${showFields || fieldsCount > 0 ? 'text-emerald-400 bg-emerald-400/10' : 'text-slate-600 hover:text-slate-300 hover:bg-slate-800'}
+              ${showFields ? 'text-emerald-400 bg-emerald-400/10' : 'text-slate-600 hover:text-slate-300 hover:bg-slate-800'}
             `}
             title="Custom Fields"
           >
