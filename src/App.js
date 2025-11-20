@@ -1280,14 +1280,14 @@ const LogsView = ({ logs, selectedDate, onAddManualLog, onEditLog, onDeleteLog, 
               >
                 <div 
                   onMouseDown={(e) => startInteraction(e, log, 'move')}
-                  className={`group relative h-full border-l-2 rounded-lg p-2 flex flex-col justify-center cursor-move ${log.taskId ? 'bg-emerald-500/10 border-emerald-400' : 'bg-blue-500/10 border-blue-400'}`}
+                  className={`group relative h-full border-l-2 rounded-lg p-2 flex flex-col justify-center cursor-move ${log.taskId ? 'bg-emerald-500/10 border-emerald-400' : 'bg-sky-500/10 border-sky-400/50'}`}
                 >
                   {/* Resize Handles */}
                   <div onMouseDown={(e) => startInteraction(e, log, 'resize-top')} className="absolute -top-1 left-0 w-full h-2 cursor-row-resize" />
                   <div onMouseDown={(e) => startInteraction(e, log, 'resize-bottom')} className="absolute -bottom-1 left-0 w-full h-2 cursor-row-resize" />
 
-                  <p className={`text-sm font-medium truncate ${log.taskId ? 'text-emerald-300' : 'text-blue-300'}`}>{log.taskText}</p>
-                  <p className={`text-xs ${log.taskId ? 'text-emerald-500' : 'text-blue-500'}`}>
+                  <p className={`text-sm font-medium truncate ${log.taskId ? 'text-emerald-300' : 'text-sky-300'}`}>{log.taskText}</p>
+                  <p className={`text-xs ${log.taskId ? 'text-emerald-500' : 'text-sky-500'}`}>
                     {format(currentLog.startTime, 'h:mm a')} - {format(currentLog.endTime, 'h:mm a')}
                   </p>
                   {/* Hover controls for Edit/Delete */}
@@ -1321,7 +1321,7 @@ const LogsView = ({ logs, selectedDate, onAddManualLog, onEditLog, onDeleteLog, 
             const { top, height } = getPositionAndHeight(start, end);
             return (
               <div 
-                className="absolute w-full bg-blue-500/30 rounded-r-lg pointer-events-none" 
+                className="absolute w-full bg-sky-500/30 rounded-r-lg pointer-events-none"
                 style={{ top, height }}
               ></div>
             );
@@ -1714,6 +1714,12 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAdd
             onRequestDelete={onRequestDelete}
           />
         ))}
+        {selectedDate >= getTodayDateString() && (
+          <button onClick={onAddRoot} className="w-full mt-4 py-3 text-sm text-slate-500 hover:text-emerald-400 border border-dashed border-slate-800 hover:border-emerald-500/30 rounded-lg flex items-center justify-center gap-2 transition-colors">
+            <Plus size={16} />
+            <span>Add New Task</span>
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1953,6 +1959,7 @@ export default function TaskTreeApp() {
 
   const highlightedNodeRef = useRef(null);
   const datePickerRef = useRef(null);
+  const contentRef = useRef(null); // Ref for the content wrapper
 
   const highlightTimeoutRef = useRef(null);
 
@@ -2644,6 +2651,32 @@ export default function TaskTreeApp() {
     setManualLogModal(null);
   };
 
+  // --- Panning & Zooming Constraints ---
+  const clampPan = (newPan, currentScale) => {
+    if (!contentRef.current) return newPan;
+
+    const canvas = contentRef.current.parentElement.parentElement;
+    const content = contentRef.current;
+
+    const canvasWidth = canvas.offsetWidth;
+    const canvasHeight = canvas.offsetHeight;
+    const contentWidth = content.offsetWidth * currentScale;
+    const contentHeight = content.offsetHeight * currentScale;
+
+    // Calculate the boundaries. We allow some overscroll (padding).
+    const padding = 200; // Allow 200px of overscroll
+    const minX = -(contentWidth - canvasWidth + padding);
+    const maxX = padding;
+    const minY = -(contentHeight - canvasHeight + padding);
+    const maxY = padding;
+
+    // The pan values are unscaled, so we need to divide the boundaries by the scale.
+    const clampedX = Math.max(minX / currentScale, Math.min(maxX / currentScale, newPan.x));
+    const clampedY = Math.max(minY / currentScale, Math.min(maxY / currentScale, newPan.y));
+
+    return { x: clampedX, y: clampedY };
+  };
+
   const handleDeleteLog = (logId) => {
     setLogs(prevLogs => prevLogs.filter(log => log.id !== logId));
   };
@@ -2667,10 +2700,10 @@ export default function TaskTreeApp() {
     if (!isDragging) return;
     const dx = e.clientX - dragStartRef.current.x;
     const dy = e.clientY - dragStartRef.current.y;
-    setPan({
+    setPan(clampPan({
       x: dragStartRef.current.panX + dx / scale,
       y: dragStartRef.current.panY + dy / scale,
-    });
+    }, scale));
   };
 
   const handleMouseUpOrLeave = () => {
@@ -2678,17 +2711,39 @@ export default function TaskTreeApp() {
   };
 
   const handleWheel = (e) => {
-    // This prevents the default browser behavior for horizontal two-finger swipes
-    // on a trackpad, which is typically to navigate back or forward in history.
-    // We only prevent it when horizontal scroll is the primary action.
-    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-      e.preventDefault();
-    }
+    e.preventDefault();
 
-    setPan(prevPan => ({
-      x: prevPan.x - e.deltaX / scale,
-      y: prevPan.y - e.deltaY / scale,
-    }));
+    if (e.altKey) {
+      // --- Zooming Logic ---
+      const zoomSpeed = 0.002;
+      const minScale = 0.2;
+      const maxScale = 2.5;
+
+      const canvasRect = e.currentTarget.getBoundingClientRect();
+      const mouseX = e.clientX - canvasRect.left;
+      const mouseY = e.clientY - canvasRect.top;
+
+      const oldScale = scale;
+      const newScale = Math.max(minScale, Math.min(maxScale, oldScale - e.deltaY * zoomSpeed));
+
+      // Calculate the point in the world space the mouse is pointing at
+      const worldX = (mouseX / oldScale) - pan.x;
+      const worldY = (mouseY / oldScale) - pan.y;
+
+      // Calculate the new pan to keep the world point under the mouse
+      const newPanX = (mouseX / newScale) - worldX;
+      const newPanY = (mouseY / newScale) - worldY;
+
+      setScale(newScale);
+      setPan(clampPan({ x: newPanX, y: newPanY }, newScale));
+
+    } else {
+      // --- Panning Logic ---
+      setPan(prevPan => clampPan({
+        x: prevPan.x - e.deltaX / scale,
+        y: prevPan.y - e.deltaY / scale,
+      }, scale));
+    }
   };
   // This effect will manage the user-select style during canvas panning
   useEffect(() => {
@@ -2757,62 +2812,63 @@ export default function TaskTreeApp() {
     return <FocusView task={focusedTask} timerProps={timerProps} onExit={handleExitFocus} appState={appState} />;
   }
 
-  // Check if the modal should be open and if its date values are valid.
-  const isModalReady = manualLogModal && (
-    (manualLogModal.startTime && manualLogModal.endTime) || manualLogModal.logToEdit
-  );
-
-  if (isModalReady) {
-    const isEditing = !!manualLogModal.logToEdit;
-    const startTime = isEditing ? manualLogModal.logToEdit.startTime : manualLogModal.startTime;
-    const endTime = isEditing ? manualLogModal.logToEdit.endTime : manualLogModal.endTime;
-    const initialText = isEditing ? manualLogModal.logToEdit.taskText : '';
-
-    return (
-      <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-200">
-          <h3 className="text-lg font-semibold text-slate-100 mb-2">{isEditing ? 'Edit Log Entry' : 'Add Manual Log Entry'}</h3>
-          <p className="text-sm text-slate-400 mb-4">
-            For {format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')}
-          </p>
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            const text = e.target.elements.description.value;
-            if (text) {
-              handleSaveLog({
-                id: isEditing ? manualLogModal.logToEdit.id : null,
-                text,
-                startTime,
-                endTime,
-              });
-            }
-          }}>
-            <input
-              name="description"
-              type="text"
-              autoFocus
-              defaultValue={initialText}
-              placeholder="What were you working on?"
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 mb-4"
-            />
-            <div className="flex justify-end gap-3">
-              <button type="button" onClick={() => setManualLogModal(null)} className="px-4 py-2 rounded-lg text-slate-300 hover:bg-slate-800 transition-colors">Cancel</button>
-              <button type="submit" className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-2">
-                <Save size={16} /> Save Log
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
   const isSearching = searchQuery.length > 0;
 
   return (
     <div className={`h-screen w-screen text-slate-200 font-sans overflow-hidden flex flex-col transition-colors duration-1000 ${backgroundClasses[appState]}`}>
       <style>{scrollbarHideStyle}</style>
       <style>{quillStyle}</style>
+
+      {/* Manual Log Modal */}
+      {manualLogModal && (
+        (() => {
+          const isEditing = !!manualLogModal.logToEdit;
+          const startTime = isEditing ? manualLogModal.logToEdit.startTime : manualLogModal.startTime;
+          const endTime = isEditing ? manualLogModal.logToEdit.endTime : manualLogModal.endTime;
+          const initialText = isEditing ? manualLogModal.logToEdit.taskText : '';
+
+          // Only render if we have valid times
+          if (!startTime || !endTime) return null;
+
+          return (
+            <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-200">
+                <h3 className="text-lg font-semibold text-slate-100 mb-2">{isEditing ? 'Edit Log Entry' : 'Add Manual Log Entry'}</h3>
+                <p className="text-sm text-slate-400 mb-4">
+                  For {format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')}
+                </p>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const text = e.target.elements.description.value;
+                  if (text) {
+                    handleSaveLog({
+                      id: isEditing ? manualLogModal.logToEdit.id : null,
+                      text,
+                      startTime,
+                      endTime,
+                    });
+                  }
+                }}>
+                  <input
+                    name="description"
+                    type="text"
+                    autoFocus
+                    defaultValue={initialText}
+                    placeholder="What were you working on?"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 mb-4"
+                  />
+                  <div className="flex justify-end gap-3">
+                    <button type="button" onClick={() => setManualLogModal(null)} className="px-4 py-2 rounded-lg text-slate-300 hover:bg-slate-800 transition-colors">Cancel</button>
+                    <button type="submit" className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-2">
+                      <Save size={16} /> Save Log
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          );
+        })()
+      )}
 
       {/* Delete Modal */}
       <DeleteModal 
@@ -2891,7 +2947,7 @@ export default function TaskTreeApp() {
         {activeTab === 'today' && viewMode === 'tree' && (
           <div
             data-canvas-area
-            className={`no-scrollbar flex-1 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} animate-in fade-in duration-300 overflow-auto`}
+            className={`no-scrollbar flex-1 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} animate-in fade-in duration-300 overflow-auto overscroll-x-contain`}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onWheel={handleWheel}
@@ -2902,7 +2958,7 @@ export default function TaskTreeApp() {
               className="min-w-max min-h-full p-20 flex justify-center items-start origin-top-left"
               style={{ transform: `scale(${scale}) translate(${pan.x}px, ${pan.y}px)`, transition: isDragging ? 'none' : 'transform 0.2s' }}
             >
-              <div className="flex gap-16 items-start">
+              <div ref={contentRef} className="flex gap-16 items-start">
                 {displayedTreeData.length > 0 ? (
                   <>
                     {displayedTreeData.map(node => (
