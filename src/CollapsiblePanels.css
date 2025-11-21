@@ -1,0 +1,95 @@
+.collapsible-panels-container {
+  display: flex;
+  width: 100%;
+  height: calc(100vh - 6rem); /* Full viewport height minus header */
+  border: 1px solid #334155; /* slate-700 */
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.panel {
+  flex-grow: 1;
+  flex-basis: 0;
+  cursor: pointer;
+  transition: flex-grow 0.6s cubic-bezier(0.68, -0.55, 0.27, 1.55); /* A "fancy" transition */
+  overflow: hidden;
+  position: relative;
+}
+
+.left-panel {
+  border-right: 1px solid #334155; /* slate-700 */
+}
+
+/* --- State Logic --- */
+
+/* When the left panel is active, it grows to take up almost all space */
+.collapsible-panels-container.panel-left .left-panel {
+  flex-grow: 20;
+}
+/* And the right panel shrinks */
+.collapsible-panels-container.panel-left .right-panel {
+  flex-grow: 1;
+}
+
+/* When the right panel is active, it grows */
+.collapsible-panels-container.panel-right .right-panel {
+  flex-grow: 20;
+}
+/* And the left panel shrinks */
+.collapsible-panels-container.panel-right .left-panel {
+  flex-grow: 1;
+}
+
+/* --- Content Styling --- */
+
+.panel-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+  overflow-y: auto; /* Allow vertical scrolling */
+  /* Fade content in/out to prevent it from looking squished during transition */
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* Fade out the content of the inactive panel */
+.collapsible-panels-container.panel-left .right-panel .panel-content,
+.collapsible-panels-container.panel-right .left-panel .panel-content,
+.collapsible-panels-container.panel-left .left-panel .panel-title-vertical,
+.collapsible-panels-container.panel-right .right-panel .panel-title-vertical {
+  opacity: 0;
+  pointer-events: none; /* Prevent clicking on faded content */
+}
+
+.collapsible-panels-container.panel-split .panel-content {
+  opacity: 1;
+}
+
+/* --- Vertical Title Styling --- */
+.panel-title-vertical {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  text-align: center;
+  font-size: 1.125rem; /* text-lg */
+  font-weight: 600; /* font-semibold */
+  color: #94a3b8; /* slate-400 */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-50%) rotate(180deg);
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+  white-space: nowrap;
+}
+
+.collapsible-panels-container.panel-left > .right-panel .panel-title-vertical,
+.collapsible-panels-container.panel-right > .left-panel .panel-title-vertical {
+  opacity: 1;
+}
+
+.collapsible-panels-container.panel-split .panel-title-vertical {
+  opacity: 0;
+}

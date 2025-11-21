@@ -23,6 +23,8 @@ import MemoryView from '../components/MemoryView';
 import LogsView from '../components/LogsView';
 import SettingsModal from '../components/SettingsModal';
 import DeleteModal from '../components/DeleteModal';
+import MemorySearchBar from '../MemorySearchBar';
+import CollapsiblePanels from '../CollapsiblePanels';
 
 import { getTodayDateString, isDateAnOccurrence } from '../utils/dateUtils';
 import { findNodeRecursive } from '../utils/treeUtils';
@@ -277,7 +279,7 @@ export default function MainPage({
       
       useEffect(() => {
         if (highlightedNodeRef.current) {
-          const canvas = document.querySelector('[data-canvas-area]');
+          const canvas = canvasRef.current;
           const nodeElement = highlightedNodeRef.current;
           const canvasRect = canvas.getBoundingClientRect();
           const nodeRect = nodeElement.getBoundingClientRect();
@@ -332,7 +334,7 @@ export default function MainPage({
     
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-      }, [searchResults, searchIndex, activeTab]);
+      }, [searchResults, searchIndex, activeTab, viewMode, searchQuery]);
 
     const confirmDelete = () => {
         if (deleteTargetId) {
@@ -514,48 +516,55 @@ export default function MainPage({
                         <Settings2 size={18} />
                     </button>
                 </div>
-
+                
+                {/* Centered View Mode Toggle */}
                 {activeTab === 'today' && (
-                <div className="flex items-center gap-1 rounded-lg bg-slate-900/80 p-1 border border-slate-800 backdrop-blur-sm pointer-events-auto">
-                    <button onClick={() => setViewMode('tree')} className={`p-2 rounded-md transition-colors ${viewMode === 'tree' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`} title="Tree View">
-                    <GitMerge size={18} />
-                    </button>
-                    <button onClick={() => setViewMode('list')} className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`} title="List View">
-                    <LayoutGrid size={18} />
-                    </button>
-                </div>
+                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-lg bg-slate-900/80 p-1 border border-slate-800 backdrop-blur-sm pointer-events-auto">
+                        <button onClick={() => setViewMode('tree')} className={`p-2 rounded-md transition-colors ${viewMode === 'tree' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`} title="Tree View">
+                        <GitMerge size={18} />
+                        </button>
+                        <button onClick={() => setViewMode('list')} className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`} title="List View">
+                        <LayoutGrid size={18} />
+                        </button>
+                    </div>
                 )}
 
-                <div className="pointer-events-auto flex gap-2 bg-slate-900/90 backdrop-blur p-2 rounded-xl border border-slate-800">
-                <button onClick={() => setScale(s => Math.max(0.5, s - 0.1))} className="p-2 hover:bg-white/10 rounded-lg"><Minimize size={18} /></button>
-                <span className="flex items-center px-2 text-sm font-mono text-slate-400">{Math.round(scale * 100)}%</span>
-                <button onClick={() => setScale(s => Math.min(2, s + 0.1))} className="p-2 hover:bg-white/10 rounded-lg"><Maximize size={18} /></button>
-                <div className="relative" ref={datePickerRef}>
-                    <button 
-                    onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                    className="flex items-center gap-2 cursor-pointer rounded-lg px-3 py-2 text-sm text-slate-400 hover:bg-white/10 transition-colors"
-                    >
-                    <CalendarDays size={16} />
-                    <span>{selectedDate === getTodayDateString() ? 'Today' : selectedDate}</span>
-                    </button>
-                    {isDatePickerOpen && (
-                    <div className="absolute top-full right-0 mt-2 z-30 animate-in fade-in duration-100">
-                        <CustomDatePicker 
-                        selected={selectedDate ? parseISO(selectedDate) : undefined}
-                        onSelect={(date) => {
-                            if (date) setSelectedDate(format(date, 'yyyy-MM-dd'));
-                            setIsDatePickerOpen(false);
-                        }}
-                        />
-                    </div>
+                {/* Right-aligned controls */}
+                <div className="pointer-events-auto flex items-center justify-end gap-2 bg-slate-900/90 backdrop-blur p-2 rounded-xl border border-slate-800">
+                    {activeTab === 'today' && viewMode === 'tree' && (
+                        <div className="flex items-center gap-2 animate-in fade-in duration-200">
+                            <button onClick={() => setScale(s => Math.max(0.5, s - 0.1))} className="p-2 hover:bg-white/10 rounded-lg" title="Zoom Out"><Minimize size={18} /></button>
+                            <span className="flex items-center px-2 text-sm font-mono text-slate-400 w-12 text-center justify-center">{Math.round(scale * 100)}%</span>
+                            <button onClick={() => setScale(s => Math.min(2, s + 0.1))} className="p-2 hover:bg-white/10 rounded-lg" title="Zoom In"><Maximize size={18} /></button>
+                        </div>
                     )}
-                </div>
+
+                    {activeTab !== 'memory' && (
+                        <div className="relative" ref={datePickerRef}>
+                        <button 
+                        onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
+                        className="flex items-center gap-2 cursor-pointer rounded-lg px-3 py-2 text-sm text-slate-400 hover:bg-white/10 transition-colors"
+                        >
+                        <CalendarDays size={16} />
+                        <span>{selectedDate === getTodayDateString() ? 'Today' : selectedDate}</span>
+                        </button>
+                        {isDatePickerOpen && (
+                        <div className="absolute top-full right-0 mt-2 z-30 animate-in fade-in duration-100">
+                            <CustomDatePicker 
+                            selected={selectedDate ? parseISO(selectedDate) : undefined}
+                            onSelect={(date) => {
+                                if (date) setSelectedDate(format(date, 'yyyy-MM-dd'));
+                                setIsDatePickerOpen(false);
+                            }}
+                            />
+                        </div>
+                        )}
+                        </div>
+                    )}
                 </div>
             </div>
 
             {activeTab === 'today' && <SuggestionBar suggestions={suggestedTasks} onSuggestionClick={handleSuggestionClick} />}
-
-            <SearchOverlay query={searchQuery} resultCount={searchResults.length} currentIndex={searchIndex} />
 
             <div className="pt-24 flex-1 flex flex-col min-h-0">
                 {activeTab === 'today' && viewMode === 'tree' && (
@@ -638,19 +647,45 @@ export default function MainPage({
                 })()
                 )}
                 {activeTab === 'memory' && (() => {
+                const isSearching = searchQuery.length > 0;
                 const memoryResults = isSearching ? memoryFuse.search(searchQuery).map(r => r.item) : [...memoryData.notes, ...memoryData.qas];
                 const filteredNotes = memoryResults.filter(item => 'text' in item && !('question' in item));
                 const filteredQAs = memoryResults.filter(item => 'question' in item);
 
-                return (
+                const notesContent = (
                     <MemoryView
-                    searchQuery={searchQuery}
-                    memoryData={{
-                        notes: isSearching ? filteredNotes : memoryData.notes,
-                        qas: isSearching ? filteredQAs : memoryData.qas,
-                    }}
-                    onUpdate={setMemoryData}
+                        searchQuery={searchQuery}
+                        memoryData={{
+                            notes: isSearching ? filteredNotes : memoryData.notes,
+                            qas: [],
+                        }}
+                        onUpdate={(newMemory) => setMemoryData({ ...memoryData, ...newMemory })}
+                        viewType="notes"
                     />
+                );
+
+                const qaContent = (
+                    <MemoryView
+                        searchQuery={searchQuery}
+                        memoryData={{
+                            notes: [],
+                            qas: isSearching ? filteredQAs : memoryData.qas,
+                        }}
+                        onUpdate={(newMemory) => setMemoryData({ ...memoryData, ...newMemory })}
+                        viewType="qas"
+                    />
+                );
+
+                return (
+                    <div className="flex flex-col h-full">
+                        <MemorySearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+                        <CollapsiblePanels 
+                            leftPanelContent={notesContent} 
+                            leftTitle="Notes"
+                            rightPanelContent={qaContent}
+                            rightTitle="Q&A"
+                        />
+                    </div>
                 );
                 })()}
                 {activeTab === 'logs' && <LogsView 

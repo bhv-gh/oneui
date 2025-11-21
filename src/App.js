@@ -249,6 +249,12 @@ export default function TaskTreeApp() {
     .rich-text-editor .ql-snow .ql-picker-label {
       color: #94a3b8;
     }
+    .rich-text-editor .ql-editor.ql-blank::before {
+      color: #64748b; /* slate-500 */
+      font-style: italic;
+      left: 1rem; /* Corresponds to ql-editor's padding */
+      pointer-events: none;
+    }
   `;
 
   return (
