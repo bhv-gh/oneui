@@ -2662,13 +2662,27 @@ export default function TaskTreeApp() {
     const canvasHeight = canvas.offsetHeight;
     const contentWidth = content.offsetWidth * currentScale;
     const contentHeight = content.offsetHeight * currentScale;
+    const padding = Math.min(canvasWidth, canvasHeight) * 0.2; // Allow 20% of the smaller canvas dimension as overscroll
+    let minX, maxX, minY, maxY;
 
-    // Calculate the boundaries. We allow some overscroll (padding).
-    const padding = 200; // Allow 200px of overscroll
-    const minX = -(contentWidth - canvasWidth + padding);
-    const maxX = padding;
-    const minY = -(contentHeight - canvasHeight + padding);
-    const maxY = padding;
+    if (contentWidth < canvasWidth) {
+      // Content is smaller than canvas. Allow panning within the viewport.
+      // The boundary is the edge of the content hitting the edge of the canvas.
+      minX = 0;
+      maxX = canvasWidth - contentWidth;
+    } else {
+      // Content is larger, allow panning with padding
+      minX = -(contentWidth - canvasWidth + padding);
+      maxX = padding;
+    }
+    if (contentHeight < canvasHeight) {
+      // Content is smaller than canvas.
+      minY = 0;
+      maxY = canvasHeight - contentHeight;
+    } else {
+      minY = -(contentHeight - canvasHeight + padding);
+      maxY = padding;
+    }
 
     // The pan values are unscaled, so we need to divide the boundaries by the scale.
     const clampedX = Math.max(minX / currentScale, Math.min(maxX / currentScale, newPan.x));
@@ -2711,8 +2725,6 @@ export default function TaskTreeApp() {
   };
 
   const handleWheel = (e) => {
-    e.preventDefault();
-
     if (e.altKey) {
       // --- Zooming Logic ---
       const zoomSpeed = 0.002;
@@ -2946,16 +2958,13 @@ export default function TaskTreeApp() {
       <div className="pt-24 flex-1 flex flex-col min-h-0">
         {activeTab === 'today' && viewMode === 'tree' && (
           <div
-            data-canvas-area
-            className={`no-scrollbar flex-1 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} animate-in fade-in duration-300 overflow-auto overscroll-x-contain`}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onWheel={handleWheel}
-            onMouseUp={handleMouseUpOrLeave}
-            onMouseLeave={handleMouseUpOrLeave}
+            data-canvas-area // Using vmin for background size to make it responsive
+            className={`no-scrollbar flex-1 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:2vmin_2vmin] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} animate-in fade-in duration-300 overflow-auto overscroll-x-contain`}
+          onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUpOrLeave}
+          onMouseLeave={handleMouseUpOrLeave} // wheel is handled by useEffect
           >
-            <div 
-              className="min-w-max min-h-full p-20 flex justify-center items-start origin-top-left"
+            <div // Using vmin for padding to make it responsive
+              className="min-w-max min-h-full p-[5vmin] flex justify-center items-start origin-top-left"
               style={{ transform: `scale(${scale}) translate(${pan.x}px, ${pan.y}px)`, transition: isDragging ? 'none' : 'transform 0.2s' }}
             >
               <div ref={contentRef} className="flex gap-16 items-start">
