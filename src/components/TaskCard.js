@@ -9,6 +9,7 @@ import {
   ListPlus,
   X,
   CalendarPlus,
+  CalendarDays,
   Repeat,
   Play,
 } from 'lucide-react';
@@ -111,8 +112,8 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
     <div 
       ref={isHighlighted ? highlightedRef : null}
       data-task-id={node.id}
-      className={`
-        relative flex flex-col items-center w-72 transition-all duration-300 group z-10
+      className={` 
+        relative flex flex-col items-center w-[15vw] min-w-[250px] max-w-[350px] transition-all duration-300 group z-10
         ${isSearching && !isHighlighted ? 'opacity-20 scale-95' : 'opacity-100 scale-100'}
         ${isHighlighted ? 'opacity-100' : ''}
         ${node.isCompleted && !isHighlighted ? 'opacity-70' : ''}

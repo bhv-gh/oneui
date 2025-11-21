@@ -255,7 +255,7 @@ const LogsView = ({ logs, selectedDate, onAddManualLog, onEditLog, onDeleteLog, 
 
   return (
     <div 
-      ref={scrollContainerRef} // This ref is for scrolling to current time
+      ref={scrollContainerRef}
       className="flex-1 h-0 px-8 md:px-12 pb-8 overflow-y-auto animate-in fade-in duration-300"
     >
       <h2 className="text-2xl font-bold text-slate-200 mb-6">

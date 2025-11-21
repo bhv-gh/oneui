@@ -73,6 +73,7 @@ export default function MainPage({
     const highlightedNodeRef = useRef(null);
     const datePickerRef = useRef(null);
     const contentRef = useRef(null);
+    const canvasRef = useRef(null);
     const highlightTimeoutRef = useRef(null);
 
     const filterTreeByCompletionDate = (nodes, date) => {
@@ -341,25 +342,27 @@ export default function MainPage({
     };
 
     const clampPan = (newPan, currentScale) => {
-        if (!contentRef.current) return newPan;
+        if (!contentRef.current || !canvasRef.current) return newPan;
 
-        const canvas = contentRef.current.parentElement.parentElement;
+        const canvas = canvasRef.current;
         const content = contentRef.current;
 
-        const canvasWidth = canvas.offsetWidth;
+        const canvasWidth = canvas.offsetWidth; 
         const canvasHeight = canvas.offsetHeight;
-        const contentWidth = content.offsetWidth * currentScale;
-        const contentHeight = content.offsetHeight * currentScale;
-        const padding = Math.min(canvasWidth, canvasHeight) * 0.2;
+        const contentWidth = content.offsetWidth * currentScale; 
+        const contentHeight = content.offsetHeight * currentScale; 
+        const cardWidth = Math.max(250, Math.min(350, window.innerWidth * 0.15)); // Calculate card width based on vw, with min/max
+        const padding = Math.min(canvasWidth, canvasHeight) * 0.2; // Allow 20% of the smaller canvas dimension as overscroll
         let minX, maxX, minY, maxY;
 
         if (contentWidth < canvasWidth) {
-            minX = 0;
-            maxX = canvasWidth - contentWidth;
+            minX = -contentWidth;
+            maxX = canvasWidth;
         } else {
-            minX = -(contentWidth - canvasWidth + padding);
-            maxX = padding;
+            minX = canvasWidth - contentWidth - padding;
+            maxX = padding; 
         }
+
         if (contentHeight < canvasHeight) {
             minY = 0;
             maxY = canvasHeight - contentHeight;
@@ -558,6 +561,7 @@ export default function MainPage({
                 {activeTab === 'today' && viewMode === 'tree' && (
                 <div
                     data-canvas-area
+                    ref={canvasRef}
                     className={`no-scrollbar flex-1 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:2vmin_2vmin] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} animate-in fade-in duration-300 overflow-auto overscroll-x-contain`}
                     onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUpOrLeave}
                     onMouseLeave={handleMouseUpOrLeave} onWheel={handleWheel}

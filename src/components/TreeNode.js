@@ -31,7 +31,7 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
           )}
 
           {node.children.map((child, index) => (
-            <div key={child.id} className="flex flex-col items-center relative px-4">
+            <div key={child.id} className="flex flex-col items-center relative px-[2vw]">
               {/* 1. Vertical line going UP from child to the horizontal bar */}
               <div className="w-px h-8 bg-slate-700 mb-0"></div>
               
