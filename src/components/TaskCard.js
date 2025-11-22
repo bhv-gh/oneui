@@ -16,7 +16,7 @@ import {
 import CustomDatalistInput from './CustomDatalistInput';
 import CustomDatePicker from './CustomDatePicker';
 import RecurrenceEditor from './RecurrenceEditor';
-import { POMODORO_TIME, SHORT_BREAK_TIME, LONG_BREAK_TIME } from '../WellKnown';
+import { POMODORO_TIME, SHORT_BREAK_TIME, LONG_BREAK_TIME } from '../utils/WellKnown';
 import { generateId } from '../utils/idGenerator';
 import { startOfToday, parseISO } from 'date-fns';
 

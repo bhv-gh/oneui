@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BrainCircuit, Coffee, TimerReset, Play, Pause } from 'lucide-react';
 
-import { POMODORO_TIME, SHORT_BREAK_TIME, LONG_BREAK_TIME } from '../WellKnown';
+import { POMODORO_TIME, SHORT_BREAK_TIME, LONG_BREAK_TIME } from '../utils/WellKnown';
 
 // --- Component: Pomodoro Timer ---
 const PomodoroTimer = ({ 

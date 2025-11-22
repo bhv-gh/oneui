@@ -23,8 +23,8 @@ import MemoryView from '../components/MemoryView';
 import LogsView from '../components/LogsView';
 import SettingsModal from '../components/SettingsModal';
 import DeleteModal from '../components/DeleteModal';
-import MemorySearchBar from '../MemorySearchBar';
-import CollapsiblePanels from '../CollapsiblePanels';
+import MemorySearchBar from '../components/MemorySearchBar';
+import CollapsiblePanels from '../components/CollapsiblePanels';
 
 import { getTodayDateString, isDateAnOccurrence } from '../utils/dateUtils';
 import { findNodeRecursive } from '../utils/treeUtils';
