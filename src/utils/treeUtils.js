@@ -22,3 +22,16 @@ export const findNodeRecursive = (nodes, id) => {
   }
   return null;
 };
+
+export const findNodePath = (nodes, id) => {
+  for (const node of nodes) {
+    if (node.id === id) return [node];
+    if (node.children) {
+      const path = findNodePath(node.children, id);
+      if (path.length > 0) {
+        return [node, ...path];
+      }
+    }
+  }
+  return [];
+};

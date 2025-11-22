@@ -44,7 +44,8 @@ export default function MainPage({
         handleUpdate, 
         handleAddSubtask, 
         handleDelete, 
-        handleAddRoot 
+        handleAddRoot,
+        expandBranch, 
     } = useContext(TreeDataContext);
     const { logs, handleSaveLog, handleDeleteLog, handleUpdateLogTime } = useContext(LogsContext);
     const { memoryData, setMemoryData } = useContext(MemoryContext);
@@ -84,7 +85,7 @@ export default function MainPage({
           const hasCompletedChildren = children.some(c => c !== null);
     
           if (node.completionDate === date || hasCompletedChildren) {
-            return { ...node, children, isExpanded: hasCompletedChildren };
+            return { ...node, children };
           }
           return null;
         }).filter(node => node !== null);
@@ -97,7 +98,7 @@ export default function MainPage({
           const hasScheduledChildren = children.some(c => c !== null);
     
           if ((node.scheduledDate === date || isDateAnOccurrence(node, date)) || hasScheduledChildren) {
-            return { ...node, children, isExpanded: hasScheduledChildren, originalChildrenCount };
+            return { ...node, children, originalChildrenCount };
           }
           return null;
         }).filter(node => node !== null);
@@ -305,8 +306,16 @@ export default function MainPage({
       }, [highlightedTaskId, viewMode]);
     
       useEffect(() => {
-        setHighlightedTaskId(searchResults.length > 0 ? searchResults[searchIndex]?.item.id : null);
-      }, [searchIndex, searchResults]);
+        if (searchResults.length > 0) {
+          const newHighlightedTaskId = searchResults[searchIndex]?.item.id;
+          setHighlightedTaskId(newHighlightedTaskId);
+          if (newHighlightedTaskId && viewMode === 'tree') {
+            expandBranch(newHighlightedTaskId);
+          }
+        } else {
+          setHighlightedTaskId(null);
+        }
+      }, [searchIndex, searchResults, expandBranch, viewMode]);
     
       useEffect(() => {
         const handleKeyDown = (e) => {
@@ -705,6 +714,7 @@ export default function MainPage({
                 onExport={handleExport}
                 onImport={handleImport}
             />
+            <SearchOverlay query={searchQuery} resultCount={searchResults.length} currentIndex={searchIndex} />
         </div>
     );
 }

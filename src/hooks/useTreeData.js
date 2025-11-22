@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { generateId } from '../utils/idGenerator';
 import { getTodayDateString, isDateAnOccurrence, calculateNextOccurrence } from '../utils/dateUtils';
-import { findParentNode, findNodeRecursive } from '../utils/treeUtils';
+import { findParentNode, findNodeRecursive, findNodePath } from '../utils/treeUtils';
 import { format } from 'date-fns';
 
 const initialData = [
@@ -103,6 +103,21 @@ export function useTreeData() {
     setTreeData(prevData => {
       let updatedTree = updateNodeRecursive(prevData, id, newUpdates);
 
+      if (newUpdates.isExpanded === false) {
+        const node = findNodeRecursive(updatedTree, id);
+        if (node && node.children) {
+          const collapseChildren = (children) => {
+            children.forEach(child => {
+              updatedTree = updateNodeRecursive(updatedTree, child.id, { isExpanded: false });
+              if (child.children) {
+                collapseChildren(child.children);
+              }
+            });
+          };
+          collapseChildren(node.children);
+        }
+      }
+
       if (shouldResetChildren) {
         const parentNode = findNodeRecursive(updatedTree, id);
         if (parentNode && parentNode.children) {
@@ -171,6 +186,22 @@ export function useTreeData() {
     });
   };
 
+  const expandBranch = (nodeId) => {
+    setTreeData(prevData => {
+      const path = findNodePath(prevData, nodeId);
+      if (path.length > 0) {
+        let updatedTree = prevData;
+        for (const node of path) {
+          if (!node.isExpanded) {
+            updatedTree = updateNodeRecursive(updatedTree, node.id, { isExpanded: true });
+          }
+        }
+        return updatedTree;
+      }
+      return prevData;
+    });
+  };
+
   return { 
     treeData, 
     handleUpdate, 
@@ -179,5 +210,7 @@ export function useTreeData() {
     handleAddRoot,
     handleUpdateField,
     handleAddField,
+    expandBranch,
   };
 }
+
