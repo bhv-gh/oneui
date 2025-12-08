@@ -25,13 +25,12 @@ import SettingsModal from '../components/SettingsModal';
 import DeleteModal from '../components/DeleteModal';
 import MemorySearchBar from '../components/MemorySearchBar';
 import CollapsiblePanels from '../components/CollapsiblePanels';
+import InsightsView from '../components/InsightsView';
 
 import { getTodayDateString, isDateAnOccurrence } from '../utils/dateUtils';
 import { findNodeRecursive } from '../utils/treeUtils';
 import Fuse from 'fuse.js';
-
 const POMODORO_TIME = 25 * 60;
-
 export default function MainPage({
     focusedTask,
     handleStartFocus,
@@ -49,36 +48,29 @@ export default function MainPage({
     } = useContext(TreeDataContext);
     const { logs, handleSaveLog, handleDeleteLog, handleUpdateLogTime } = useContext(LogsContext);
     const { memoryData, setMemoryData } = useContext(MemoryContext);
-
     const [scale, setScale] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const dragStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
-
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
     const [selectedDate, setSelectedDate] = useState(getTodayDateString);
     const [activeTab, setActiveTab] = useState('today');
     const [viewMode, setViewMode] = useState(() => {
         return localStorage.getItem('flowAppViewMode') || 'tree';
     });
-
     const [deleteTargetId, setDeleteTargetId] = useState(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [manualLogModal, setManualLogModal] = useState(null);
-
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [highlightedTaskId, setHighlightedTaskId] = useState(null);
     const [searchIndex, setSearchIndex] = useState(0);
-
     const [isTimelineInteracting, setIsTimelineInteracting] = useState(false);
-
     const highlightedNodeRef = useRef(null);
     const datePickerRef = useRef(null);
     const contentRef = useRef(null);
     const canvasRef = useRef(null);
     const highlightTimeoutRef = useRef(null);
-
     const filterTreeByCompletionDate = (nodes, date) => {
         return nodes.map(node => {
           const children = node.children ? filterTreeByCompletionDate(node.children, date) : [];
@@ -528,6 +520,7 @@ export default function MainPage({
                         <button onClick={() => setActiveTab('today')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'today' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Today</button>
                         <button onClick={() => setActiveTab('logs')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'logs' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Logs</button>
                         <button onClick={() => setActiveTab('memory')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'memory' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Memory</button>
+                        <button onClick={() => setActiveTab('insights')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'insights' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Insights</button>
                     </div>
                     <button 
                         onClick={() => setIsSettingsOpen(true)}
@@ -718,6 +711,7 @@ export default function MainPage({
                 onUpdateLogTime={handleUpdateLogTime}
                 onInteractionChange={setIsTimelineInteracting}
                 />}
+                {activeTab === 'insights' && <InsightsView tasks={treeData} />}
             </div>
 
             <SettingsModal 
