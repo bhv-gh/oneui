@@ -57,6 +57,7 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAdd
             onStartFocus={onStartFocus}
             onAdd={onAdd}
             onRequestDelete={onRequestDelete}
+            selectedDate={selectedDate}
           />
         ))}
         {selectedDate >= getTodayDateString() && (

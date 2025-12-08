@@ -83,8 +83,12 @@ export default function MainPage({
         return nodes.map(node => {
           const children = node.children ? filterTreeByCompletionDate(node.children, date) : [];
           const hasCompletedChildren = children.some(c => c !== null);
-    
-          if (node.completionDate === date || hasCompletedChildren) {
+          
+          const wasCompletedOnDate = node.recurrence
+            ? node.completedOccurrences?.includes(date)
+            : node.completionDate === date;
+
+          if (wasCompletedOnDate || hasCompletedChildren) {
             return { ...node, children };
           }
           return null;
@@ -108,11 +112,18 @@ export default function MainPage({
         return nodes.map(node => { 
           const originalChildrenCount = node.children?.length || 0;
           const visibleChildren = node.children ? filterForTodayView(node.children, today) : [];
-          const isTaskActionable = !node.isCompleted && (!node.scheduledDate || (node.scheduledDate && node.scheduledDate <= today));
-          const wasCompletedToday = node.completionDate === today;
+          
+          const isCompletedForToday = node.recurrence
+            ? node.completedOccurrences?.includes(today)
+            : node.isCompleted;
+
+          const isRelevantToday = (node.scheduledDate && node.scheduledDate <= today) || isDateAnOccurrence(node, today) || !node.scheduledDate;
+
+          const isTaskActionable = isRelevantToday && !isCompletedForToday;
+          const wasCompletedToday = isCompletedForToday;
           const hasVisibleDescendants = visibleChildren.length > 0;
     
-          if (isTaskActionable || wasCompletedToday || hasVisibleDescendants) {
+          if (isTaskActionable || (wasCompletedToday && isDateAnOccurrence(node, today)) || hasVisibleDescendants) {
             return { ...node, children: visibleChildren, originalChildrenCount };
           }
           return null;
@@ -595,7 +606,7 @@ export default function MainPage({
                             <TreeNode 
                                 key={node.id} 
                                 node={node} 
-                                onUpdate={handleUpdate} 
+                                onUpdate={(id, updates) => handleUpdate(id, updates, selectedDate)} 
                                 onAdd={(parentId) => handleAddSubtask(parentId, selectedDate)} 
                                 onRequestDelete={setDeleteTargetId}
                                 allFieldKeys={allFieldKeys}
@@ -606,6 +617,7 @@ export default function MainPage({
                                 highlightedTaskId={highlightedTaskId}
                                 treeData={treeData}
                                 highlightedRef={highlightedNodeRef}
+                                selectedDate={selectedDate}
                             />
                             ))}
                             {selectedDate >= getTodayDateString() && (
@@ -645,7 +657,7 @@ export default function MainPage({
                     return (
                     <ListView 
                         tasks={listTasks}
-                        onUpdate={handleUpdate}
+                        onUpdate={(id, updates) => handleUpdate(id, updates, selectedDate)}
                         onStartFocus={handleStartFocus}
                         onAdd={(parentId) => handleAddSubtask(parentId, selectedDate)}
                         onRequestDelete={setDeleteTargetId}

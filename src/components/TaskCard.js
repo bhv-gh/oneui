@@ -22,8 +22,10 @@ import { startOfToday, parseISO } from 'date-fns';
 import { getTodayDateString } from '../utils/dateUtils';
 
 // --- Component: Task Card (The actual node content) ---
-const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, isHighlighted, highlightedRef, treeData }) => {
-  const isCompleted = (node.isCompleted && !node.recurrence) || (node.recurrence && node.completionDate === getTodayDateString());
+const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, isHighlighted, highlightedRef, treeData, selectedDate }) => {
+  const isCompleted = node.recurrence
+    ? node.completedOccurrences?.includes(selectedDate)
+    : node.isCompleted;
   const [isEditing, setIsEditing] = useState(false);
   const [showFields, setShowFields] = useState(false);
   const inputRef = useRef(null);

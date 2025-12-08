@@ -14,8 +14,11 @@ import RecurrenceEditor from './RecurrenceEditor';
 import { getTodayDateString } from '../utils/dateUtils';
 
 // --- Component: Task List Item (for List View) ---
-const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete }) => {
-  const isCompleted = (task.isCompleted && !task.recurrence) || (task.recurrence && task.completionDate === getTodayDateString());
+const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, selectedDate }) => {
+  const isCompleted = task.recurrence
+    ? task.completedOccurrences?.includes(selectedDate)
+    : task.isCompleted;
+
   const [isEditing, setIsEditing] = useState(false);
   const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false);
   const [isRecurrenceEditorOpen, setIsRecurrenceEditorOpen] = useState(false);
@@ -95,10 +98,10 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
       <button 
         onClick={(e) => {
           e.stopPropagation();
-          onUpdate(task.id, { isCompleted: !task.isCompleted });
+          onUpdate(task.id, { isCompleted: !isCompleted });
         }}
         className={`flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full border transition-all duration-300 ${
-          task.isCompleted 
+          isCompleted 
             ? 'bg-emerald-500 border-emerald-500 text-white' 
             : 'border-slate-500 text-transparent group-hover:border-emerald-400'
         }`}

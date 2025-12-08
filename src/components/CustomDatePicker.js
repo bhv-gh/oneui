@@ -32,7 +32,7 @@ const CustomDatePicker = ({ selected, onSelect }) => {
       onSelect={onSelect}
       showOutsideDays
       classNames={{
-        root: 'bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-xl shadow-2xl p-3 flex flex-col', // Added flex-col
+        root: 'bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-3 flex flex-col', // Added flex-col
         caption: 'flex justify-center items-center relative mb-2',
         caption_label: 'text-sm font-medium text-slate-200',
         nav: 'flex items-center',

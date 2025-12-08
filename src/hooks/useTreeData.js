@@ -82,55 +82,43 @@ export function useTreeData() {
       .map(node => ({ ...node, children: deleteNodeRecursive(node.children, id) }));
   };
 
-  const handleUpdate = (id, updates) => {
+  const handleUpdate = (id, updates, forDate) => {
     let newUpdates = { ...updates };
-    let shouldResetChildren = false;
 
-    if (newUpdates.isCompleted === true) {
-      newUpdates.completionDate = getTodayDateString();
-      const task = findNodeRecursive(treeData, id);
+    const task = findNodeRecursive(treeData, id);
+    if (!task) return;
 
-      if (task?.recurrence) {
-        const nextDate = calculateNextOccurrence(task, getTodayDateString());
-        newUpdates = { ...newUpdates, isCompleted: false, scheduledDate: nextDate ? format(nextDate, 'yyyy-MM-dd') : null };
-        
-        if (task.children && task.children.length > 0) {
-          shouldResetChildren = true;
-        }
+    // If recurrence is being set for the first time, establish a stable start date.
+    if (newUpdates.recurrence && !task.recurrence) {
+      newUpdates.recurrenceStartDate = task.scheduledDate || forDate || getTodayDateString();
+    }
+    // If recurrence is being removed, also remove the start date.
+    if (newUpdates.recurrence === null) {
+      newUpdates.recurrenceStartDate = null;
+    }
+
+    if (task.recurrence) {
+      const completed = new Set(task.completedOccurrences || []);
+      if (newUpdates.isCompleted === true) {
+        completed.add(forDate);
+      } else if (newUpdates.isCompleted === false) {
+        completed.delete(forDate);
       }
-    } else if (newUpdates.isCompleted === false) {
-      newUpdates.completionDate = null;
+      newUpdates.completedOccurrences = Array.from(completed);
+      delete newUpdates.isCompleted; // Not used for recurring tasks
+      delete newUpdates.completionDate; // Not used for recurring tasks
+    
+    } else {
+      // Non-recurring task logic
+      if (newUpdates.isCompleted === true) {
+        newUpdates.completionDate = forDate;
+      } else if (newUpdates.isCompleted === false) {
+        newUpdates.completionDate = null;
+      }
     }
 
     setTreeData(prevData => {
-      let updatedTree = updateNodeRecursive(prevData, id, newUpdates);
-
-      if (newUpdates.isExpanded === false) {
-        const node = findNodeRecursive(updatedTree, id);
-        if (node && node.children) {
-          const collapseChildren = (children) => {
-            children.forEach(child => {
-              updatedTree = updateNodeRecursive(updatedTree, child.id, { isExpanded: false });
-              if (child.children) {
-                collapseChildren(child.children);
-              }
-            });
-          };
-          collapseChildren(node.children);
-        }
-      }
-
-      if (shouldResetChildren) {
-        const parentNode = findNodeRecursive(updatedTree, id);
-        if (parentNode && parentNode.children) {
-          for (const child of parentNode.children) {
-            updatedTree = updateNodeRecursive(updatedTree, child.id, { isCompleted: false, completionDate: null });
-          }
-        }
-      }
-
-
-      return updatedTree;
+      return updateNodeRecursive(prevData, id, newUpdates);
     });
   };
 
