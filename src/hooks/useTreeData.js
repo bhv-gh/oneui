@@ -127,16 +127,7 @@ export function useTreeData() {
         }
       }
 
-      if (newUpdates.isCompleted) {
-        const parent = findParentNode(updatedTree, id);
-        if (parent && !parent.isCompleted) {
-          const updatedParent = findNodeRecursive(updatedTree, parent.id);
-          const allChildrenCompleted = updatedParent.children.every(child => child.isCompleted);
-          if (allChildrenCompleted) {
-            updatedTree = updateNodeRecursive(updatedTree, parent.id, { isCompleted: true, completionDate: getTodayDateString(), isExpanded: false });
-          }
-        }
-      }
+
       return updatedTree;
     });
   };
