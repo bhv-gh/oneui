@@ -98,6 +98,8 @@ export function useTreeData() {
           shouldResetChildren = true;
         }
       }
+    } else if (newUpdates.isCompleted === false) {
+      newUpdates.completionDate = null;
     }
 
     setTreeData(prevData => {

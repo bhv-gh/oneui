@@ -11,10 +11,11 @@ import {
 import { format, parseISO } from 'date-fns';
 import CustomDatePicker from './CustomDatePicker';
 import RecurrenceEditor from './RecurrenceEditor';
+import { getTodayDateString } from '../utils/dateUtils';
 
 // --- Component: Task List Item (for List View) ---
 const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete }) => {
-  const isCompleted = task.isCompleted && !task.recurrence;
+  const isCompleted = (task.isCompleted && !task.recurrence) || (task.recurrence && task.completionDate === getTodayDateString());
   const [isEditing, setIsEditing] = useState(false);
   const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false);
   const [isRecurrenceEditorOpen, setIsRecurrenceEditorOpen] = useState(false);

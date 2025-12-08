@@ -19,9 +19,11 @@ import RecurrenceEditor from './RecurrenceEditor';
 import { POMODORO_TIME, SHORT_BREAK_TIME, LONG_BREAK_TIME } from '../utils/WellKnown';
 import { generateId } from '../utils/idGenerator';
 import { startOfToday, parseISO } from 'date-fns';
+import { getTodayDateString } from '../utils/dateUtils';
 
 // --- Component: Task Card (The actual node content) ---
 const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, isHighlighted, highlightedRef, treeData }) => {
+  const isCompleted = (node.isCompleted && !node.recurrence) || (node.recurrence && node.completionDate === getTodayDateString());
   const [isEditing, setIsEditing] = useState(false);
   const [showFields, setShowFields] = useState(false);
   const inputRef = useRef(null);
@@ -116,7 +118,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
         relative flex flex-col items-center w-[15vw] min-w-[250px] max-w-[350px] transition-all duration-300 group z-10
         ${isSearching && !isHighlighted ? 'opacity-20 scale-95' : 'opacity-100 scale-100'}
         ${isHighlighted ? 'opacity-100' : ''}
-        ${node.isCompleted && !isHighlighted ? 'opacity-70' : ''}
+        ${isCompleted && !isHighlighted ? 'opacity-70' : ''}
 
       `}
     >
@@ -128,7 +130,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
             ? 'border-cyan-400 shadow-[0_0_25px_rgba(56,189,248,0.4)]' 
             : hasPausedTimer && !isCurrentlyRunningInFocus 
               ? 'border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)] animate-border-pulse' 
-              : (node.isCompleted ? 'border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'border-slate-700 hover:border-slate-500 hover:shadow-2xl hover:shadow-emerald-500/5')}
+              : (isCompleted ? 'border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'border-slate-700 hover:border-slate-500 hover:shadow-2xl hover:shadow-emerald-500/5')}
         `}
       >
         <div className="flex items-start gap-3">
@@ -139,7 +141,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 e.stopPropagation();
                 // If trying to complete a parent task
                 // Use originalChildrenCount to check for ALL children, not just visible ones.
-                if (!node.isCompleted && node.originalChildrenCount > 0) {
+                if (!isCompleted && node.originalChildrenCount > 0) {
                   // We need to find the node in the full tree to check its real children's status.
                   const fullNode = findNodeRecursive(treeData, node.id);
                   const allChildrenDone = fullNode.children.every(child => child.isCompleted);
@@ -167,11 +169,11 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 }
 
                 // Proceed with update if it's being un-completed, has no children, or all children are done.
-                onUpdate(node.id, { isCompleted: !node.isCompleted, isExpanded: false });
+                onUpdate(node.id, { isCompleted: !isCompleted, isExpanded: false });
               }}
               className={`
                 mt-1 flex items-center justify-center w-5 h-5 rounded-full border transition-all duration-300
-                ${node.isCompleted 
+                ${isCompleted 
                   ? 'bg-emerald-500 border-emerald-500 text-white' 
                   : 'border-slate-500 text-transparent hover:border-emerald-400'}
               `}
@@ -214,7 +216,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 className={`
                   cursor-text text-sm font-medium break-words pb-1 min-h-[1.5rem]
                   ${node.text ? 'text-slate-200' : 'text-slate-500 italic'}
-                  ${node.isCompleted ? 'line-through text-slate-500' : ''}
+                  ${isCompleted ? 'line-through text-slate-500' : ''}
                 `}
               >
                 {node.text || "New Task"}
