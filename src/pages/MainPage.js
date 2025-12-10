@@ -107,15 +107,17 @@ export default function MainPage({
           
           const isCompletedForToday = node.recurrence
             ? node.completedOccurrences?.includes(today)
-            : node.isCompleted;
+            : (node.isCompleted && node.completionDate === today);
 
           const isRelevantToday = (node.scheduledDate && node.scheduledDate <= today) || isDateAnOccurrence(node, today) || !node.scheduledDate;
 
           const isTaskActionable = isRelevantToday && !isCompletedForToday;
-          const wasCompletedToday = isCompletedForToday;
+          const wasCompletedToday = node.recurrence
+            ? node.completedOccurrences?.includes(today)
+            : node.isCompleted && node.completionDate === today;
           const hasVisibleDescendants = visibleChildren.length > 0;
     
-          if (isTaskActionable || (wasCompletedToday && isDateAnOccurrence(node, today)) || hasVisibleDescendants) {
+          if (isTaskActionable || wasCompletedToday || hasVisibleDescendants) {
             return { ...node, children: visibleChildren, originalChildrenCount };
           }
           return null;

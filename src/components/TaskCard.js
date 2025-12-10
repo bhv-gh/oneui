@@ -99,7 +99,12 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
 
   // Stats
   const totalChildren = node.children.length;
-  const completedChildren = node.children.filter(c => c.isCompleted).length;
+  const completedChildren = node.children.filter(c => {
+    if (c.recurrence) {
+      return c.completedOccurrences?.includes(selectedDate);
+    }
+    return c.isCompleted;
+  }).length;
   const progress = totalChildren === 0 ? 0 : (completedChildren / totalChildren) * 100;
   const fieldsCount = node.fields ? node.fields.length : 0;
 
