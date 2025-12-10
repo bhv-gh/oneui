@@ -2,7 +2,7 @@ import React from 'react';
 import TaskCard from './TaskCard';
 
 // --- Component: Recursive Tree Node ---
-const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, highlightedTaskId, highlightedRef, treeData, selectedDate }) => {
+const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, highlightedTaskId, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled }) => {
   const hasChildren = node.children.length > 0;
 
   return (
@@ -21,6 +21,8 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
         highlightedRef={highlightedRef}
         treeData={treeData} // Pass down the full tree data
         selectedDate={selectedDate}
+        newlyAddedTaskId={newlyAddedTaskId}
+        onFocusHandled={onFocusHandled}
       />
       
       {/* Children Container */}
@@ -64,6 +66,8 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 highlightedRef={highlightedRef}
                 treeData={treeData} // And pass it down recursively
                 selectedDate={selectedDate}
+                newlyAddedTaskId={newlyAddedTaskId}
+                onFocusHandled={onFocusHandled}
               />
             </div>
           ))}

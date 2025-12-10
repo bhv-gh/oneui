@@ -132,11 +132,12 @@ export function useTreeData() {
   };
 
   const handleAddSubtask = (parentId, selectedDate) => {
-    let newNodeId = null;
+    let newNodeId;
     setTreeData(prev => {
       const result = addNodeRecursive(prev, parentId, selectedDate);
       newNodeId = result.newNodeId;
       const treeWithNewNode = result.nodes;
+      // When adding a subtask, un-complete the parent
       return updateNodeRecursive(treeWithNewNode, parentId, { isCompleted: false, completionDate: null });
     });
     return newNodeId;
@@ -149,7 +150,7 @@ export function useTreeData() {
   const handleAddRoot = (selectedDate) => {
     const newRootTask = {
       id: generateId(),
-      text: 'New Project',
+      text: '',
       isCompleted: false,
       isExpanded: true,
       fields: [],
@@ -159,6 +160,7 @@ export function useTreeData() {
       newRootTask.scheduledDate = selectedDate;
     }
     setTreeData(prev => [...prev, newRootTask]);
+    return newRootTask.id;
   };
   
   const handleUpdateField = (nodeId, fieldId, key, newValue) => {

@@ -8,7 +8,7 @@ const getTodayDateString = () => {
 };
 
 // --- Component: List View ---
-const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAddRoot, selectedDate }) => {
+const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAddRoot, selectedDate, newlyAddedTaskId, onFocusHandled }) => {
   const flattenedTasks = useMemo(() => {
     const flatten = (nodes, path = []) => {
       let list = [];
@@ -58,6 +58,8 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAdd
             onAdd={onAdd}
             onRequestDelete={onRequestDelete}
             selectedDate={selectedDate}
+            newlyAddedTaskId={newlyAddedTaskId}
+            onFocusHandled={onFocusHandled}
           />
         ))}
         {selectedDate >= getTodayDateString() && (

@@ -14,7 +14,7 @@ import RecurrenceEditor from './RecurrenceEditor';
 import { getTodayDateString } from '../utils/dateUtils';
 
 // --- Component: Task List Item (for List View) ---
-const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, selectedDate }) => {
+const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, selectedDate, newlyAddedTaskId, onFocusHandled }) => {
   const isCompleted = task.recurrence
     ? task.completedOccurrences?.includes(selectedDate)
     : task.isCompleted;
@@ -36,6 +36,15 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
       inputRef.current.focus();
     }
   }, [isEditing]);
+
+  useEffect(() => {
+    if (newlyAddedTaskId === task.id) {
+      setIsEditing(true);
+      if (onFocusHandled) {
+        onFocusHandled();
+      }
+    }
+  }, [newlyAddedTaskId, task.id, onFocusHandled]);
 
   // Close popovers on outside click
   useEffect(() => {

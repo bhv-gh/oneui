@@ -22,7 +22,7 @@ import { startOfToday, parseISO } from 'date-fns';
 import { getTodayDateString } from '../utils/dateUtils';
 
 // --- Component: Task Card (The actual node content) ---
-const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, isHighlighted, highlightedRef, treeData, selectedDate }) => {
+const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, isHighlighted, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled }) => {
   const isCompleted = node.recurrence
     ? node.completedOccurrences?.includes(selectedDate)
     : node.isCompleted;
@@ -52,6 +52,15 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
       inputRef.current.focus();
     }
   }, [node.text, isEditing]);
+
+  useEffect(() => {
+    if (newlyAddedTaskId === node.id) {
+      setIsEditing(true);
+      if (onFocusHandled) {
+        onFocusHandled();
+      }
+    }
+  }, [newlyAddedTaskId, node.id, onFocusHandled]);
 
   // Close schedule picker on outside click
   useEffect(() => {

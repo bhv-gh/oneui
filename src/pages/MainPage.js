@@ -59,6 +59,7 @@ export default function MainPage({
         return localStorage.getItem('flowAppViewMode') || 'tree';
     });
     const [deleteTargetId, setDeleteTargetId] = useState(null);
+    const [newlyAddedTaskId, setNewlyAddedTaskId] = useState(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [manualLogModal, setManualLogModal] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -71,6 +72,14 @@ export default function MainPage({
     const contentRef = useRef(null);
     const canvasRef = useRef(null);
     const highlightTimeoutRef = useRef(null);
+
+    const handleAddTaskAndFocus = (addFn) => {
+        const newId = addFn();
+        if (newId) {
+            setNewlyAddedTaskId(newId);
+        }
+    };
+
     const filterTreeByCompletionDate = (nodes, date) => {
         return nodes.map(node => {
           const children = node.children ? filterTreeByCompletionDate(node.children, date) : [];
@@ -602,7 +611,7 @@ export default function MainPage({
                                 key={node.id} 
                                 node={node} 
                                 onUpdate={(id, updates) => handleUpdate(id, updates, selectedDate)} 
-                                onAdd={(parentId) => handleAddSubtask(parentId, selectedDate)} 
+                                onAdd={(parentId) => handleAddTaskAndFocus(() => handleAddSubtask(parentId, selectedDate))} 
                                 onRequestDelete={setDeleteTargetId}
                                 allFieldKeys={allFieldKeys}
                                 onStartFocus={handleStartFocus}
@@ -613,10 +622,12 @@ export default function MainPage({
                                 treeData={treeData}
                                 highlightedRef={highlightedNodeRef}
                                 selectedDate={selectedDate}
+                                newlyAddedTaskId={newlyAddedTaskId}
+                                onFocusHandled={() => setNewlyAddedTaskId(null)}
                             />
                             ))}
                             {selectedDate >= getTodayDateString() && (
-                            <button onClick={() => handleAddRoot(selectedDate)} className="w-64 h-24 rounded-2xl border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-600 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all">
+                            <button onClick={() => handleAddTaskAndFocus(() => handleAddRoot(selectedDate))} className="w-64 h-24 rounded-2xl border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-600 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all">
                                 <div className="flex flex-col items-center gap-2">
                                 <Plus size={24} />
                                 <span className="font-medium">New Root</span>
@@ -629,7 +640,7 @@ export default function MainPage({
                             <div className="text-slate-600">No tasks were completed on this day.</div>
                         ) : (
                             <button 
-                            onClick={() => handleAddRoot(selectedDate)}
+                            onClick={() => handleAddTaskAndFocus(() => handleAddRoot(selectedDate))}
                             className="w-64 h-24 rounded-2xl border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-600 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all"
                             >
                             <div className="flex flex-col items-center gap-2">
@@ -654,10 +665,12 @@ export default function MainPage({
                         tasks={listTasks}
                         onUpdate={(id, updates) => handleUpdate(id, updates, selectedDate)}
                         onStartFocus={handleStartFocus}
-                        onAdd={(parentId) => handleAddSubtask(parentId, selectedDate)}
+                        onAdd={(parentId) => handleAddTaskAndFocus(() => handleAddSubtask(parentId, selectedDate))}
                         onRequestDelete={setDeleteTargetId}
-                        onAddRoot={() => handleAddRoot(selectedDate)}
+                        onAddRoot={() => handleAddTaskAndFocus(() => handleAddRoot(selectedDate))}
                         selectedDate={selectedDate}
+                        newlyAddedTaskId={newlyAddedTaskId}
+                        onFocusHandled={() => setNewlyAddedTaskId(null)}
                     />
                     );
                 })()
