@@ -1,19 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ReactQuill from 'react-quill';
 import { Pencil, Trash2 } from 'lucide-react';
 import 'react-quill/dist/quill.snow.css';
+import { useDebounce } from '../hooks/useDebounce';
 
 // --- Component: Rich Text Note (for Memory View) ---
 const RichTextNote = ({ note, onUpdate, onDelete, placeholder }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [content, setContent] = useState(note.text);
+  const debouncedContent = useDebounce(content, 500);
+  const isInitialMount = useRef(true);
+  const editorRef = useRef(null);
 
-  const handleSave = () => {
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    
     // Treat an empty editor (which Quill represents as '<p><br></p>') as an empty string.
-    const contentToSave = content === '<p><br></p>' ? '' : content;
+    const contentToSave = debouncedContent === '<p><br></p>' ? '' : debouncedContent;
     onUpdate(note.id, contentToSave);
-    setIsEditing(false);
+
+  }, [debouncedContent]);
+
+  const handleBlur = (e) => {
+    // If the new focused element is outside the editor container, exit editing mode.
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setIsEditing(false);
+    }
   };
+
 
   // Custom toolbar options for a cleaner look
   const quillModules = {
@@ -28,7 +45,11 @@ const RichTextNote = ({ note, onUpdate, onDelete, placeholder }) => {
 
   if (isEditing) {
     return (
-      <div className="bg-slate-900/50 rounded-xl p-4 group relative animate-in fade-in duration-200">
+      <div 
+        ref={editorRef} 
+        onBlur={handleBlur} 
+        className="bg-slate-900/50 rounded-xl p-4 group relative animate-in fade-in duration-200"
+      >
         <ReactQuill 
           theme="snow" 
           value={content} 
@@ -37,10 +58,6 @@ const RichTextNote = ({ note, onUpdate, onDelete, placeholder }) => {
           modules={quillModules}
           className="rich-text-editor" // Custom class for styling
         />
-        <div className="flex justify-end gap-2 mt-3">
-          <button onClick={() => setIsEditing(false)} className="px-3 py-1 text-xs rounded-md text-slate-300 hover:bg-slate-700">Cancel</button>
-          <button onClick={handleSave} className="px-3 py-1 text-xs rounded-md bg-emerald-600 text-white hover:bg-emerald-700">Save</button>
-        </div>
       </div>
     );
   }

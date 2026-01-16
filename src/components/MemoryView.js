@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Lightbulb,
   HelpCircle,
@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import RichTextNote from './RichTextNote';
 import { generateId } from '../utils/idGenerator';
+import { useDebounce } from '../hooks/useDebounce';
 
 // --- Component: Memory View ---
 const MemoryView = ({ memoryData, onUpdate, searchQuery, viewType }) => {
@@ -61,10 +62,22 @@ const MemoryView = ({ memoryData, onUpdate, searchQuery, viewType }) => {
   const EditableField = ({ value, onChange, placeholder }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [text, setText] = useState(value);
+    const debouncedText = useDebounce(text, 500);
+    const isInitialMount = useRef(true);
+
+    useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+        onChange(debouncedText);
+    }, [debouncedText]);
 
     const handleBlur = () => {
       setIsEditing(false);
-      onChange(text);
+      if (text !== value) {
+        onChange(text);
+      }
     };
 
     if (isEditing) {
