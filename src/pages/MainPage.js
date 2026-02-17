@@ -738,9 +738,10 @@ export default function MainPage({
                     </div>
                 );
                 })()}
-                {activeTab === 'logs' && <LogsView 
-                logs={logs} 
-                selectedDate={selectedDate} 
+                {activeTab === 'logs' && <LogsView
+                logs={logs}
+                treeData={treeData}
+                selectedDate={selectedDate}
                 onAddManualLog={(times) => setManualLogModal(times)}
                 onEditLog={(log) => setManualLogModal({ logToEdit: log })}
                 onDeleteLog={handleDeleteLog}
