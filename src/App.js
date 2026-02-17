@@ -15,7 +15,9 @@ import { playNotificationSound, getNotificationSound } from './utils/notificatio
 import { getTimerDurations, getNudgeMinutes } from './utils/timerSettings';
 
 import FocusView from './components/FocusView';
+import TriageModal from './components/TriageModal';
 import MainPage from './pages/MainPage';
+import { getTodayDateString } from './utils/dateUtils';
 
 export default function TaskTreeApp() {
   const treeDataHook = useTreeData();
@@ -30,6 +32,8 @@ export default function TaskTreeApp() {
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [pomodoroCount, setPomodoroCount] = useState(0);
   const [activeSession, setActiveSession] = useState(null);
+  const [capturedTasks, setCapturedTasks] = useState([]);
+  const [showTriageModal, setShowTriageModal] = useState(false);
 
   // Refs for notification action handlers
   const swRegistrationRef = useRef(null);
@@ -79,8 +83,8 @@ export default function TaskTreeApp() {
           clearTimeout(nudgeTimeoutRef.current);
           nudgeTimeoutRef.current = setTimeout(() => {
             showNotification(
-              'Time to focus!',
-              "You haven't started a pomodoro in a while.",
+              'Knock Knock!',
+              "You haven't started this in a while.",
               [{ action: 'snooze', title: 'Remind in 10 min' }],
               null,
               'pomodoro-nudge'
@@ -240,7 +244,29 @@ export default function TaskTreeApp() {
         handleUpdate(focusedTask.id, { timeRemaining, timerMode, isTimerActive: false });
       }
     }
+    if (capturedTasks.length > 0) {
+      setShowTriageModal(true);
+    }
     setFocusedTaskId(null);
+  };
+
+  const handleCaptureTask = (text) => {
+    setCapturedTasks(prev => [...prev, { id: generateId(), text }]);
+  };
+
+  const handleAddCapturedAsRoot = (text) => {
+    const newId = treeDataHook.handleAddRoot(getTodayDateString());
+    handleUpdate(newId, { text });
+  };
+
+  const handleAddCapturedUnderParent = (text, parentId) => {
+    const newId = treeDataHook.handleAddSubtask(parentId, getTodayDateString());
+    handleUpdate(newId, { text });
+  };
+
+  const handleTriageComplete = () => {
+    setCapturedTasks([]);
+    setShowTriageModal(false);
   };
 
   // Idle nudge: notify when no pomodoro is running for a configured period
@@ -255,8 +281,8 @@ export default function TaskTreeApp() {
 
     nudgeTimeoutRef.current = setTimeout(() => {
       showNotification(
-        'Time to focus!',
-        "You haven't started a pomodoro in a while.",
+        'Knock Knock!',
+        "You haven't started this in a while.",
         [{ action: 'snooze', title: 'Remind in 10 min' }],
         null,
         'pomodoro-nudge'
@@ -387,12 +413,23 @@ export default function TaskTreeApp() {
         <MemoryContext.Provider value={memoryDataHook}>
           <style>{scrollbarHideStyle}</style>
           <style>{quillStyle}</style>
-          {focusedTask ? (
+          {showTriageModal ? (
+            <TriageModal
+              capturedTasks={capturedTasks}
+              treeData={treeData}
+              onAddAsRoot={handleAddCapturedAsRoot}
+              onAddUnderParent={handleAddCapturedUnderParent}
+              onDiscard={() => {}}
+              onComplete={handleTriageComplete}
+            />
+          ) : focusedTask ? (
             <FocusView
               task={focusedTask}
               timerProps={timerProps}
               onExit={handleExitFocus}
               appState={appState}
+              capturedTasks={capturedTasks}
+              onCaptureTask={handleCaptureTask}
             />
           ) : (
             <MainPage

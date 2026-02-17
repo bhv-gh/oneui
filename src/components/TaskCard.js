@@ -15,6 +15,7 @@ import {
   Eye,
   EyeOff,
   Sparkles,
+  ExternalLink,
 } from 'lucide-react';
 import CustomDatalistInput from './CustomDatalistInput';
 import CustomDatePicker from './CustomDatePicker';
@@ -23,6 +24,7 @@ import { getTimerDurations } from '../utils/timerSettings';
 import { generateId } from '../utils/idGenerator';
 import { startOfToday, parseISO } from 'date-fns';
 import { getTodayDateString } from '../utils/dateUtils';
+import { isUrl, fetchPageTitle, getLinkedSegments } from '../utils/linkUtils';
 
 // --- Component: Task Card (The actual node content) ---
 const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, isHighlighted, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled }) => {
@@ -32,6 +34,8 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
   const [isEditing, setIsEditing] = useState(false);
   const [showFields, setShowFields] = useState(false);
   const inputRef = useRef(null);
+  const nodeRef = useRef(node);
+  nodeRef.current = node;
   const [incompleteWarning, setIncompleteWarning] = useState(null);
   const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false);
   const [isRecurrenceEditorOpen, setIsRecurrenceEditorOpen] = useState(false);
@@ -88,6 +92,26 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') setIsEditing(false);
+  };
+
+  const handlePaste = (e) => {
+    const pasted = e.clipboardData.getData('text').trim();
+    if (isUrl(pasted)) {
+      // Let the URL paste into text naturally — don't preventDefault
+      // Just register the link and fetch its title
+      const alreadyTracked = (node.links || []).some(l => l.url === pasted);
+      if (!alreadyTracked) {
+        const newLinks = [...(node.links || []), { url: pasted, title: pasted }];
+        onUpdate(node.id, { links: newLinks });
+      }
+      fetchPageTitle(pasted).then(title => {
+        const latest = nodeRef.current;
+        const updatedLinks = (latest.links || []).map(l =>
+          l.url === pasted ? { ...l, title } : l
+        );
+        onUpdate(node.id, { links: updatedLinks });
+      });
+    }
   };
 
   // --- Field Handlers ---
@@ -215,21 +239,47 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
           {/* Text Content */}
           <div className="flex-1 min-w-0">
             {isEditing ? (
-              <input
-                ref={inputRef}
-                type="text"
-                value={node.text}
-                onChange={(e) => onUpdate(node.id, { text: e.target.value })}
-                onBlur={() => setIsEditing(false)}
-                onKeyDown={handleKeyDown}
-                className="bg-transparent text-slate-200 text-sm w-full outline-none border-b border-emerald-500/50 pb-1"
-                placeholder="Task name..."
-                autoFocus
-                onClick={(e) => e.stopPropagation()}
-              />
+              <>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={node.text}
+                  onChange={(e) => onUpdate(node.id, { text: e.target.value })}
+                  onBlur={() => setIsEditing(false)}
+                  onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
+                  className="bg-transparent text-slate-200 text-sm w-full outline-none border-b border-emerald-500/50 pb-1"
+                  placeholder="Task name..."
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                />
+                {node.links && node.links.length > 0 && (
+                  <div className="flex flex-col gap-0.5 mt-1">
+                    {node.links.map((l, i) => (
+                      <div key={i} className="flex items-center gap-1">
+                        <ExternalLink size={10} className="text-cyan-500 flex-shrink-0" />
+                        <span className="text-[10px] text-cyan-500/70 truncate flex-1">{l.title !== l.url ? `${l.title} — ${l.url}` : l.url}</span>
+                        <button
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const updated = node.links.filter((_, j) => j !== i);
+                            onUpdate(node.id, { links: updated.length ? updated : null });
+                          }}
+                          className="text-slate-600 hover:text-rose-400 transition-colors flex-shrink-0"
+                          title="Remove link"
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             ) : (
-              <div 
+              <div
                 onClick={(e) => {
+                  if (e.target.tagName === 'A') return;
                   e.stopPropagation();
                   setIsEditing(true);
                 }}
@@ -239,7 +289,29 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                   ${isCompleted ? 'line-through text-slate-500' : ''}
                 `}
               >
-                {node.text || "New Task"}
+                {(() => {
+                  const segments = getLinkedSegments(node.text, node.links);
+                  if (segments) {
+                    return segments.map((seg, i) =>
+                      seg.type === 'link' ? (
+                        <a
+                          key={i}
+                          href={seg.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-cyan-400 hover:text-cyan-300 hover:underline"
+                        >
+                          {seg.content}
+                          <ExternalLink size={10} className="inline ml-0.5 mb-0.5" />
+                        </a>
+                      ) : (
+                        <span key={i}>{seg.content}</span>
+                      )
+                    );
+                  }
+                  return node.text || "New Task";
+                })()}
               </div>
             )}
           </div>

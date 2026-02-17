@@ -2,15 +2,20 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { XCircle, PictureInPicture } from 'lucide-react';
 import PomodoroTimer from './PomodoroTimer';
+import PipTimerView from './PipTimerView';
+import QuickCapture from './QuickCapture';
 
 // --- Component: Full Screen Focus View ---
-const FocusView = ({ task, timerProps, onExit, appState }) => {
+const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onCaptureTask }) => {
   const [pipWindow, setPipWindow] = useState(null);
   const [pipPortalRoot, setPipPortalRoot] = useState(null);
   const [isPipActive, setIsPipActive] = useState(false);
+  const pipWindowRef = useRef(null);
   const canvasRef = useRef(null);
   const videoRef = useRef(null);
   const requestRef = useRef();
+  const taskRef = useRef(task);
+  taskRef.current = task;
 
   useEffect(() => {
     setIsPipActive(!!pipWindow);
@@ -27,11 +32,9 @@ const FocusView = ({ task, timerProps, onExit, appState }) => {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#1E293B'; // bg-slate-800
+    ctx.fillStyle = '#1E293B';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
     ctx.fillStyle = 'white';
     ctx.font = 'bold 60px monospace';
     ctx.textAlign = 'center';
@@ -40,9 +43,7 @@ const FocusView = ({ task, timerProps, onExit, appState }) => {
   };
 
   const animate = () => {
-    if (timerProps) {
-      drawToCanvas(timerProps.timeRemaining);
-    }
+    if (timerProps) drawToCanvas(timerProps.timeRemaining);
     requestRef.current = requestAnimationFrame(animate);
   };
 
@@ -51,9 +52,7 @@ const FocusView = ({ task, timerProps, onExit, appState }) => {
       requestRef.current = requestAnimationFrame(animate);
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      if (video && canvas) {
-        video.srcObject = canvas.captureStream();
-      }
+      if (video && canvas) video.srcObject = canvas.captureStream();
       return () => cancelAnimationFrame(requestRef.current);
     }
   }, []);
@@ -65,159 +64,137 @@ const FocusView = ({ task, timerProps, onExit, appState }) => {
   }, [timerProps?.timeRemaining]);
 
   useEffect(() => {
-    if (pipWindow) {
-      const backgrounds = {
-        focusing: '#020617',
-        break: '#082f49',
-        paused: '#022c22',
-        idle: '#022c22',
-      };
-      pipWindow.document.body.style.background = backgrounds[appState];
-      pipWindow.document.body.style.transition = 'background 1s';
+    if (pipWindowRef.current) {
+      const backgrounds = { focusing: '#020617', break: '#082f49', paused: '#022c22', idle: '#022c22' };
+      pipWindowRef.current.document.body.style.background = backgrounds[appState];
+      pipWindowRef.current.document.body.style.transition = 'background 1s';
     }
   }, [appState, pipWindow]);
 
-  const closePictureInPicture = async () => {
-    if (!isPipActive && !document.pictureInPictureElement) return;
-    if (pipWindow) {
-      pipWindow.close();
+  // --- PiP: open / close / toggle ---
+  // Kept minimal. requestWindow() auto-closes any prior PiP window per spec.
+
+  const openPip = async () => {
+    const t = taskRef.current;
+    if (!t) return;
+
+    if ('documentPictureInPicture' in window) {
+      // Clear stale ref so React state stays consistent
+      pipWindowRef.current = null;
+
+      try {
+        const win = await window.documentPictureInPicture.requestWindow({ width: 450, height: 320 });
+        pipWindowRef.current = win;
+
+        win.document.head.appendChild(Object.assign(win.document.createElement('title'), {
+          innerText: `Focusing on: ${t.text || 'Untitled Task'}`,
+        }));
+
+        const style = win.document.createElement('style');
+        style.textContent = 'html,body{height:100%;margin:0;padding:0;overflow:hidden}';
+        win.document.head.appendChild(style);
+
+        const root = win.document.createElement('div');
+        root.id = 'pip-root';
+        root.style.cssText = 'width:100%;height:100%;display:flex;flex-direction:column;box-sizing:border-box';
+        win.document.body.appendChild(root);
+
+        setPipPortalRoot(root);
+        setPipWindow(win);
+
+        win.addEventListener('pagehide', () => {
+          pipWindowRef.current = null;
+          setPipWindow(null);
+          setPipPortalRoot(null);
+        });
+      } catch (e) {
+        pipWindowRef.current = null;
+        console.error('PiP open failed:', e);
+      }
+    } else if (videoRef.current && document.pictureInPictureEnabled) {
+      try {
+        await videoRef.current.requestPictureInPicture();
+        setIsPipActive(true);
+        videoRef.current.addEventListener('leavepictureinpicture', () => setIsPipActive(false), { once: true });
+      } catch (e) {
+        console.error('Video PiP failed:', e);
+      }
     }
+  };
+
+  const closePip = () => {
+    const win = pipWindowRef.current || window.documentPictureInPicture?.window;
+    if (win) { try { win.close(); } catch (_) {} }
+    pipWindowRef.current = null;
+
     if (document.pictureInPictureElement) {
-      await document.exitPictureInPicture();
+      document.exitPictureInPicture().catch(() => {});
     }
+
     setPipWindow(null);
     setPipPortalRoot(null);
     setIsPipActive(false);
   };
 
-  const openPictureInPicture = async () => {
-    if (!task) return;
-    if (isPipActive || document.pictureInPictureElement) return;
-
-    const docPipSupported = 'documentPictureInPicture' in window;
-    const videoPipSupported = videoRef.current && document.pictureInPictureEnabled;
-
-    if (docPipSupported) {
-      try {
-        const newPipWindow = await window.documentPictureInPicture.requestWindow({
-          width: 450,
-          height: 320,
-        });
-
-        const title = newPipWindow.document.createElement('title');
-        title.innerText = `Focusing on: ${task.text || "Untitled Task"}`;
-        newPipWindow.document.head.appendChild(title);
-
-        const styleSheets = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'));
-        styleSheets.forEach(sheet => {
-          newPipWindow.document.head.appendChild(sheet.cloneNode(true));
-        });
-
-        const baseStyle = newPipWindow.document.createElement('style');
-        baseStyle.textContent = 'html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }';
-        newPipWindow.document.head.appendChild(baseStyle);
-
-        const pipRoot = newPipWindow.document.createElement('div');
-        pipRoot.id = 'pip-root';
-        pipRoot.style.cssText = 'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; box-sizing: border-box;';
-        newPipWindow.document.body.appendChild(pipRoot);
-
-        setPipPortalRoot(pipRoot);
-        setPipWindow(newPipWindow);
-
-        newPipWindow.addEventListener('pagehide', () => {
-          setPipWindow(null);
-          setPipPortalRoot(null);
-        });
-      } catch (error) {
-        console.error('Error opening Document PiP window:', error);
-      }
-    } else if (videoPipSupported) {
-      try {
-        await videoRef.current.requestPictureInPicture();
-        setIsPipActive(true);
-        videoRef.current.addEventListener('leavepictureinpicture', () => {
-          setIsPipActive(false);
-        }, { once: true });
-      } catch (error) {
-        console.error('Error entering Video PiP:', error);
-      }
-    }
-  };
-
-  const togglePictureInPicture = () => {
-    if (isPipActive || document.pictureInPictureElement) {
-      closePictureInPicture();
+  const togglePip = () => {
+    if (pipWindowRef.current || window.documentPictureInPicture?.window || document.pictureInPictureElement) {
+      closePip();
     } else {
-      openPictureInPicture();
+      openPip();
     }
   };
 
-  // Auto PiP on tab switch (like Google Meet)
+  // Auto PiP on tab switch — single listener, uses refs for latest functions
+  const openPipRef = useRef(openPip);
+  const closePipRef = useRef(closePip);
+  openPipRef.current = openPip;
+  closePipRef.current = closePip;
+
   useEffect(() => {
-    const handleVisibilityChange = () => {
+    const handler = () => {
       if (document.visibilityState === 'hidden') {
-        if (!isPipActive && !document.pictureInPictureElement) {
-          openPictureInPicture();
-        }
+        // Always try to open — requestWindow() handles duplicates
+        openPipRef.current();
       } else if (document.visibilityState === 'visible') {
-        if (isPipActive || document.pictureInPictureElement) {
-          closePictureInPicture();
-        }
+        closePipRef.current();
       }
     };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  });
-
-  useEffect(() => {
-    return () => {
-      closePictureInPicture();
-    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
   }, []);
+
+  // Cleanup on unmount
+  useEffect(() => () => closePip(), []);
 
   if (!task) return null;
 
-  const {
-    timeRemaining,
-    isTimerActive,
-    timerMode,
-    onStartPause,
-    onReset,
-    onSetMode
-  } = timerProps;
+  const { timeRemaining, isTimerActive, timerMode, onStartPause, onReset, onSetMode } = timerProps;
 
-  const handleExitClick = () => {
-    closePictureInPicture();
-    onExit();
-  };
+  const handleExitClick = () => { closePip(); onExit(); };
 
   const backgroundClasses = {
-    focusing: 'bg-slate-950', 
-    break: 'bg-sky-950',
-    paused: 'bg-emerald-950',   
-    idle: 'bg-emerald-950',     
+    focusing: 'bg-slate-950', break: 'bg-sky-950',
+    paused: 'bg-emerald-950', idle: 'bg-emerald-950',
   };
 
   return (
     <div className={`fixed inset-0 z-[200] flex flex-col items-center justify-center p-8 animate-in fade-in duration-300 transition-colors duration-1000 ${backgroundClasses[appState]}`}>
       <canvas ref={canvasRef} width="400" height="200" style={{ display: 'none' }} />
       <video ref={videoRef} muted playsInline autoPlay style={{ display: 'none' }} />
+
       {pipWindow && pipPortalRoot && ReactDOM.createPortal(
-        <div className="w-full text-center px-4">
-          <PomodoroTimer
-            timeRemaining={timeRemaining}
-            isTimerActive={isTimerActive}
-            timerMode={timerMode}
-            onStartPause={onStartPause}
-            onReset={onReset}
-            onSetMode={onSetMode}
-            onTogglePip={togglePictureInPicture}
-          />
-        </div>,
+        <PipTimerView
+          timeRemaining={timeRemaining}
+          isTimerActive={isTimerActive}
+          timerMode={timerMode}
+          onStartPause={onStartPause}
+          onReset={onReset}
+          onSetMode={onSetMode}
+          onTogglePip={togglePip}
+          onCapture={onCaptureTask}
+          capturedCount={capturedTasks.length}
+          appState={appState}
+        />,
         pipPortalRoot
       )}
 
@@ -228,12 +205,12 @@ const FocusView = ({ task, timerProps, onExit, appState }) => {
       <div className="text-center">
         <p className="text-slate-500 text-lg mb-2">Focusing on:</p>
         <h1 className="text-4xl font-bold text-slate-100 mb-12 truncate max-w-2xl">{task.text || "Untitled Task"}</h1>
-        
+
         {isPipActive ? (
           <div className="flex flex-col items-center gap-4 animate-in fade-in duration-300">
             <p className="text-slate-400">Timer is in Picture-in-Picture mode.</p>
-            <button 
-              onClick={closePictureInPicture}
+            <button
+              onClick={closePip}
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
             >
               <PictureInPicture size={18} />
@@ -241,16 +218,20 @@ const FocusView = ({ task, timerProps, onExit, appState }) => {
             </button>
           </div>
         ) : (
-          <PomodoroTimer 
+          <PomodoroTimer
             timeRemaining={timeRemaining}
             isTimerActive={isTimerActive}
             timerMode={timerMode}
             onStartPause={onStartPause}
             onReset={onReset}
             onSetMode={onSetMode}
-            onTogglePip={togglePictureInPicture}
+            onTogglePip={togglePip}
           />
         )}
+      </div>
+
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
+        <QuickCapture onCapture={onCaptureTask} capturedCount={capturedTasks.length} />
       </div>
     </div>
   );

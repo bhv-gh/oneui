@@ -8,11 +8,11 @@ import {
   PictureInPicture,
 } from 'lucide-react';
 
-const PomodoroTimer = ({ 
-  timeRemaining, 
-  isTimerActive, 
+const PomodoroTimer = ({
+  timeRemaining,
+  isTimerActive,
   timerMode,
-  onStartPause, 
+  onStartPause,
   onReset,
   onSetMode,
   onTogglePip

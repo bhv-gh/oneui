@@ -8,11 +8,14 @@ import {
   Repeat,
   Play,
   Sparkles,
+  ExternalLink,
+  X,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import CustomDatePicker from './CustomDatePicker';
 import RecurrenceEditor from './RecurrenceEditor';
 import { getTodayDateString } from '../utils/dateUtils';
+import { isUrl, fetchPageTitle, getLinkedSegments } from '../utils/linkUtils';
 
 // --- Component: Task List Item (for List View) ---
 const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, selectedDate, newlyAddedTaskId, onFocusHandled }) => {
@@ -24,6 +27,8 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
   const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false);
   const [isRecurrenceEditorOpen, setIsRecurrenceEditorOpen] = useState(false);
   const inputRef = useRef(null);
+  const taskRef = useRef(task);
+  taskRef.current = task;
   const schedulePickerRef = useRef(null);
   const recurrenceEditorRef = useRef(null);
 
@@ -64,6 +69,24 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       setIsEditing(false);
+    }
+  };
+
+  const handlePaste = (e) => {
+    const pasted = e.clipboardData.getData('text').trim();
+    if (isUrl(pasted)) {
+      const alreadyTracked = (task.links || []).some(l => l.url === pasted);
+      if (!alreadyTracked) {
+        const newLinks = [...(task.links || []), { url: pasted, title: pasted }];
+        onUpdate(task.id, { links: newLinks });
+      }
+      fetchPageTitle(pasted).then(title => {
+        const latest = taskRef.current;
+        const updatedLinks = (latest.links || []).map(l =>
+          l.url === pasted ? { ...l, title } : l
+        );
+        onUpdate(task.id, { links: updatedLinks });
+      });
     }
   };
 
@@ -127,22 +150,73 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
           </div>
         )}
         {isEditing ? (
-          <input
-            ref={inputRef}
-            type="text"
-            value={task.text}
-            onChange={(e) => onUpdate(task.id, { text: e.target.value })}
-            onBlur={() => setIsEditing(false)}
-            onKeyDown={handleKeyDown}
-            className="bg-transparent text-slate-200 font-medium w-full outline-none border-b border-emerald-500/50"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div>
+            <input
+              ref={inputRef}
+              type="text"
+              value={task.text}
+              onChange={(e) => onUpdate(task.id, { text: e.target.value })}
+              onBlur={() => setIsEditing(false)}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              className="bg-transparent text-slate-200 font-medium w-full outline-none border-b border-emerald-500/50"
+              onClick={(e) => e.stopPropagation()}
+            />
+            {task.links && task.links.length > 0 && (
+              <div className="flex flex-col gap-0.5 mt-1">
+                {task.links.map((l, i) => (
+                  <div key={i} className="flex items-center gap-1">
+                    <ExternalLink size={10} className="text-cyan-500 flex-shrink-0" />
+                    <span className="text-[10px] text-cyan-500/70 truncate flex-1">{l.title !== l.url ? `${l.title} — ${l.url}` : l.url}</span>
+                    <button
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const updated = task.links.filter((_, j) => j !== i);
+                        onUpdate(task.id, { links: updated.length ? updated : null });
+                      }}
+                      className="text-slate-600 hover:text-rose-400 transition-colors flex-shrink-0"
+                      title="Remove link"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         ) : (
-          <p 
-            onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
-            className={`font-medium text-slate-200 truncate cursor-text ${isCompleted ? 'line-through' : ''}`}
+          <p
+            onClick={(e) => {
+              if (e.target.tagName === 'A') return;
+              e.stopPropagation();
+              setIsEditing(true);
+            }}
+            className={`font-medium text-slate-200 cursor-text ${isCompleted ? 'line-through' : ''}`}
           >
-            {task.text || "Untitled Task"}
+            {(() => {
+              const segments = getLinkedSegments(task.text, task.links);
+              if (segments) {
+                return segments.map((seg, i) =>
+                  seg.type === 'link' ? (
+                    <a
+                      key={i}
+                      href={seg.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-cyan-400 hover:text-cyan-300 hover:underline"
+                    >
+                      {seg.content}
+                      <ExternalLink size={10} className="inline ml-0.5 mb-0.5" />
+                    </a>
+                  ) : (
+                    <span key={i}>{seg.content}</span>
+                  )
+                );
+              }
+              return task.text || "Untitled Task";
+            })()}
           </p>
         )}
       </div>
