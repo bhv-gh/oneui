@@ -3,7 +3,15 @@ import TaskCard from './TaskCard';
 
 // --- Component: Recursive Tree Node ---
 const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, highlightedTaskId, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled }) => {
-  const hasChildren = node.children.length > 0;
+  const visibleChildren = node.hideCompleted
+    ? node.children.filter(child => {
+        if (child.recurrence) {
+          return !child.completedOccurrences?.includes(selectedDate);
+        }
+        return !child.isCompleted;
+      })
+    : node.children;
+  const hasChildren = visibleChildren.length > 0;
 
   return (
     <div className="flex flex-col items-center">
@@ -29,20 +37,20 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
       {node.isExpanded && hasChildren && (
         <div className="flex items-start pt-0 relative">
           {/* Horizontal Connector Line */}
-          {node.children.length > 1 && (
+          {visibleChildren.length > 1 && (
             <div className="absolute top-0 left-0 right-0 h-px bg-slate-700 translate-y-0"></div>
           )}
 
-          {node.children.map((child, index) => (
+          {visibleChildren.map((child, index) => (
             <div key={child.id} className="flex flex-col items-center relative px-[2vw]">
               {/* 1. Vertical line going UP from child to the horizontal bar */}
               <div className="w-px h-8 bg-slate-700 mb-0"></div>
-              
+
               {/* 2. Horizontal Connectors (The "Arms") */}
-              {node.children.length > 1 && (
+              {visibleChildren.length > 1 && (
                 <>
                   {/* Right arm (for all except last child) */}
-                  {index !== node.children.length - 1 && (
+                  {index !== visibleChildren.length - 1 && (
                     <div className="absolute top-0 right-0 w-1/2 h-px bg-slate-700"></div>
                   )}
                   {/* Left arm (for all except first child) */}

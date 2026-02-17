@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import './App.css';
 import 'react-quill/dist/quill.snow.css';
 import 'react-day-picker/dist/style.css';
@@ -11,13 +11,11 @@ import LogsContext from './contexts/LogsContext';
 import MemoryContext from './contexts/MemoryContext';
 import { findNodeRecursive } from './utils/treeUtils';
 import { generateId } from './utils/idGenerator';
+import { playNotificationSound, getNotificationSound } from './utils/notificationSounds';
+import { getTimerDurations, getNudgeMinutes } from './utils/timerSettings';
 
 import FocusView from './components/FocusView';
 import MainPage from './pages/MainPage';
-
-const POMODORO_TIME = 25 * 60;
-const SHORT_BREAK_TIME = 5 * 60;
-const LONG_BREAK_TIME = 15 * 60;
 
 export default function TaskTreeApp() {
   const treeDataHook = useTreeData();
@@ -28,15 +26,89 @@ export default function TaskTreeApp() {
 
   const [focusedTaskId, setFocusedTaskId] = useState(null);
   const [timerMode, setTimerMode] = useState('pomodoro');
-  const [timeRemaining, setTimeRemaining] = useState(POMODORO_TIME);
+  const [timeRemaining, setTimeRemaining] = useState(() => getTimerDurations().pomodoro);
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [pomodoroCount, setPomodoroCount] = useState(0);
   const [activeSession, setActiveSession] = useState(null);
+
+  // Refs for notification action handlers
+  const swRegistrationRef = useRef(null);
+  const handleUpdateRef = useRef(handleUpdate);
+  const focusedTaskIdRef = useRef(focusedTaskId);
+  const nudgeTimeoutRef = useRef(null);
+  handleUpdateRef.current = handleUpdate;
+  focusedTaskIdRef.current = focusedTaskId;
 
   const focusedTask = useMemo(() => {
     if (!focusedTaskId) return null;
     return findNodeRecursive(treeData, focusedTaskId);
   }, [treeData, focusedTaskId]);
+
+  // Register service worker for notification actions
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    navigator.serviceWorker.register(`${process.env.PUBLIC_URL}/notification-sw.js`)
+      .then(reg => { swRegistrationRef.current = reg; })
+      .catch(err => console.error('Notification SW registration failed:', err));
+
+    const handleMessage = (event) => {
+      if (event.data?.type === 'NOTIFICATION_ACTION') {
+        const { action, taskId } = event.data;
+        window.focus();
+
+        if (action === 'newPomodoro') {
+          const tid = taskId || focusedTaskIdRef.current;
+          if (tid) {
+            setFocusedTaskId(tid);
+            setTimerMode('pomodoro');
+            setTimeRemaining(getTimerDurations().pomodoro);
+            setIsTimerActive(true);
+            setActiveSession({ taskId: tid, startTime: new Date() });
+          }
+        } else if (action === 'markFinished') {
+          const tid = taskId || focusedTaskIdRef.current;
+          if (tid) {
+            handleUpdateRef.current(tid, { isCompleted: true });
+          }
+          setIsTimerActive(false);
+          setActiveSession(null);
+          setFocusedTaskId(null);
+        } else if (action === 'snooze') {
+          // Snooze nudge for 10 minutes
+          clearTimeout(nudgeTimeoutRef.current);
+          nudgeTimeoutRef.current = setTimeout(() => {
+            showNotification(
+              'Time to focus!',
+              "You haven't started a pomodoro in a while.",
+              [{ action: 'snooze', title: 'Remind in 10 min' }],
+              null,
+              'pomodoro-nudge'
+            );
+            playNotificationSound(getNotificationSound());
+          }, 10 * 60 * 1000);
+        }
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', handleMessage);
+  }, []);
+
+  const showNotification = (title, body, actions = [], taskId = null, tag = 'pomodoro-timer') => {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const reg = swRegistrationRef.current;
+    if (reg) {
+      reg.showNotification(title, {
+        body,
+        icon: '/logo192.png',
+        actions,
+        data: { taskId },
+        requireInteraction: actions.length > 0,
+        tag,
+      });
+    }
+  };
 
   useEffect(() => {
     if (!focusedTask) return;
@@ -48,6 +120,7 @@ export default function TaskTreeApp() {
       }, 1000);
     } else if (isTimerActive && timeRemaining === 0) {
       setIsTimerActive(false);
+      playNotificationSound(getNotificationSound());
       if (timerMode === 'pomodoro') {
         const newCount = pomodoroCount + 1;
         setPomodoroCount(newCount);
@@ -61,8 +134,27 @@ export default function TaskTreeApp() {
           handleAddField(focusedTask.id, { label: 'Pomodoros', value: '1' });
         }
 
+        showNotification(
+          'Pomodoro Complete!',
+          focusedTask.text || 'Untitled Task',
+          [
+            { action: 'newPomodoro', title: 'New Pomodoro' },
+            { action: 'markFinished', title: 'Mark Finished' },
+          ],
+          focusedTask.id
+        );
+
         setTimerMode(newCount % 4 === 0 ? 'longBreak' : 'shortBreak');
       } else {
+        showNotification(
+          'Break Over!',
+          `Ready to focus on: ${focusedTask.text || 'Untitled Task'}`,
+          [
+            { action: 'newPomodoro', title: 'Start Focus' },
+            { action: 'markFinished', title: 'Mark Finished' },
+          ],
+          focusedTask.id
+        );
         setTimerMode('pomodoro');
       }
     }
@@ -70,7 +162,8 @@ export default function TaskTreeApp() {
   }, [isTimerActive, timeRemaining, timerMode, pomodoroCount, focusedTask, handleUpdateField, handleAddField]);
 
   useEffect(() => {
-    const timeMap = { pomodoro: POMODORO_TIME, shortBreak: SHORT_BREAK_TIME, longBreak: LONG_BREAK_TIME };
+    const durations = getTimerDurations();
+    const timeMap = { pomodoro: durations.pomodoro, shortBreak: durations.shortBreak, longBreak: durations.longBreak };
     setTimeRemaining(timeMap[timerMode]);
   }, [timerMode]);
 
@@ -79,6 +172,11 @@ export default function TaskTreeApp() {
 
     if (newIsTimerActive && focusedTask) {
       setActiveSession({ taskId: focusedTask.id, startTime: new Date() });
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+      const modeLabel = timerMode === 'pomodoro' ? 'Focus' : timerMode === 'shortBreak' ? 'Short Break' : 'Long Break';
+      showNotification(`${modeLabel} Started`, focusedTask.text || 'Untitled Task', [], focusedTask.id);
     } else if (!newIsTimerActive && activeSession) {
       const endTime = new Date();
       const newLog = {
@@ -100,7 +198,8 @@ export default function TaskTreeApp() {
   const handleTimerReset = () => {
     if (!focusedTask) return;
     setIsTimerActive(false);
-    const timeMap = { pomodoro: POMODORO_TIME, shortBreak: SHORT_BREAK_TIME, longBreak: LONG_BREAK_TIME };
+    const durations = getTimerDurations();
+    const timeMap = { pomodoro: durations.pomodoro, shortBreak: durations.shortBreak, longBreak: durations.longBreak };
     setTimeRemaining(timeMap[timerMode]);
     if (focusedTask) {
       handleUpdate(focusedTask.id, { timeRemaining: timeMap[timerMode], timerMode, isTimerActive: false });
@@ -111,13 +210,14 @@ export default function TaskTreeApp() {
   const handleStartFocus = (taskId) => {
     setFocusedTaskId(taskId);
     const task = findNodeRecursive(treeData, taskId);
+    const defaultPomodoro = getTimerDurations().pomodoro;
     if (task) {
       setTimerMode(task.timerMode || 'pomodoro');
-      setTimeRemaining(task.timeRemaining !== undefined ? task.timeRemaining : POMODORO_TIME);
-      setIsTimerActive(false); 
+      setTimeRemaining(task.timeRemaining !== undefined ? task.timeRemaining : defaultPomodoro);
+      setIsTimerActive(false);
     } else {
       setTimerMode('pomodoro');
-      setTimeRemaining(POMODORO_TIME);
+      setTimeRemaining(defaultPomodoro);
       setIsTimerActive(false);
     }
   };
@@ -142,7 +242,31 @@ export default function TaskTreeApp() {
     }
     setFocusedTaskId(null);
   };
-  
+
+  // Idle nudge: notify when no pomodoro is running for a configured period
+  useEffect(() => {
+    clearTimeout(nudgeTimeoutRef.current);
+    // Only nudge when completely idle (not in focus mode, timer not active)
+    if (focusedTaskId || isTimerActive) return;
+
+    const nudgeMinutes = getNudgeMinutes();
+    if (nudgeMinutes <= 0) return;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    nudgeTimeoutRef.current = setTimeout(() => {
+      showNotification(
+        'Time to focus!',
+        "You haven't started a pomodoro in a while.",
+        [{ action: 'snooze', title: 'Remind in 10 min' }],
+        null,
+        'pomodoro-nudge'
+      );
+      playNotificationSound(getNotificationSound());
+    }, nudgeMinutes * 60 * 1000);
+
+    return () => clearTimeout(nudgeTimeoutRef.current);
+  }, [focusedTaskId, isTimerActive]);
+
   const timerProps = {
     timeRemaining,
     isTimerActive,

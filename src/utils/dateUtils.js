@@ -1,8 +1,7 @@
 import { parseISO, isToday, addDays, addWeeks, addMonths, addYears, differenceInDays, differenceInCalendarWeeks, differenceInMonths, format } from 'date-fns';
 
 export const getTodayDateString = () => {
-  const today = new Date();
-  return today.toISOString().split('T')[0]; // YYYY-MM-DD format
+  return format(new Date(), 'yyyy-MM-dd');
 };
 
 export const isDateAnOccurrence = (task, targetDateStr) => {

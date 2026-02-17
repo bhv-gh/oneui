@@ -10,20 +10,24 @@ const getTodayDateString = () => {
 // --- Component: List View ---
 const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAddRoot, selectedDate, newlyAddedTaskId, onFocusHandled }) => {
   const flattenedTasks = useMemo(() => {
-    const flatten = (nodes, path = []) => {
+    const flatten = (nodes, path = [], parentHideCompleted = false) => {
       let list = [];
       for (const node of nodes) {
-        // We only want to display leaf nodes or tasks that are relevant themselves
-        // For simplicity in list view, let's show all nodes.
+        const nodeIsCompleted = node.recurrence
+          ? node.completedOccurrences?.includes(selectedDate)
+          : node.isCompleted;
+        // Skip completed nodes if the parent has hideCompleted set
+        if (parentHideCompleted && nodeIsCompleted) continue;
+
         list.push({ task: node, path });
         if (node.children) {
-          list = list.concat(flatten(node.children, [...path, node.text || "Untitled"]));
+          list = list.concat(flatten(node.children, [...path, node.text || "Untitled"], node.hideCompleted));
         }
       }
       return list;
     };
     return flatten(tasks);
-  }, [tasks]);
+  }, [tasks, selectedDate]);
 
   if (flattenedTasks.length === 0) {
     return (

@@ -66,14 +66,14 @@ const FocusView = ({ task, timerProps, onExit, appState }) => {
 
   useEffect(() => {
     if (pipWindow) {
-      const body = pipWindow.document.body;
-      const backgroundClasses = {
-        focusing: 'bg-slate-950', 
-        break: 'bg-sky-950',
-        paused: 'bg-emerald-950',   
-        idle: 'bg-emerald-950',     
+      const backgrounds = {
+        focusing: '#020617',
+        break: '#082f49',
+        paused: '#022c22',
+        idle: '#022c22',
       };
-      body.className = `flex items-center justify-center h-full ${backgroundClasses[appState]}`;
+      pipWindow.document.body.style.background = backgrounds[appState];
+      pipWindow.document.body.style.transition = 'background 1s';
     }
   }, [appState, pipWindow]);
 
@@ -90,24 +90,8 @@ const FocusView = ({ task, timerProps, onExit, appState }) => {
     setIsPipActive(false);
   };
 
-  useEffect(() => {
-    return () => {
-      closePictureInPicture();
-    };
-  }, []);
-
-  if (!task) return null;
-
-  const {
-    timeRemaining,
-    isTimerActive,
-    timerMode,
-    onStartPause,
-    onReset,
-    onSetMode
-  } = timerProps;
-  
   const openPictureInPicture = async () => {
+    if (!task) return;
     if (isPipActive || document.pictureInPictureElement) return;
 
     const docPipSupported = 'documentPictureInPicture' in window;
@@ -119,21 +103,25 @@ const FocusView = ({ task, timerProps, onExit, appState }) => {
           width: 450,
           height: 320,
         });
-        
+
         const title = newPipWindow.document.createElement('title');
         title.innerText = `Focusing on: ${task.text || "Untitled Task"}`;
         newPipWindow.document.head.appendChild(title);
-        
+
         const styleSheets = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'));
         styleSheets.forEach(sheet => {
           newPipWindow.document.head.appendChild(sheet.cloneNode(true));
         });
 
+        const baseStyle = newPipWindow.document.createElement('style');
+        baseStyle.textContent = 'html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }';
+        newPipWindow.document.head.appendChild(baseStyle);
+
         const pipRoot = newPipWindow.document.createElement('div');
         pipRoot.id = 'pip-root';
-        pipRoot.style.width = '100%';
+        pipRoot.style.cssText = 'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; box-sizing: border-box;';
         newPipWindow.document.body.appendChild(pipRoot);
-        
+
         setPipPortalRoot(pipRoot);
         setPipWindow(newPipWindow);
 
@@ -165,6 +153,43 @@ const FocusView = ({ task, timerProps, onExit, appState }) => {
     }
   };
 
+  // Auto PiP on tab switch (like Google Meet)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        if (!isPipActive && !document.pictureInPictureElement) {
+          openPictureInPicture();
+        }
+      } else if (document.visibilityState === 'visible') {
+        if (isPipActive || document.pictureInPictureElement) {
+          closePictureInPicture();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  });
+
+  useEffect(() => {
+    return () => {
+      closePictureInPicture();
+    };
+  }, []);
+
+  if (!task) return null;
+
+  const {
+    timeRemaining,
+    isTimerActive,
+    timerMode,
+    onStartPause,
+    onReset,
+    onSetMode
+  } = timerProps;
+
   const handleExitClick = () => {
     closePictureInPicture();
     onExit();
@@ -182,8 +207,8 @@ const FocusView = ({ task, timerProps, onExit, appState }) => {
       <canvas ref={canvasRef} width="400" height="200" style={{ display: 'none' }} />
       <video ref={videoRef} muted playsInline autoPlay style={{ display: 'none' }} />
       {pipWindow && pipPortalRoot && ReactDOM.createPortal(
-        <div className="w-full max-w-md">
-          <PomodoroTimer 
+        <div className="w-full text-center px-4">
+          <PomodoroTimer
             timeRemaining={timeRemaining}
             isTimerActive={isTimerActive}
             timerMode={timerMode}

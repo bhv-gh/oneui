@@ -30,7 +30,6 @@ import InsightsView from '../components/InsightsView';
 import { getTodayDateString, isDateAnOccurrence } from '../utils/dateUtils';
 import { findNodeRecursive } from '../utils/treeUtils';
 import Fuse from 'fuse.js';
-const POMODORO_TIME = 25 * 60;
 export default function MainPage({
     focusedTask,
     handleStartFocus,
@@ -53,7 +52,8 @@ export default function MainPage({
     const [isDragging, setIsDragging] = useState(false);
     const dragStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-    const [selectedDate, setSelectedDate] = useState(getTodayDateString);
+    const [simulatedToday, setSimulatedToday] = useState(getTodayDateString);
+    const [selectedDate, setSelectedDate] = useState(simulatedToday);
     const [activeTab, setActiveTab] = useState('today');
     const [viewMode, setViewMode] = useState(() => {
         return localStorage.getItem('flowAppViewMode') || 'tree';
@@ -72,6 +72,27 @@ export default function MainPage({
     const contentRef = useRef(null);
     const canvasRef = useRef(null);
     const highlightTimeoutRef = useRef(null);
+    const lastTodayRef = useRef(getTodayDateString());
+
+    useEffect(() => {
+        const checkForDayChange = () => {
+            const currentToday = getTodayDateString();
+            if (currentToday !== lastTodayRef.current) {
+                if (selectedDate === lastTodayRef.current) {
+                    setSelectedDate(currentToday);
+                }
+                lastTodayRef.current = currentToday;
+            }
+        };
+
+        window.addEventListener('focus', checkForDayChange);
+        const interval = setInterval(checkForDayChange, 60000);
+
+        return () => {
+            window.removeEventListener('focus', checkForDayChange);
+            clearInterval(interval);
+        };
+    }, [selectedDate]);
 
     const handleAddTaskAndFocus = (addFn) => {
         const newId = addFn();
@@ -134,11 +155,11 @@ export default function MainPage({
       };
     
       const displayedTreeData = useMemo(() => {
-        const today = getTodayDateString();
+        const today = simulatedToday;
         if (selectedDate < today) return filterTreeByCompletionDate(treeData, selectedDate);
         if (selectedDate > today) return filterTreeByScheduledDate(treeData, selectedDate);
         return filterForTodayView(treeData, today);
-      }, [treeData, selectedDate]);
+      }, [treeData, selectedDate, simulatedToday]);
     
       const allFieldKeys = useMemo(() => {
         const keys = new Set();
@@ -161,7 +182,7 @@ export default function MainPage({
       }, [treeData]);
     
       const suggestedTasks = useMemo(() => {
-        const todayStr = getTodayDateString();
+        const todayStr = simulatedToday;
     
         if (selectedDate < todayStr) {
           return [];
@@ -570,7 +591,7 @@ export default function MainPage({
                         className="flex items-center gap-2 cursor-pointer rounded-lg px-3 py-2 text-sm text-slate-400 hover:bg-white/10 transition-colors"
                         >
                         <CalendarDays size={16} />
-                        <span>{selectedDate === getTodayDateString() ? 'Today' : selectedDate}</span>
+                        <span>{selectedDate === simulatedToday ? 'Today' : selectedDate}</span>
                         </button>
                         {isDatePickerOpen && (
                         <div className="absolute top-full right-0 mt-2 z-30 animate-in fade-in duration-100">
@@ -626,7 +647,7 @@ export default function MainPage({
                                 onFocusHandled={() => setNewlyAddedTaskId(null)}
                             />
                             ))}
-                            {selectedDate >= getTodayDateString() && (
+                            {selectedDate >= simulatedToday && (
                             <button onClick={() => handleAddTaskAndFocus(() => handleAddRoot(selectedDate))} className="w-64 h-24 rounded-2xl border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-600 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all">
                                 <div className="flex flex-col items-center gap-2">
                                 <Plus size={24} />
@@ -636,7 +657,7 @@ export default function MainPage({
                             )}
                         </>
                         ) : (
-                        selectedDate < getTodayDateString() ? (
+                        selectedDate < simulatedToday ? (
                             <div className="text-slate-600">No tasks were completed on this day.</div>
                         ) : (
                             <button 
@@ -734,6 +755,8 @@ export default function MainPage({
                 onClose={() => setIsSettingsOpen(false)}
                 onExport={handleExport}
                 onImport={handleImport}
+                simulatedToday={simulatedToday}
+                setSimulatedToday={setSimulatedToday}
             />
             <SearchOverlay query={searchQuery} resultCount={searchResults.length} currentIndex={searchIndex} />
         </div>

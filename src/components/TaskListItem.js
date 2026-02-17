@@ -7,6 +7,7 @@ import {
   CalendarPlus,
   Repeat,
   Play,
+  Sparkles,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import CustomDatePicker from './CustomDatePicker';
@@ -148,6 +149,15 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
 
       {/* Actions */}
       <div className="flex items-center gap-2">
+        {isCompleted && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onRequestDelete(task.id); }}
+            className="p-2 rounded-md text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+            title="Clean up completed task"
+          >
+            <Sparkles size={16} />
+          </button>
+        )}
         {task.recurrence && <div className="flex items-center gap-1 text-cyan-500" title="Recurring"><Repeat size={14} /></div>}
         {task.scheduledDate && (
           <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-800/50 px-2 py-1 rounded-md">

@@ -12,11 +12,14 @@ import {
   CalendarDays,
   Repeat,
   Play,
+  Eye,
+  EyeOff,
+  Sparkles,
 } from 'lucide-react';
 import CustomDatalistInput from './CustomDatalistInput';
 import CustomDatePicker from './CustomDatePicker';
 import RecurrenceEditor from './RecurrenceEditor';
-import { POMODORO_TIME, SHORT_BREAK_TIME, LONG_BREAK_TIME } from '../utils/WellKnown';
+import { getTimerDurations } from '../utils/timerSettings';
 import { generateId } from '../utils/idGenerator';
 import { startOfToday, parseISO } from 'date-fns';
 import { getTodayDateString } from '../utils/dateUtils';
@@ -116,15 +119,16 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
   }).length;
   const progress = totalChildren === 0 ? 0 : (completedChildren / totalChildren) * 100;
   const fieldsCount = node.fields ? node.fields.length : 0;
+  const hasCompletedChildren = completedChildren > 0;
 
   const isCurrentlyRunningInFocus = focusedTaskId === node.id && isTimerActive;
 
-  const hasPausedTimer = 
-    node.timeRemaining !== undefined && 
-    node.timeRemaining > 0 && 
-    node.timeRemaining < (
-      node.timerMode === 'shortBreak' ? SHORT_BREAK_TIME : node.timerMode === 'longBreak' ? LONG_BREAK_TIME : POMODORO_TIME
-    );
+  const hasPausedTimer = (() => {
+    if (node.timeRemaining === undefined || node.timeRemaining <= 0) return false;
+    const d = getTimerDurations();
+    const full = node.timerMode === 'shortBreak' ? d.shortBreak : node.timerMode === 'longBreak' ? d.longBreak : d.pomodoro;
+    return node.timeRemaining < full;
+  })();
 
   return (
     <div 
@@ -241,19 +245,33 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
           </div>
           
           {/* Fields Toggle */}
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowFields(!showFields);
-            }}
-            className={`
-              p-1 rounded-md transition-colors flex-shrink-0
-              ${showFields ? 'text-emerald-400 bg-emerald-400/10' : 'text-slate-600 hover:text-slate-300 hover:bg-slate-800'}
-            `}
-            title="Custom Fields"
-          >
-            <Settings2 size={14} />
-          </button>
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            {isCompleted && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRequestDelete(node.id);
+                }}
+                className="p-1 rounded-md text-slate-600 hover:text-rose-400 hover:bg-rose-400/10 transition-colors"
+                title="Clean up completed task"
+              >
+                <Sparkles size={14} />
+              </button>
+            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowFields(!showFields);
+              }}
+              className={`
+                p-1 rounded-md transition-colors
+                ${showFields ? 'text-emerald-400 bg-emerald-400/10' : 'text-slate-600 hover:text-slate-300 hover:bg-slate-800'}
+              `}
+              title="Custom Fields"
+            >
+              <Settings2 size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Custom Fields Section */}
@@ -323,16 +341,34 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
         <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-800">
           {/* Collapse Toggle */}
           {node.children.length > 0 && (
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                onUpdate(node.id, { isExpanded: !node.isExpanded });
-              }}
-              className="text-xs flex items-center gap-1 text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 px-2 py-1 rounded-md transition-colors"
-            >
-              {node.isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-              <span>{node.children.length}</span>
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUpdate(node.id, { isExpanded: !node.isExpanded });
+                }}
+                className="text-xs flex items-center gap-1 text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 px-2 py-1 rounded-md transition-colors"
+              >
+                {node.isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                <span>{node.children.length}</span>
+              </button>
+              {hasCompletedChildren && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpdate(node.id, { hideCompleted: !node.hideCompleted });
+                  }}
+                  className={`text-xs flex items-center gap-1 px-2 py-1 rounded-md transition-colors ${
+                    node.hideCompleted
+                      ? 'text-amber-400 bg-amber-400/10 hover:bg-amber-400/20'
+                      : 'text-slate-400 bg-slate-800/50 hover:bg-slate-800 hover:text-white'
+                  }`}
+                  title={node.hideCompleted ? 'Show completed subtasks' : 'Hide completed subtasks'}
+                >
+                  {node.hideCompleted ? <EyeOff size={12} /> : <Eye size={12} />}
+                </button>
+              )}
+            </div>
           )}
           
           {/* Progress Bar (if no children, empty space) */}
