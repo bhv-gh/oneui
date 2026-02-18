@@ -4,24 +4,7 @@ import { getTodayDateString, isDateAnOccurrence, calculateNextOccurrence } from 
 import { findParentNode, findNodeRecursive, findNodePath } from '../utils/treeUtils';
 import { format } from 'date-fns';
 
-const initialData = [
-  {
-    id: 'root-welcome',
-    text: 'Welcome to Flow!',
-    isCompleted: false,
-    isExpanded: true,
-    fields: [],
-    children: [
-      {
-        id: 'sub-1',
-        text: 'Click on me to edit',
-        isCompleted: false,
-        isExpanded: false,
-        children: []
-      },
-    ]
-  }
-];
+const initialData = [];
 
 export function useTreeData() {
   const [treeData, setTreeData] = useState(() => {
