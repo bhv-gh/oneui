@@ -387,7 +387,7 @@ export default function TaskTreeApp() {
 
     nudgeTimeoutRef.current = setTimeout(() => {
       showNotification(
-        'Knock Knock!',
+        getRandomNudge(),
         "You haven't started this in a while.",
         [{ action: 'snooze', title: 'Remind in 10 min' }],
         null,
