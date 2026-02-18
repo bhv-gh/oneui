@@ -8,7 +8,7 @@ const getTodayDateString = () => {
 };
 
 // --- Component: List View ---
-const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAddRoot, selectedDate, newlyAddedTaskId, onFocusHandled }) => {
+const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAddRoot, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes }) => {
   const flattenedTasks = useMemo(() => {
     const flatten = (nodes, path = [], parentHideCompleted = false) => {
       let list = [];
@@ -53,7 +53,7 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAdd
     <div data-list-view-container className="flex-1 overflow-y-auto p-8 animate-in fade-in duration-300">
       <div className="max-w-4xl mx-auto space-y-1">
         {flattenedTasks.map(({ task, path }) => (
-          <TaskListItem 
+          <TaskListItem
             key={task.id}
             task={task}
             path={path}
@@ -64,6 +64,7 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAdd
             selectedDate={selectedDate}
             newlyAddedTaskId={newlyAddedTaskId}
             onFocusHandled={onFocusHandled}
+            onOpenNotes={onOpenNotes}
           />
         ))}
         {selectedDate >= getTodayDateString() && (

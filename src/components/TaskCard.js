@@ -16,6 +16,7 @@ import {
   EyeOff,
   Sparkles,
   ExternalLink,
+  StickyNote,
 } from 'lucide-react';
 import CustomDatalistInput from './CustomDatalistInput';
 import CustomDatePicker from './CustomDatePicker';
@@ -27,7 +28,7 @@ import { getTodayDateString } from '../utils/dateUtils';
 import { isUrl, fetchPageTitle, getLinkedSegments } from '../utils/linkUtils';
 
 // --- Component: Task Card (The actual node content) ---
-const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, isHighlighted, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled }) => {
+const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, isHighlighted, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes }) => {
   const isCompleted = node.recurrence
     ? node.completedOccurrences?.includes(selectedDate)
     : node.isCompleted;
@@ -523,6 +524,19 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
               title="Focus on this task"
             >
               <Play size={14} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onOpenNotes) onOpenNotes(node.id);
+              }}
+              className="relative p-1 text-slate-400 hover:text-amber-400 hover:bg-amber-400/10 rounded-md transition-colors"
+              title="Notes"
+            >
+              <StickyNote size={14} />
+              {node.notes && (
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-400 rounded-full" />
+              )}
             </button>
           </div>
         </div>

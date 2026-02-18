@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useContext } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useContext, useCallback } from 'react';
 import { 
     Plus, 
     Minimize,
@@ -26,6 +26,7 @@ import DeleteModal from '../components/DeleteModal';
 import MemorySearchBar from '../components/MemorySearchBar';
 import CollapsiblePanels from '../components/CollapsiblePanels';
 import InsightsView from '../components/InsightsView';
+import TaskNotesPanel from '../components/TaskNotesPanel';
 
 import { getTodayDateString, isDateAnOccurrence } from '../utils/dateUtils';
 import { findNodeRecursive } from '../utils/treeUtils';
@@ -67,6 +68,7 @@ export default function MainPage({
     const [highlightedTaskId, setHighlightedTaskId] = useState(null);
     const [searchIndex, setSearchIndex] = useState(0);
     const [isTimelineInteracting, setIsTimelineInteracting] = useState(false);
+    const [notesTaskId, setNotesTaskId] = useState(null);
     const highlightedNodeRef = useRef(null);
     const datePickerRef = useRef(null);
     const contentRef = useRef(null);
@@ -100,6 +102,14 @@ export default function MainPage({
             setNewlyAddedTaskId(newId);
         }
     };
+
+    const handleOpenNotes = useCallback((taskId) => {
+        setNotesTaskId(taskId);
+    }, []);
+
+    const handleCloseNotes = useCallback(() => {
+        setNotesTaskId(null);
+    }, []);
 
     const filterTreeByCompletionDate = (nodes, date) => {
         return nodes.map(node => {
@@ -218,7 +228,13 @@ export default function MainPage({
     
         if (selectedDate === todayStr) {
           overdueTasks.sort((a, b) => parseISO(a.scheduledDate) - parseISO(b.scheduledDate));
-          const shuffledPending = otherPendingTasks.sort(() => 0.5 - Math.random());
+          // Stable shuffle seeded by date so suggestions don't reshuffle on every treeData change
+          const dateSeed = selectedDate.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+          const shuffledPending = otherPendingTasks.sort((a, b) => {
+            const hashA = a.id.split('').reduce((s, c) => ((s << 5) - s + c.charCodeAt(0)) | 0, dateSeed);
+            const hashB = b.id.split('').reduce((s, c) => ((s << 5) - s + c.charCodeAt(0)) | 0, dateSeed);
+            return hashA - hashB;
+          });
     
           const suggestions = [...overdueTasks, ...tasksForSelectedDate, ...shuffledPending];
           return suggestions.slice(0, 3);
@@ -354,7 +370,7 @@ export default function MainPage({
     
       useEffect(() => {
         const handleKeyDown = (e) => {
-          if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+          if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable) return;
     
           if (searchResults.length > 0) {
             if (e.key === 'ArrowDown') {
@@ -628,11 +644,11 @@ export default function MainPage({
                         {displayedTreeData.length > 0 ? (
                         <>
                             {displayedTreeData.map(node => (
-                            <TreeNode 
-                                key={node.id} 
-                                node={node} 
-                                onUpdate={(id, updates) => handleUpdate(id, updates, selectedDate)} 
-                                onAdd={(parentId) => handleAddTaskAndFocus(() => handleAddSubtask(parentId, selectedDate))} 
+                            <TreeNode
+                                key={node.id}
+                                node={node}
+                                onUpdate={(id, updates) => handleUpdate(id, updates, selectedDate)}
+                                onAdd={(parentId) => handleAddTaskAndFocus(() => handleAddSubtask(parentId, selectedDate))}
                                 onRequestDelete={setDeleteTargetId}
                                 allFieldKeys={allFieldKeys}
                                 onStartFocus={handleStartFocus}
@@ -645,6 +661,7 @@ export default function MainPage({
                                 selectedDate={selectedDate}
                                 newlyAddedTaskId={newlyAddedTaskId}
                                 onFocusHandled={() => setNewlyAddedTaskId(null)}
+                                onOpenNotes={handleOpenNotes}
                             />
                             ))}
                             {selectedDate >= simulatedToday && (
@@ -682,7 +699,7 @@ export default function MainPage({
                     : displayedTreeData;
 
                     return (
-                    <ListView 
+                    <ListView
                         tasks={listTasks}
                         onUpdate={(id, updates) => handleUpdate(id, updates, selectedDate)}
                         onStartFocus={handleStartFocus}
@@ -692,6 +709,7 @@ export default function MainPage({
                         selectedDate={selectedDate}
                         newlyAddedTaskId={newlyAddedTaskId}
                         onFocusHandled={() => setNewlyAddedTaskId(null)}
+                        onOpenNotes={handleOpenNotes}
                     />
                     );
                 })()
@@ -750,6 +768,20 @@ export default function MainPage({
                 />}
                 {activeTab === 'insights' && <InsightsView tasks={treeData} />}
             </div>
+
+            {notesTaskId && (() => {
+                const notesTask = findNodeRecursive(treeData, notesTaskId);
+                if (!notesTask) return null;
+                return (
+                    <TaskNotesPanel
+                        taskId={notesTaskId}
+                        taskTitle={notesTask.text}
+                        initialNotes={notesTask.notes || ''}
+                        onUpdate={handleUpdate}
+                        onClose={handleCloseNotes}
+                    />
+                );
+            })()}
 
             <SettingsModal 
                 isOpen={isSettingsOpen}

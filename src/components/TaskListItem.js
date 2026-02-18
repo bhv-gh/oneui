@@ -10,6 +10,7 @@ import {
   Sparkles,
   ExternalLink,
   X,
+  StickyNote,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import CustomDatePicker from './CustomDatePicker';
@@ -18,7 +19,7 @@ import { getTodayDateString } from '../utils/dateUtils';
 import { isUrl, fetchPageTitle, getLinkedSegments } from '../utils/linkUtils';
 
 // --- Component: Task List Item (for List View) ---
-const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, selectedDate, newlyAddedTaskId, onFocusHandled }) => {
+const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes }) => {
   const isCompleted = task.recurrence
     ? task.completedOccurrences?.includes(selectedDate)
     : task.isCompleted;
@@ -274,6 +275,16 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
             title="Focus on this task"
           >
             <Play size={16} />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); if (onOpenNotes) onOpenNotes(task.id); }}
+            className="relative p-2 rounded-md text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+            title="Notes"
+          >
+            <StickyNote size={16} />
+            {task.notes && (
+              <span className="absolute top-1 right-1 w-2 h-2 bg-amber-400 rounded-full" />
+            )}
           </button>
         </div>
       </div>

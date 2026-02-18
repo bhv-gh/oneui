@@ -2,7 +2,7 @@ import React from 'react';
 import TaskCard from './TaskCard';
 
 // --- Component: Recursive Tree Node ---
-const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, highlightedTaskId, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled }) => {
+const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, highlightedTaskId, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes }) => {
   const visibleChildren = node.hideCompleted
     ? node.children.filter(child => {
         if (child.recurrence) {
@@ -15,10 +15,10 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
 
   return (
     <div className="flex flex-col items-center">
-      <TaskCard 
-        node={node} 
-        onUpdate={onUpdate} 
-        onAdd={onAdd} 
+      <TaskCard
+        node={node}
+        onUpdate={onUpdate}
+        onAdd={onAdd}
         onRequestDelete={onRequestDelete}
         allFieldKeys={allFieldKeys}
         onStartFocus={onStartFocus}
@@ -31,6 +31,7 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
         selectedDate={selectedDate}
         newlyAddedTaskId={newlyAddedTaskId}
         onFocusHandled={onFocusHandled}
+        onOpenNotes={onOpenNotes}
       />
       
       {/* Children Container */}
@@ -60,10 +61,10 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 </>
               )}
 
-              <TreeNode 
-                node={child} 
-                onUpdate={onUpdate} 
-                onAdd={onAdd} 
+              <TreeNode
+                node={child}
+                onUpdate={onUpdate}
+                onAdd={onAdd}
                 onRequestDelete={onRequestDelete}
                 allFieldKeys={allFieldKeys}
                 onStartFocus={onStartFocus}
@@ -76,6 +77,7 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 selectedDate={selectedDate}
                 newlyAddedTaskId={newlyAddedTaskId}
                 onFocusHandled={onFocusHandled}
+                onOpenNotes={onOpenNotes}
               />
             </div>
           ))}
