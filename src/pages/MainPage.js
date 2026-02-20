@@ -579,6 +579,14 @@ export default function MainPage({
                             )}
                         </div>
                     )}
+                    <button
+                        onClick={handleSync}
+                        disabled={isSyncing}
+                        className="p-2 rounded-lg text-slate-400 hover:bg-white/10 disabled:opacity-50"
+                        title="Sync all data"
+                    >
+                        <RefreshCw size={18} className={isSyncing ? 'animate-spin' : ''} />
+                    </button>
                     {isSpeechSupported && (
                         <button
                             onClick={() => setIsRambleOpen(true)}

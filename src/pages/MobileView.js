@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo, useContext, useCallback, useRef } from 'react';
-import { Plus, CalendarDays, Settings2, Mic } from 'lucide-react';
+import { Plus, CalendarDays, Settings2, Mic, RefreshCw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 import TreeDataContext from '../contexts/TreeDataContext';
+import LogsContext from '../contexts/LogsContext';
+import MemoryContext from '../contexts/MemoryContext';
 import CustomDatePicker from '../components/CustomDatePicker';
 import MobileTaskItem from '../components/MobileTaskItem';
 import SettingsModal from '../components/SettingsModal';
@@ -22,13 +24,17 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
     handleDelete,
     handleAddRoot,
     syncStatus,
+    forceSync: forceSyncTree,
   } = useContext(TreeDataContext);
+  const { forceSync: forceSyncLogs } = useContext(LogsContext);
+  const { forceSync: forceSyncMemory } = useContext(MemoryContext);
 
   const [simulatedToday, setSimulatedToday] = useState(getTodayDateString);
   const [selectedDate, setSelectedDate] = useState(simulatedToday);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isRambleOpen, setIsRambleOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [newlyAddedTaskId, setNewlyAddedTaskId] = useState(null);
   const [notesTaskId, setNotesTaskId] = useState(null);
@@ -99,6 +105,16 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
     }
   }, [handleAddRoot, handleAddSubtask, handleUpdate, selectedDate]);
 
+  const handleSync = useCallback(async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      await Promise.all([forceSyncTree(), forceSyncLogs(), forceSyncMemory()]);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [isSyncing, forceSyncTree, forceSyncLogs, forceSyncMemory]);
+
   const confirmDelete = () => {
     if (deleteTargetId) {
       handleDelete(deleteTargetId);
@@ -117,8 +133,8 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
         </h1>
 
         <div className="flex items-center gap-1">
-          {/* Sync status */}
-          {syncStatus !== 'idle' && (
+          {/* Sync status + button */}
+          {syncStatus !== 'idle' && !isSyncing && (
             <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md ${
               syncStatus === 'saving' ? 'text-slate-400' :
               syncStatus === 'saved' ? 'text-emerald-400' :
@@ -131,6 +147,14 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
               {syncStatus === 'error' && <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />}
             </div>
           )}
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="p-2 rounded-lg text-slate-400 active:bg-slate-800 disabled:opacity-50"
+            title="Sync"
+          >
+            <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
+          </button>
 
           {/* Date selector */}
           <button
