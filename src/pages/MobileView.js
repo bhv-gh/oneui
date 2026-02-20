@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useContext, useCallback, useRef } from 'react';
-import { Plus, CalendarDays, Settings2 } from 'lucide-react';
+import { Plus, CalendarDays, Settings2, Mic } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 import TreeDataContext from '../contexts/TreeDataContext';
@@ -8,6 +8,7 @@ import MobileTaskItem from '../components/MobileTaskItem';
 import SettingsModal from '../components/SettingsModal';
 import DeleteModal from '../components/DeleteModal';
 import TaskNotesPanel from '../components/TaskNotesPanel';
+import RambleModal, { isSpeechSupported } from '../components/RambleModal';
 
 import { getTodayDateString } from '../utils/dateUtils';
 import { filterTreeByCompletionDate, filterTreeByScheduledDate, filterForTodayView } from '../utils/treeFilters';
@@ -27,6 +28,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
   const [selectedDate, setSelectedDate] = useState(simulatedToday);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isRambleOpen, setIsRambleOpen] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [newlyAddedTaskId, setNewlyAddedTaskId] = useState(null);
   const [notesTaskId, setNotesTaskId] = useState(null);
@@ -86,6 +88,17 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
   const handleOpenNotes = useCallback((taskId) => setNotesTaskId(taskId), []);
   const handleCloseNotes = useCallback(() => setNotesTaskId(null), []);
 
+  const handleRambleAdd = useCallback((tasks) => {
+    for (const task of tasks) {
+      const rootId = handleAddRoot(selectedDate);
+      handleUpdate(rootId, { text: task.text });
+      for (const child of (task.children || [])) {
+        const childId = handleAddSubtask(rootId, selectedDate);
+        handleUpdate(childId, { text: child.text });
+      }
+    }
+  }, [handleAddRoot, handleAddSubtask, handleUpdate, selectedDate]);
+
   const confirmDelete = () => {
     if (deleteTargetId) {
       handleDelete(deleteTargetId);
@@ -127,6 +140,17 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
             <CalendarDays size={16} />
             <span>{selectedDate === simulatedToday ? 'Today' : selectedDate.slice(5)}</span>
           </button>
+
+          {/* Ramble mic */}
+          {isSpeechSupported && (
+            <button
+              onClick={() => setIsRambleOpen(true)}
+              className="p-2 rounded-lg text-slate-400 active:bg-slate-800"
+              title="Ramble"
+            >
+              <Mic size={18} />
+            </button>
+          )}
 
           {/* Settings */}
           <button
@@ -234,6 +258,13 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
         simulatedToday={simulatedToday}
         setSimulatedToday={setSimulatedToday}
         onLogout={onLogout}
+      />
+
+      {/* Ramble modal */}
+      <RambleModal
+        isOpen={isRambleOpen}
+        onClose={() => setIsRambleOpen(false)}
+        onAddTasks={handleRambleAdd}
       />
     </div>
   );

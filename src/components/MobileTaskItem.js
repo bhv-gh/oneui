@@ -82,18 +82,19 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
     <div data-task-id={task.id} style={indentationStyle}>
       {/* Main row */}
       <div className={`flex items-center gap-3 px-3 py-3 min-h-[44px] ${isCompleted ? 'opacity-50' : ''}`}>
-        {/* Checkbox — 44px tap target */}
-        <button
-          onClick={() => onUpdate(task.id, { isCompleted: !isCompleted })}
-          className={`flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full border-2 transition-all ${
-            isCompleted
-              ? 'bg-emerald-500 border-emerald-500 text-white'
-              : 'border-slate-500'
-          }`}
-          style={{ minWidth: 24, minHeight: 24, padding: 8, margin: -8 }}
-        >
-          {isCompleted && <Check size={14} strokeWidth={3} />}
-        </button>
+        {/* Checkbox — visual 24px circle, 44px tap target via wrapper */}
+        <div className="flex-shrink-0 flex items-center justify-center w-11 h-11 -ml-2.5">
+          <button
+            onClick={() => onUpdate(task.id, { isCompleted: !isCompleted })}
+            className={`flex items-center justify-center w-6 h-6 rounded-full border-2 transition-all ${
+              isCompleted
+                ? 'bg-emerald-500 border-emerald-500 text-white'
+                : 'border-slate-500'
+            }`}
+          >
+            {isCompleted && <Check size={14} strokeWidth={3} />}
+          </button>
+        </div>
 
         {/* Task text */}
         <div className="flex-1 min-w-0">
@@ -105,7 +106,7 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
               onChange={(e) => onUpdate(task.id, { text: e.target.value })}
               onBlur={() => setIsEditing(false)}
               onKeyDown={handleKeyDown}
-              className="bg-transparent text-slate-200 text-sm w-full outline-none border-b border-emerald-500/50 py-1"
+              className="bg-transparent text-slate-200 text-base w-full outline-none border-b border-emerald-500/50 py-1"
             />
           ) : (
             <p

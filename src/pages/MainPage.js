@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo, useContext, useCallback } from 'react';
-import { 
-    Plus, 
+import {
+    Plus,
     Minimize,
     Maximize,
     CalendarDays,
     Settings2,
     GitMerge,
     LayoutGrid,
+    Mic,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -27,6 +28,7 @@ import MemorySearchBar from '../components/MemorySearchBar';
 import CollapsiblePanels from '../components/CollapsiblePanels';
 import InsightsView from '../components/InsightsView';
 import TaskNotesPanel from '../components/TaskNotesPanel';
+import RambleModal, { isSpeechSupported } from '../components/RambleModal';
 
 import { getTodayDateString, isDateAnOccurrence } from '../utils/dateUtils';
 import { filterTreeByCompletionDate, filterTreeByScheduledDate, filterForTodayView } from '../utils/treeFilters';
@@ -71,6 +73,7 @@ export default function MainPage({
     const [deleteTargetId, setDeleteTargetId] = useState(null);
     const [newlyAddedTaskId, setNewlyAddedTaskId] = useState(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isRambleOpen, setIsRambleOpen] = useState(false);
     const [manualLogModal, setManualLogModal] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
@@ -119,6 +122,17 @@ export default function MainPage({
     const handleCloseNotes = useCallback(() => {
         setNotesTaskId(null);
     }, []);
+
+    const handleRambleAdd = useCallback((tasks) => {
+        for (const task of tasks) {
+            const rootId = handleAddRoot(selectedDate);
+            handleUpdate(rootId, { text: task.text });
+            for (const child of (task.children || [])) {
+                const childId = handleAddSubtask(rootId, selectedDate);
+                handleUpdate(childId, { text: child.text });
+            }
+        }
+    }, [handleAddRoot, handleAddSubtask, handleUpdate, selectedDate]);
 
       const displayedTreeData = useMemo(() => {
         const today = simulatedToday;
@@ -552,6 +566,15 @@ export default function MainPage({
                             )}
                         </div>
                     )}
+                    {isSpeechSupported && (
+                        <button
+                            onClick={() => setIsRambleOpen(true)}
+                            className="p-2 rounded-lg text-slate-400 hover:bg-white/10"
+                            title="Ramble — voice input"
+                        >
+                            <Mic size={18} />
+                        </button>
+                    )}
                     <button
                         onClick={() => setIsSettingsOpen(true)}
                         className="p-2 rounded-lg text-slate-400 hover:bg-white/10"
@@ -773,6 +796,11 @@ export default function MainPage({
                 simulatedToday={simulatedToday}
                 setSimulatedToday={setSimulatedToday}
                 onLogout={onLogout}
+            />
+            <RambleModal
+                isOpen={isRambleOpen}
+                onClose={() => setIsRambleOpen(false)}
+                onAddTasks={handleRambleAdd}
             />
             <SearchOverlay query={searchQuery} resultCount={searchResults.length} currentIndex={searchIndex} />
         </div>
