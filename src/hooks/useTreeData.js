@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { generateId } from '../utils/idGenerator';
 import { getTodayDateString } from '../utils/dateUtils';
-import { findNodeRecursive, findNodePath } from '../utils/treeUtils';
+import { findNodeRecursive, findNodePath, findParentNode, isDescendantOf } from '../utils/treeUtils';
 import * as api from '../api/client';
 
 export function useTreeData() {
@@ -226,6 +226,47 @@ export function useTreeData() {
     });
   };
 
+  const handleMoveNode = (nodeId, newParentId) => {
+    setTreeData(prev => {
+      // No-op: can't move to self
+      if (newParentId === nodeId) return prev;
+
+      const node = findNodeRecursive(prev, nodeId);
+      if (!node) return prev;
+
+      // No-op: circular move (can't drop parent onto its own descendant)
+      if (newParentId !== null && isDescendantOf(prev, nodeId, newParentId)) return prev;
+
+      // No-op: already at target position
+      if (newParentId === null) {
+        // Check if already a root node
+        if (prev.some(n => n.id === nodeId)) return prev;
+      } else {
+        const targetParent = findNodeRecursive(prev, newParentId);
+        if (targetParent && targetParent.children.some(c => c.id === nodeId)) return prev;
+      }
+
+      // Remove node from old position
+      const treeWithout = deleteNodeRecursive(prev, nodeId);
+
+      // Insert as last child of new parent (or at root level)
+      if (newParentId === null) {
+        return [...treeWithout, node];
+      } else {
+        const insertIntoParent = (nodes) => nodes.map(n => {
+          if (n.id === newParentId) {
+            return { ...n, isExpanded: true, children: [...n.children, node] };
+          }
+          if (n.children.length > 0) {
+            return { ...n, children: insertIntoParent(n.children) };
+          }
+          return n;
+        });
+        return insertIntoParent(treeWithout);
+      }
+    });
+  };
+
   const treeDataRef = useRef(treeData);
   treeDataRef.current = treeData;
 
@@ -266,6 +307,7 @@ export function useTreeData() {
     handleAddTree,
     handleUpdateField,
     handleAddField,
+    handleMoveNode,
     expandBranch,
   };
 }

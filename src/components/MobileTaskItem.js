@@ -9,13 +9,15 @@ import {
   MoreVertical,
   ExternalLink,
   StickyNote,
+  GripVertical,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import CustomDatePicker from './CustomDatePicker';
 import RecurrenceEditor from './RecurrenceEditor';
 import { getLinkedSegments } from '../utils/linkUtils';
 
-const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes }) => {
+const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId }) => {
   const isCompleted = task.recurrence
     ? task.completedOccurrences?.includes(selectedDate)
     : task.isCompleted;
@@ -27,6 +29,11 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
   const inputRef = useRef(null);
   const schedulePickerRef = useRef(null);
   const recurrenceEditorRef = useRef(null);
+
+  // DnD hooks
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: task.id });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: task.id });
+  const isDropTarget = isOver && activeDragId && activeDragId !== task.id;
 
   const indentationStyle = {
     paddingLeft: `${0.75 + path.length * 1}rem`,
@@ -79,9 +86,20 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
   };
 
   return (
-    <div data-task-id={task.id} style={indentationStyle}>
+    <div ref={setDropRef} data-task-id={task.id} style={indentationStyle} className={`${isDragging ? 'opacity-40' : ''} ${isDropTarget ? 'border-l-2 border-cyan-400' : ''}`}>
       {/* Main row */}
       <div className={`flex items-center gap-3 px-3 py-3 min-h-[44px] ${isCompleted ? 'opacity-50' : ''}`}>
+        {/* Drag Handle */}
+        <div
+          ref={setDragRef}
+          {...listeners}
+          {...attributes}
+          data-drag-handle
+          className="flex-shrink-0 cursor-grab active:cursor-grabbing text-slate-600 -ml-1"
+          style={{ touchAction: 'none' }}
+        >
+          <GripVertical size={16} />
+        </div>
         {/* Checkbox — visual 24px circle, 44px tap target via wrapper */}
         <div className="flex-shrink-0 flex items-center justify-center w-11 h-11 -ml-2.5">
           <button

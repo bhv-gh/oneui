@@ -11,15 +11,17 @@ import {
   ExternalLink,
   X,
   StickyNote,
+  GripVertical,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import CustomDatePicker from './CustomDatePicker';
 import RecurrenceEditor from './RecurrenceEditor';
 import { getTodayDateString } from '../utils/dateUtils';
 import { isUrl, fetchPageTitle, getLinkedSegments } from '../utils/linkUtils';
 
 // --- Component: Task List Item (for List View) ---
-const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes }) => {
+const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId }) => {
   const isCompleted = task.recurrence
     ? task.completedOccurrences?.includes(selectedDate)
     : task.isCompleted;
@@ -32,6 +34,11 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
   taskRef.current = task;
   const schedulePickerRef = useRef(null);
   const recurrenceEditorRef = useRef(null);
+
+  // DnD hooks
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: task.id });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: task.id });
+  const isDropTarget = isOver && activeDragId && activeDragId !== task.id;
 
   const indentationStyle = {
     // 1rem base padding + 1.5rem for each level of nesting
@@ -103,11 +110,22 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
   };
 
   return (
-    <div 
+    <div
+      ref={setDropRef}
       data-task-id={task.id}
-      className={`relative flex items-center gap-4 px-4 py-3 rounded-lg transition-colors group ${isCompleted ? 'opacity-50' : ''} hover:bg-slate-800/50`}
+      className={`relative flex items-center gap-4 px-4 py-3 rounded-lg transition-colors group ${isCompleted ? 'opacity-50' : ''} ${isDragging ? '!opacity-40' : ''} ${isDropTarget ? 'border-l-2 border-cyan-400 bg-cyan-400/5' : ''} hover:bg-slate-800/50`}
       style={indentationStyle}
     >
+      {/* Drag Handle */}
+      <div
+        ref={setDragRef}
+        {...listeners}
+        {...attributes}
+        data-drag-handle
+        className="flex-shrink-0 cursor-grab active:cursor-grabbing text-slate-600 hover:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"
+      >
+        <GripVertical size={16} />
+      </div>
       {/* Schedule Picker Popover */}
       {isSchedulePickerOpen && (
         <div ref={schedulePickerRef} className="absolute top-full right-4 mt-2 z-30 animate-in fade-in duration-100">

@@ -17,7 +17,9 @@ import {
   Sparkles,
   ExternalLink,
   StickyNote,
+  GripVertical,
 } from 'lucide-react';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import CustomDatalistInput from './CustomDatalistInput';
 import CustomDatePicker from './CustomDatePicker';
 import RecurrenceEditor from './RecurrenceEditor';
@@ -28,7 +30,7 @@ import { getTodayDateString } from '../utils/dateUtils';
 import { isUrl, fetchPageTitle, getLinkedSegments } from '../utils/linkUtils';
 
 // --- Component: Task Card (The actual node content) ---
-const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, isHighlighted, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes }) => {
+const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, isHighlighted, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId }) => {
   const isCompleted = node.recurrence
     ? node.completedOccurrences?.includes(selectedDate)
     : node.isCompleted;
@@ -42,6 +44,12 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
   const [isRecurrenceEditorOpen, setIsRecurrenceEditorOpen] = useState(false);
   const schedulePickerRef = useRef(null);
   const recurrenceEditorRef = useRef(null);
+
+  // DnD hooks
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: node.id });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: node.id });
+
+  const isDropTarget = isOver && activeDragId && activeDragId !== node.id;
 
   // This is a helper function that needs access to the top-level state.
   // Instead of passing the function, we pass the data it needs (`treeData`).
@@ -156,29 +164,45 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
   })();
 
   return (
-    <div 
-      ref={isHighlighted ? highlightedRef : null}
+    <div
+      ref={(el) => {
+        setDropRef(el);
+        if (isHighlighted && highlightedRef) highlightedRef.current = el;
+      }}
       data-task-id={node.id}
-      className={` 
+      className={`
         relative flex flex-col items-center w-[15vw] min-w-[250px] max-w-[350px] transition-all duration-300 group z-10
         ${isSearching && !isHighlighted ? 'opacity-20 scale-95' : 'opacity-100 scale-100'}
         ${isHighlighted ? 'opacity-100' : ''}
         ${isCompleted && !isHighlighted ? 'opacity-70' : ''}
-
+        ${isDragging ? '!opacity-40' : ''}
       `}
     >
       {/* The Card Box */}
-      <div 
+      <div
         className={`
           relative w-full bg-slate-900/90 backdrop-blur-md border rounded-2xl p-3 shadow-xl transition-all duration-300
-          ${isHighlighted 
-            ? 'border-cyan-400 shadow-[0_0_25px_rgba(56,189,248,0.4)]' 
-            : hasPausedTimer && !isCurrentlyRunningInFocus 
-              ? 'border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)] animate-border-pulse' 
+          ${isDropTarget
+            ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]'
+            : isHighlighted
+            ? 'border-cyan-400 shadow-[0_0_25px_rgba(56,189,248,0.4)]'
+            : hasPausedTimer && !isCurrentlyRunningInFocus
+              ? 'border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)] animate-border-pulse'
               : (isCompleted ? 'border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'border-slate-700 hover:border-slate-500 hover:shadow-2xl hover:shadow-emerald-500/5')}
         `}
       >
         <div className="flex items-start gap-3">
+          {/* Drag Handle */}
+          <div
+            ref={setDragRef}
+            {...listeners}
+            {...attributes}
+            data-drag-handle
+            className="mt-1 flex-shrink-0 cursor-grab active:cursor-grabbing text-slate-600 hover:text-slate-400 transition-colors"
+          >
+            <GripVertical size={14} />
+          </div>
+
           {/* Checkbox with Tooltip Wrapper */}
           <div className="relative flex-shrink-0">
             <button 

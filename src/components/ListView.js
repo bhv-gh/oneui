@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Plus } from 'lucide-react';
+import { useDroppable } from '@dnd-kit/core';
 import TaskListItem from './TaskListItem';
 
 const getTodayDateString = () => {
@@ -8,7 +9,7 @@ const getTodayDateString = () => {
 };
 
 // --- Component: List View ---
-const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAddRoot, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes }) => {
+const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAddRoot, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId }) => {
   const flattenedTasks = useMemo(() => {
     const flatten = (nodes, path = [], parentHideCompleted = false) => {
       let list = [];
@@ -28,6 +29,8 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAdd
     };
     return flatten(tasks);
   }, [tasks, selectedDate]);
+
+  const { setNodeRef: setRootDropRef, isOver: isRootOver } = useDroppable({ id: '__root__' });
 
   if (flattenedTasks.length === 0) {
     return (
@@ -65,6 +68,7 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAdd
             newlyAddedTaskId={newlyAddedTaskId}
             onFocusHandled={onFocusHandled}
             onOpenNotes={onOpenNotes}
+            activeDragId={activeDragId}
           />
         ))}
         {selectedDate >= getTodayDateString() && (
@@ -72,6 +76,18 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAdd
             <Plus size={16} />
             <span>Add New Task</span>
           </button>
+        )}
+        {activeDragId && (
+          <div
+            ref={setRootDropRef}
+            className={`w-full mt-2 py-4 text-sm text-center rounded-lg border-2 border-dashed transition-all ${
+              isRootOver
+                ? 'border-cyan-400 bg-cyan-400/10 text-cyan-400'
+                : 'border-slate-700 text-slate-500'
+            }`}
+          >
+            Drop here for root level
+          </div>
         )}
       </div>
     </div>

@@ -11,6 +11,8 @@ import {
     RefreshCw,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, pointerWithin } from '@dnd-kit/core';
+import { useDroppable } from '@dnd-kit/core';
 
 import TreeDataContext from '../contexts/TreeDataContext';
 import LogsContext from '../contexts/LogsContext';
@@ -30,12 +32,35 @@ import CollapsiblePanels from '../components/CollapsiblePanels';
 import InsightsView from '../components/InsightsView';
 import TaskNotesPanel from '../components/TaskNotesPanel';
 import RambleModal, { isSpeechSupported } from '../components/RambleModal';
+import QuickAddModal from '../components/QuickAddModal';
 
 import { getTodayDateString, isDateAnOccurrence } from '../utils/dateUtils';
 import { filterTreeByCompletionDate, filterTreeByScheduledDate, filterForTodayView } from '../utils/treeFilters';
 import { findNodeRecursive } from '../utils/treeUtils';
 import * as api from '../api/client';
 import Fuse from 'fuse.js';
+
+// Small droppable wrapper for root drop zone in tree view
+function RootDropZoneButton({ onClick, activeDragId }) {
+    const { setNodeRef, isOver } = useDroppable({ id: '__root__' });
+    const isDropTarget = isOver && activeDragId;
+    return (
+        <button
+            ref={setNodeRef}
+            onClick={onClick}
+            className={`w-64 h-24 rounded-2xl border-2 border-dashed flex items-center justify-center transition-all ${
+                isDropTarget
+                    ? 'border-cyan-400 bg-cyan-400/10 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]'
+                    : 'border-slate-800 text-slate-600 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5'
+            }`}
+        >
+            <div className="flex flex-col items-center gap-2">
+                <Plus size={24} />
+                <span className="font-medium">{isDropTarget ? 'Drop as Root' : 'New Root'}</span>
+            </div>
+        </button>
+    );
+}
 export default function MainPage({
     focusedTask,
     handleStartFocus,
@@ -51,6 +76,7 @@ export default function MainPage({
         handleDelete,
         handleAddRoot,
         handleAddTree,
+        handleMoveNode,
         expandBranch,
         syncStatus,
         forceSync: forceSyncTree,
@@ -77,6 +103,7 @@ export default function MainPage({
     const [newlyAddedTaskId, setNewlyAddedTaskId] = useState(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isRambleOpen, setIsRambleOpen] = useState(false);
+    const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [manualLogModal, setManualLogModal] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -85,12 +112,33 @@ export default function MainPage({
     const [searchIndex, setSearchIndex] = useState(0);
     const [isTimelineInteracting, setIsTimelineInteracting] = useState(false);
     const [notesTaskId, setNotesTaskId] = useState(null);
+    const [activeDragId, setActiveDragId] = useState(null);
     const highlightedNodeRef = useRef(null);
     const datePickerRef = useRef(null);
     const contentRef = useRef(null);
     const canvasRef = useRef(null);
     const highlightTimeoutRef = useRef(null);
     const lastTodayRef = useRef(getTodayDateString());
+
+    // DnD sensors and handlers
+    const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 8 } });
+    const dndSensors = useSensors(pointerSensor);
+
+    const handleDragStart = useCallback((event) => {
+        setActiveDragId(event.active.id);
+    }, []);
+
+    const handleDragEnd = useCallback((event) => {
+        const { active, over } = event;
+        if (over && active.id !== over.id) {
+            handleMoveNode(active.id, over.id === '__root__' ? null : over.id);
+        }
+        setActiveDragId(null);
+    }, [handleMoveNode]);
+
+    const handleDragCancel = useCallback(() => {
+        setActiveDragId(null);
+    }, []);
 
     useEffect(() => {
         const checkForDayChange = () => {
@@ -347,6 +395,12 @@ export default function MainPage({
     
       useEffect(() => {
         const handleKeyDown = (e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            setIsQuickAddOpen(true);
+            return;
+          }
+
           if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable) return;
     
           if (searchResults.length > 0) {
@@ -417,7 +471,7 @@ export default function MainPage({
     };
 
     const handleMouseDown = (e) => {
-        if (e.target.closest('button, input, .cursor-text')) return;
+        if (e.target.closest('button, input, .cursor-text, [data-drag-handle]')) return;
         e.preventDefault();
         setIsDragging(true);
         dragStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
@@ -648,6 +702,7 @@ export default function MainPage({
             {activeTab === 'today' && <SuggestionBar suggestions={suggestedTasks} onSuggestionClick={handleSuggestionClick} />}
 
             <div className="pt-24 flex-1 flex flex-col min-h-0">
+              <DndContext sensors={dndSensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
                 {activeTab === 'today' && viewMode === 'tree' && (
                 <div
                     data-canvas-area
@@ -682,15 +737,11 @@ export default function MainPage({
                                 newlyAddedTaskId={newlyAddedTaskId}
                                 onFocusHandled={() => setNewlyAddedTaskId(null)}
                                 onOpenNotes={handleOpenNotes}
+                                activeDragId={activeDragId}
                             />
                             ))}
                             {selectedDate >= simulatedToday && (
-                            <button onClick={() => handleAddTaskAndFocus(() => handleAddRoot(selectedDate))} className="w-64 h-24 rounded-2xl border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-600 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all">
-                                <div className="flex flex-col items-center gap-2">
-                                <Plus size={24} />
-                                <span className="font-medium">New Root</span>
-                                </div>
-                            </button>
+                            <RootDropZoneButton onClick={() => handleAddTaskAndFocus(() => handleAddRoot(selectedDate))} activeDragId={activeDragId} />
                             )}
                         </>
                         ) : (
@@ -730,6 +781,7 @@ export default function MainPage({
                         newlyAddedTaskId={newlyAddedTaskId}
                         onFocusHandled={() => setNewlyAddedTaskId(null)}
                         onOpenNotes={handleOpenNotes}
+                        activeDragId={activeDragId}
                     />
                     );
                 })()
@@ -787,6 +839,17 @@ export default function MainPage({
                 onInteractionChange={setIsTimelineInteracting}
                 />}
                 {activeTab === 'insights' && <InsightsView tasks={treeData} />}
+              <DragOverlay dropAnimation={null}>
+                {activeDragId ? (() => {
+                    const dragNode = findNodeRecursive(treeData, activeDragId);
+                    return dragNode ? (
+                        <div className="px-4 py-2 bg-slate-800 border border-cyan-400 rounded-lg shadow-lg text-sm text-slate-200 max-w-[200px] truncate">
+                            {dragNode.text || 'Untitled Task'}
+                        </div>
+                    ) : null;
+                })() : null}
+              </DragOverlay>
+              </DndContext>
             </div>
 
             {notesTaskId && (() => {
@@ -818,6 +881,15 @@ export default function MainPage({
                 onAddTasks={handleRambleAdd}
             />
             <SearchOverlay query={searchQuery} resultCount={searchResults.length} currentIndex={searchIndex} />
+            <QuickAddModal
+                isOpen={isQuickAddOpen}
+                onClose={() => setIsQuickAddOpen(false)}
+                treeData={treeData}
+                onAddSubtask={handleAddSubtask}
+                onAddRoot={handleAddRoot}
+                onUpdate={handleUpdate}
+                selectedDate={selectedDate}
+            />
         </div>
     );
 }

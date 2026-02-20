@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useContext, useCallback, useRef } from 'react';
 import { Plus, CalendarDays, Settings2, Mic, RefreshCw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors, pointerWithin } from '@dnd-kit/core';
+import { useDroppable } from '@dnd-kit/core';
 
 import TreeDataContext from '../contexts/TreeDataContext';
 import LogsContext from '../contexts/LogsContext';
@@ -11,10 +13,29 @@ import SettingsModal from '../components/SettingsModal';
 import DeleteModal from '../components/DeleteModal';
 import TaskNotesPanel from '../components/TaskNotesPanel';
 import RambleModal, { isSpeechSupported } from '../components/RambleModal';
+import QuickAddModal from '../components/QuickAddModal';
 
 import { getTodayDateString } from '../utils/dateUtils';
 import { filterTreeByCompletionDate, filterTreeByScheduledDate, filterForTodayView } from '../utils/treeFilters';
 import { findNodeRecursive } from '../utils/treeUtils';
+
+// Root drop zone for mobile view
+function MobileRootDropZone({ activeDragId }) {
+  const { setNodeRef, isOver } = useDroppable({ id: '__root__' });
+  if (!activeDragId) return null;
+  return (
+    <div
+      ref={setNodeRef}
+      className={`mx-4 my-2 py-4 text-sm text-center rounded-lg border-2 border-dashed transition-all ${
+        isOver
+          ? 'border-cyan-400 bg-cyan-400/10 text-cyan-400'
+          : 'border-slate-700 text-slate-500'
+      }`}
+    >
+      Drop here for root level
+    </div>
+  );
+}
 
 export default function MobileView({ handleStartFocus, handleExport, handleImport, onLogout }) {
   const {
@@ -24,6 +45,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
     handleDelete,
     handleAddRoot,
     handleAddTree,
+    handleMoveNode,
     syncStatus,
     forceSync: forceSyncTree,
   } = useContext(TreeDataContext);
@@ -35,12 +57,35 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isRambleOpen, setIsRambleOpen] = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [newlyAddedTaskId, setNewlyAddedTaskId] = useState(null);
   const [notesTaskId, setNotesTaskId] = useState(null);
+  const [activeDragId, setActiveDragId] = useState(null);
   const datePickerRef = useRef(null);
   const lastTodayRef = useRef(getTodayDateString());
+
+  // DnD sensors and handlers
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } });
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 8 } });
+  const dndSensors = useSensors(touchSensor, pointerSensor);
+
+  const handleDragStart = useCallback((event) => {
+    setActiveDragId(event.active.id);
+  }, []);
+
+  const handleDragEnd = useCallback((event) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      handleMoveNode(active.id, over.id === '__root__' ? null : over.id);
+    }
+    setActiveDragId(null);
+  }, [handleMoveNode]);
+
+  const handleDragCancel = useCallback(() => {
+    setActiveDragId(null);
+  }, []);
 
   // Day-change detection
   useEffect(() => {
@@ -181,6 +226,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
       </div>
 
       {/* Scrollable task list */}
+      <DndContext sensors={dndSensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
       <div className="flex-1 overflow-y-auto overscroll-y-contain no-scrollbar">
         {flattenedTasks.length === 0 ? (
           <div className="flex-1 flex items-center justify-center h-full">
@@ -188,7 +234,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
               <p className="text-slate-600 text-sm">No tasks were completed on this day.</p>
             ) : (
               <button
-                onClick={() => handleAddTaskAndFocus(() => handleAddRoot(selectedDate))}
+                onClick={() => setIsQuickAddOpen(true)}
                 className="flex flex-col items-center gap-2 text-slate-500 active:text-emerald-400 p-8"
               >
                 <Plus size={28} />
@@ -211,16 +257,29 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
                 newlyAddedTaskId={newlyAddedTaskId}
                 onFocusHandled={() => setNewlyAddedTaskId(null)}
                 onOpenNotes={handleOpenNotes}
+                activeDragId={activeDragId}
               />
             ))}
+            <MobileRootDropZone activeDragId={activeDragId} />
           </div>
         )}
       </div>
+      <DragOverlay dropAnimation={null}>
+        {activeDragId ? (() => {
+          const dragNode = findNodeRecursive(treeData, activeDragId);
+          return dragNode ? (
+            <div className="px-4 py-2 bg-slate-800 border border-cyan-400 rounded-lg shadow-lg text-sm text-slate-200 max-w-[200px] truncate">
+              {dragNode.text || 'Untitled Task'}
+            </div>
+          ) : null;
+        })() : null}
+      </DragOverlay>
+      </DndContext>
 
-      {/* FAB — add root task */}
+      {/* FAB — quick add */}
       {!isPastDate && (
         <button
-          onClick={() => handleAddTaskAndFocus(() => handleAddRoot(selectedDate))}
+          onClick={() => setIsQuickAddOpen(true)}
           className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-emerald-600 active:bg-emerald-700 text-white shadow-lg shadow-emerald-900/40 flex items-center justify-center z-30"
         >
           <Plus size={24} />
@@ -283,6 +342,17 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
         isOpen={isRambleOpen}
         onClose={() => setIsRambleOpen(false)}
         onAddTasks={handleRambleAdd}
+      />
+
+      {/* Quick add modal */}
+      <QuickAddModal
+        isOpen={isQuickAddOpen}
+        onClose={() => setIsQuickAddOpen(false)}
+        treeData={treeData}
+        onAddSubtask={handleAddSubtask}
+        onAddRoot={handleAddRoot}
+        onUpdate={handleUpdate}
+        selectedDate={selectedDate}
       />
     </div>
   );

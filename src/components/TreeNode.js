@@ -2,7 +2,7 @@ import React from 'react';
 import TaskCard from './TaskCard';
 
 // --- Component: Recursive Tree Node ---
-const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, highlightedTaskId, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes }) => {
+const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, highlightedTaskId, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId }) => {
   const visibleChildren = node.hideCompleted
     ? node.children.filter(child => {
         if (child.recurrence) {
@@ -27,11 +27,12 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
         isSearching={isSearching}
         isHighlighted={node.id === highlightedTaskId}
         highlightedRef={highlightedRef}
-        treeData={treeData} // Pass down the full tree data
+        treeData={treeData}
         selectedDate={selectedDate}
         newlyAddedTaskId={newlyAddedTaskId}
         onFocusHandled={onFocusHandled}
         onOpenNotes={onOpenNotes}
+        activeDragId={activeDragId}
       />
       
       {/* Children Container */}
@@ -73,11 +74,12 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 isSearching={isSearching}
                 highlightedTaskId={highlightedTaskId}
                 highlightedRef={highlightedRef}
-                treeData={treeData} // And pass it down recursively
+                treeData={treeData}
                 selectedDate={selectedDate}
                 newlyAddedTaskId={newlyAddedTaskId}
                 onFocusHandled={onFocusHandled}
                 onOpenNotes={onOpenNotes}
+                activeDragId={activeDragId}
               />
             </div>
           ))}

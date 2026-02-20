@@ -23,6 +23,12 @@ export const findNodeRecursive = (nodes, id) => {
   return null;
 };
 
+export const isDescendantOf = (nodes, ancestorId, checkId) => {
+  const ancestor = findNodeRecursive(nodes, ancestorId);
+  if (!ancestor) return false;
+  return !!findNodeRecursive(ancestor.children || [], checkId);
+};
+
 export const findNodePath = (nodes, id) => {
   for (const node of nodes) {
     if (node.id === id) return [node];
