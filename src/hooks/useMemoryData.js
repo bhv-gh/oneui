@@ -104,5 +104,18 @@ export function useMemoryData() {
     });
   };
 
-  return { memoryData, setMemoryData: setMemoryDataWithSync };
+  const forceSync = async () => {
+    try {
+      const [notes, qas] = await Promise.all([api.getNotes(), api.getQAs()]);
+      // Use raw setter to avoid triggering diff-based sync
+      setMemoryData({
+        notes: notes || [],
+        qas: qas || [],
+      });
+    } catch (err) {
+      console.error('Memory force sync failed:', err);
+    }
+  };
+
+  return { memoryData, setMemoryData: setMemoryDataWithSync, forceSync };
 }

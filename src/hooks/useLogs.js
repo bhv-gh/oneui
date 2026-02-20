@@ -97,5 +97,20 @@ export function useLogs() {
     api.createLog(log).catch(console.error);
   }
 
-  return { logs, setLogs, handleSaveLog, handleDeleteLog, handleUpdateLogTime, addLog };
+  const forceSync = async () => {
+    try {
+      const data = await api.getLogs();
+      if (data) {
+        setLogs(data.map(log => ({
+          ...log,
+          startTime: new Date(log.startTime),
+          endTime: new Date(log.endTime),
+        })));
+      }
+    } catch (err) {
+      console.error('Logs force sync failed:', err);
+    }
+  };
+
+  return { logs, setLogs, handleSaveLog, handleDeleteLog, handleUpdateLogTime, addLog, forceSync };
 }

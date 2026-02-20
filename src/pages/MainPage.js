@@ -8,6 +8,7 @@ import {
     GitMerge,
     LayoutGrid,
     Mic,
+    RefreshCw,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -51,9 +52,10 @@ export default function MainPage({
         handleAddRoot,
         expandBranch,
         syncStatus,
+        forceSync: forceSyncTree,
     } = useContext(TreeDataContext);
-    const { logs, handleSaveLog, handleDeleteLog, handleUpdateLogTime } = useContext(LogsContext);
-    const { memoryData, setMemoryData } = useContext(MemoryContext);
+    const { logs, handleSaveLog, handleDeleteLog, handleUpdateLogTime, forceSync: forceSyncLogs } = useContext(LogsContext);
+    const { memoryData, setMemoryData, forceSync: forceSyncMemory } = useContext(MemoryContext);
     const [scale, setScale] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
@@ -74,6 +76,7 @@ export default function MainPage({
     const [newlyAddedTaskId, setNewlyAddedTaskId] = useState(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isRambleOpen, setIsRambleOpen] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
     const [manualLogModal, setManualLogModal] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
@@ -133,6 +136,16 @@ export default function MainPage({
             }
         }
     }, [handleAddRoot, handleAddSubtask, handleUpdate, selectedDate]);
+
+    const handleSync = useCallback(async () => {
+        if (isSyncing) return;
+        setIsSyncing(true);
+        try {
+            await Promise.all([forceSyncTree(), forceSyncLogs(), forceSyncMemory()]);
+        } finally {
+            setIsSyncing(false);
+        }
+    }, [isSyncing, forceSyncTree, forceSyncLogs, forceSyncMemory]);
 
       const displayedTreeData = useMemo(() => {
         const today = simulatedToday;

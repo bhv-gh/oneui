@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { generateId } from '../utils/idGenerator';
 import { getTodayDateString } from '../utils/dateUtils';
 import { findNodeRecursive, findNodePath } from '../utils/treeUtils';
@@ -227,11 +227,39 @@ export function useTreeData() {
     });
   };
 
+  const treeDataRef = useRef(treeData);
+  treeDataRef.current = treeData;
+
+  const forceSync = useCallback(async () => {
+    setSyncStatus('saving');
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    try {
+      // Push local state to remote
+      await api.putTree(treeDataRef.current);
+      // Pull fresh data from remote
+      const row = await api.getTree();
+      if (row && Array.isArray(row.data)) {
+        isInitialLoad.current = true;
+        setTreeData(row.data);
+        // Allow the state to settle before re-enabling saves
+        setTimeout(() => { isInitialLoad.current = false; }, 50);
+      }
+      setSyncStatus('saved');
+      savedTimerRef.current = setTimeout(() => setSyncStatus('idle'), 2000);
+    } catch (err) {
+      console.error('Force sync failed:', err);
+      setSyncStatus('error');
+      savedTimerRef.current = setTimeout(() => setSyncStatus('idle'), 3000);
+    }
+  }, []);
+
   return {
     treeData,
     setTreeData,
     isLoading,
     syncStatus,
+    forceSync,
     handleUpdate,
     handleAddSubtask,
     handleDelete,
