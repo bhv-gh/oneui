@@ -29,7 +29,9 @@ import InsightsView from '../components/InsightsView';
 import TaskNotesPanel from '../components/TaskNotesPanel';
 
 import { getTodayDateString, isDateAnOccurrence } from '../utils/dateUtils';
+import { filterTreeByCompletionDate, filterTreeByScheduledDate, filterForTodayView } from '../utils/treeFilters';
 import { findNodeRecursive } from '../utils/treeUtils';
+import * as api from '../api/client';
 import Fuse from 'fuse.js';
 export default function MainPage({
     focusedTask,
@@ -37,14 +39,16 @@ export default function MainPage({
     appState,
     handleExport,
     handleImport,
+    onLogout,
 }) {
-    const { 
-        treeData, 
-        handleUpdate, 
-        handleAddSubtask, 
-        handleDelete, 
+    const {
+        treeData,
+        handleUpdate,
+        handleAddSubtask,
+        handleDelete,
         handleAddRoot,
-        expandBranch, 
+        expandBranch,
+        syncStatus,
     } = useContext(TreeDataContext);
     const { logs, handleSaveLog, handleDeleteLog, handleUpdateLogTime } = useContext(LogsContext);
     const { memoryData, setMemoryData } = useContext(MemoryContext);
@@ -59,6 +63,11 @@ export default function MainPage({
     const [viewMode, setViewMode] = useState(() => {
         return localStorage.getItem('flowAppViewMode') || 'tree';
     });
+
+    useEffect(() => {
+        localStorage.setItem('flowAppViewMode', viewMode);
+        api.updateSettings({ viewMode }).catch(() => {});
+    }, [viewMode]);
     const [deleteTargetId, setDeleteTargetId] = useState(null);
     const [newlyAddedTaskId, setNewlyAddedTaskId] = useState(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -111,59 +120,6 @@ export default function MainPage({
         setNotesTaskId(null);
     }, []);
 
-    const filterTreeByCompletionDate = (nodes, date) => {
-        return nodes.map(node => {
-          const children = node.children ? filterTreeByCompletionDate(node.children, date) : [];
-          const hasCompletedChildren = children.some(c => c !== null);
-          
-          const wasCompletedOnDate = node.recurrence
-            ? node.completedOccurrences?.includes(date)
-            : node.completionDate === date;
-
-          if (wasCompletedOnDate || hasCompletedChildren) {
-            return { ...node, children };
-          }
-          return null;
-        }).filter(node => node !== null);
-      };
-    
-      const filterTreeByScheduledDate = (nodes, date) => {
-        return nodes.map(node => {
-          const originalChildrenCount = node.children?.length || 0;
-          const children = node.children ? filterTreeByScheduledDate(node.children, date) : [];
-          const hasScheduledChildren = children.some(c => c !== null);
-    
-          if ((node.scheduledDate === date || isDateAnOccurrence(node, date)) || hasScheduledChildren) {
-            return { ...node, children, originalChildrenCount };
-          }
-          return null;
-        }).filter(node => node !== null);
-      };
-    
-      const filterForTodayView = (nodes, today) => {
-        return nodes.map(node => { 
-          const originalChildrenCount = node.children?.length || 0;
-          const visibleChildren = node.children ? filterForTodayView(node.children, today) : [];
-          
-          const isCompletedForToday = node.recurrence
-            ? node.completedOccurrences?.includes(today)
-            : (node.isCompleted && node.completionDate === today);
-
-          const isRelevantToday = (node.scheduledDate && node.scheduledDate <= today) || isDateAnOccurrence(node, today) || !node.scheduledDate;
-
-          const isTaskActionable = isRelevantToday && !isCompletedForToday;
-          const wasCompletedToday = node.recurrence
-            ? node.completedOccurrences?.includes(today)
-            : node.isCompleted && node.completionDate === today;
-          const hasVisibleDescendants = visibleChildren.length > 0;
-    
-          if (isTaskActionable || wasCompletedToday || hasVisibleDescendants) {
-            return { ...node, children: visibleChildren, originalChildrenCount };
-          }
-          return null;
-        }).filter(node => node !== null);
-      };
-    
       const displayedTreeData = useMemo(() => {
         const today = simulatedToday;
         if (selectedDate < today) return filterTreeByCompletionDate(treeData, selectedDate);
@@ -570,7 +526,33 @@ export default function MainPage({
                         <button onClick={() => setActiveTab('memory')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'memory' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Memory</button>
                         <button onClick={() => setActiveTab('insights')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'insights' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Insights</button>
                     </div>
-                    <button 
+                    {syncStatus !== 'idle' && (
+                        <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-md transition-all duration-300 ${
+                            syncStatus === 'saving' ? 'text-slate-400' :
+                            syncStatus === 'saved' ? 'text-emerald-400' :
+                            syncStatus === 'error' ? 'text-rose-400' : ''
+                        }`}>
+                            {syncStatus === 'saving' && (
+                                <>
+                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse" />
+                                    Saving
+                                </>
+                            )}
+                            {syncStatus === 'saved' && (
+                                <>
+                                    <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                    Saved
+                                </>
+                            )}
+                            {syncStatus === 'error' && (
+                                <>
+                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-400" />
+                                    Sync failed
+                                </>
+                            )}
+                        </div>
+                    )}
+                    <button
                         onClick={() => setIsSettingsOpen(true)}
                         className="p-2 rounded-lg text-slate-400 hover:bg-white/10"
                     >
@@ -783,13 +765,14 @@ export default function MainPage({
                 );
             })()}
 
-            <SettingsModal 
+            <SettingsModal
                 isOpen={isSettingsOpen}
                 onClose={() => setIsSettingsOpen(false)}
                 onExport={handleExport}
                 onImport={handleImport}
                 simulatedToday={simulatedToday}
                 setSimulatedToday={setSimulatedToday}
+                onLogout={onLogout}
             />
             <SearchOverlay query={searchQuery} resultCount={searchResults.length} currentIndex={searchIndex} />
         </div>

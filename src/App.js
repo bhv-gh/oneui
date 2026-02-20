@@ -12,11 +12,16 @@ import MemoryContext from './contexts/MemoryContext';
 import { findNodeRecursive } from './utils/treeUtils';
 import { generateId } from './utils/idGenerator';
 import { playNotificationSound, getNotificationSound } from './utils/notificationSounds';
-import { getTimerDurations, getNudgeMinutes } from './utils/timerSettings';
+import { getTimerDurations, getNudgeMinutes, initSettingsFromSupabase } from './utils/timerSettings';
+import { getUserHash, clearUserHash } from './utils/userHash';
+import * as api from './api/client';
 
 import FocusView from './components/FocusView';
 import TriageModal from './components/TriageModal';
+import SecretScreen from './components/SecretScreen';
 import MainPage from './pages/MainPage';
+import MobileView from './pages/MobileView';
+import useIsMobile from './hooks/useIsMobile';
 import { getTodayDateString } from './utils/dateUtils';
 
 const NUDGE_TITLES = [
@@ -126,11 +131,32 @@ const NUDGE_TITLES = [
 const getRandomNudge = () => NUDGE_TITLES[Math.floor(Math.random() * NUDGE_TITLES.length)];
 
 export default function TaskTreeApp() {
+  const [userHash, setUserHashState] = useState(() => getUserHash());
+
+  const handleLogout = () => {
+    clearUserHash();
+    setUserHashState('');
+  };
+
+  if (!userHash) {
+    return <SecretScreen onAuthenticated={(hash) => setUserHashState(hash)} />;
+  }
+
+  return <AppContent key={userHash} onLogout={handleLogout} />;
+}
+
+function AppContent({ onLogout }) {
+  const isMobile = useIsMobile();
   const treeDataHook = useTreeData();
   const logsHook = useLogs();
   const memoryDataHook = useMemoryData();
-  
+
   const { treeData, handleUpdate, handleUpdateField, handleAddField } = treeDataHook;
+
+  // Load settings from Supabase on mount
+  useEffect(() => {
+    initSettingsFromSupabase();
+  }, []);
 
   const [focusedTaskId, setFocusedTaskId] = useState(null);
   const [timerMode, setTimerMode] = useState('pomodoro');
@@ -408,13 +434,18 @@ export default function TaskTreeApp() {
     onSetMode: setTimerMode
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     try {
-      const stateToExport = {
-        treeData: treeData,
-        logs: logsHook.logs,
-        memoryData: memoryDataHook.memoryData,
-      };
+      let stateToExport;
+      try {
+        stateToExport = await api.bulkExport();
+      } catch {
+        stateToExport = {
+          treeData: treeData,
+          logs: logsHook.logs,
+          memoryData: memoryDataHook.memoryData,
+        };
+      }
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(stateToExport, null, 2));
       const downloadAnchorNode = document.createElement('a');
       downloadAnchorNode.setAttribute("href", dataStr);
@@ -438,24 +469,37 @@ export default function TaskTreeApp() {
     }
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const importedState = JSON.parse(event.target.result);
-        if (importedState.memoryData) {
-          memoryDataHook.setMemoryData(importedState.memoryData);
+        if (!importedState.treeData) {
+          alert("Import failed: Invalid file format.");
+          return;
         }
-        if (importedState.treeData && Array.isArray(importedState.logs)) {
+
+        // Import to Supabase
+        try {
+          await api.bulkImport(importedState);
+        } catch (err) {
+          console.error("Supabase import failed, applying locally:", err);
+        }
+
+        // Apply locally
+        if (importedState.treeData) {
           treeDataHook.setTreeData(importedState.treeData);
+        }
+        if (importedState.logs && Array.isArray(importedState.logs)) {
           const revivedLogs = importedState.logs.map(log => ({
             ...log,
             startTime: new Date(log.startTime),
             endTime: new Date(log.endTime)
           }));
           logsHook.setLogs(revivedLogs);
-          alert("Data imported successfully!");
-        } else {
-          alert("Import failed: Invalid file format.");
         }
+        if (importedState.memoryData) {
+          memoryDataHook.setMemoryData(importedState.memoryData);
+        }
+        alert("Data imported successfully!");
       } catch (error) {
         console.error("Import failed:", error);
         alert("Import failed: Could not parse the file.");
@@ -519,7 +563,28 @@ export default function TaskTreeApp() {
         <MemoryContext.Provider value={memoryDataHook}>
           <style>{scrollbarHideStyle}</style>
           <style>{quillStyle}</style>
-          {showTriageModal ? (
+          {treeDataHook.isLoading ? (
+            <div className="min-h-screen bg-slate-950 flex flex-col">
+              <div className="h-14 border-b border-slate-800 flex items-center px-6 gap-4">
+                <div className="shimmer h-5 w-24 rounded-md bg-slate-800" />
+                <div className="flex-1" />
+                <div className="shimmer h-5 w-16 rounded-md bg-slate-800" />
+                <div className="shimmer h-5 w-16 rounded-md bg-slate-800" />
+                <div className="shimmer h-5 w-16 rounded-md bg-slate-800" />
+              </div>
+              <div className="flex-1 p-8 space-y-4">
+                <div className="shimmer h-10 w-64 rounded-lg bg-slate-800" />
+                <div className="space-y-3 mt-6">
+                  <div className="shimmer h-14 w-full rounded-xl bg-slate-800/60" />
+                  <div className="shimmer h-14 w-full rounded-xl bg-slate-800/60" style={{ animationDelay: '0.15s' }} />
+                  <div className="shimmer h-14 w-5/6 rounded-xl bg-slate-800/60 ml-8" style={{ animationDelay: '0.3s' }} />
+                  <div className="shimmer h-14 w-5/6 rounded-xl bg-slate-800/60 ml-8" style={{ animationDelay: '0.45s' }} />
+                  <div className="shimmer h-14 w-full rounded-xl bg-slate-800/60" style={{ animationDelay: '0.6s' }} />
+                  <div className="shimmer h-14 w-4/6 rounded-xl bg-slate-800/60 ml-8" style={{ animationDelay: '0.75s' }} />
+                </div>
+              </div>
+            </div>
+          ) : showTriageModal ? (
             <TriageModal
               capturedTasks={capturedTasks}
               treeData={treeData}
@@ -537,6 +602,13 @@ export default function TaskTreeApp() {
               capturedTasks={capturedTasks}
               onCaptureTask={handleCaptureTask}
             />
+          ) : isMobile ? (
+            <MobileView
+              handleStartFocus={handleStartFocus}
+              handleExport={handleExport}
+              handleImport={handleImport}
+              onLogout={onLogout}
+            />
           ) : (
             <MainPage
               focusedTask={focusedTask}
@@ -544,6 +616,7 @@ export default function TaskTreeApp() {
               appState={appState}
               handleExport={handleExport}
               handleImport={handleImport}
+              onLogout={onLogout}
             />
           )}
         </MemoryContext.Provider>

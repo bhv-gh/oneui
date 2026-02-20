@@ -1,32 +1,82 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { generateId } from '../utils/idGenerator';
-import { getTodayDateString, isDateAnOccurrence, calculateNextOccurrence } from '../utils/dateUtils';
-import { findParentNode, findNodeRecursive, findNodePath } from '../utils/treeUtils';
-import { format } from 'date-fns';
+import { getTodayDateString } from '../utils/dateUtils';
+import { findNodeRecursive, findNodePath } from '../utils/treeUtils';
+import * as api from '../api/client';
 
-const initialData = [];
+const MIGRATED_FLAG = 'flowMigratedToSupabase';
 
 export function useTreeData() {
-  const [treeData, setTreeData] = useState(() => {
-    try {
-      const savedJSON = localStorage.getItem('taskTreeGraphDataV2');
-      if (!savedJSON) {
-        return initialData;
-      }
-
-      const savedData = JSON.parse(savedJSON);
-      const savedRootIds = new Set(savedData.map(node => node.id));
-      const newNodesToAdd = initialData.filter(node => !savedRootIds.has(node.id));
-
-      return [...savedData, ...newNodesToAdd];
-    } catch (e) {
-      console.error("Failed to load or merge data from localStorage:", e);
-      return initialData;
-    }
-  });
+  const [treeData, setTreeData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
+  const saveTimerRef = useRef(null);
+  const savedTimerRef = useRef(null);
+  const isInitialLoad = useRef(true);
 
   useEffect(() => {
-    localStorage.setItem('taskTreeGraphDataV2', JSON.stringify(treeData));
+    const init = async () => {
+      try {
+        const migrated = localStorage.getItem(MIGRATED_FLAG);
+
+        if (!migrated) {
+          // First time: migrate localStorage data to Supabase
+          const localJSON = localStorage.getItem('taskTreeGraphDataV2');
+          const localData = localJSON ? JSON.parse(localJSON) : [];
+
+          if (localData.length > 0) {
+            await api.putTree(localData);
+            setTreeData(localData);
+          }
+
+          localStorage.setItem(MIGRATED_FLAG, 'true');
+          localStorage.removeItem('taskTreeGraphDataV2');
+        } else {
+          // Already migrated: load from Supabase only
+          const row = await api.getTree();
+          if (row && Array.isArray(row.data)) {
+            setTreeData(row.data);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to init tree:', err);
+        // Last resort fallback: try localStorage if it still exists
+        try {
+          const fallback = localStorage.getItem('taskTreeGraphDataV2');
+          if (fallback) setTreeData(JSON.parse(fallback));
+        } catch {}
+      } finally {
+        setIsLoading(false);
+        isInitialLoad.current = false;
+      }
+    };
+    init();
+  }, []);
+
+  // Debounced save to Supabase only (no localStorage)
+  useEffect(() => {
+    if (isInitialLoad.current) return;
+
+    setSyncStatus('saving');
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      api.putTree(treeData)
+        .then(() => {
+          setSyncStatus('saved');
+          savedTimerRef.current = setTimeout(() => setSyncStatus('idle'), 2000);
+        })
+        .catch(err => {
+          console.error('Failed to save tree to Supabase:', err);
+          setSyncStatus('error');
+          savedTimerRef.current = setTimeout(() => setSyncStatus('idle'), 3000);
+        });
+    }, 1000);
+
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
   }, [treeData]);
 
   const updateNodeRecursive = (nodes, id, updates) => {
@@ -80,11 +130,9 @@ export function useTreeData() {
     const task = findNodeRecursive(treeData, id);
     if (!task) return;
 
-    // If recurrence is being set for the first time, establish a stable start date.
     if (newUpdates.recurrence && !task.recurrence) {
       newUpdates.recurrenceStartDate = task.scheduledDate || forDate || getTodayDateString();
     }
-    // If recurrence is being removed, also remove the start date.
     if (newUpdates.recurrence === null) {
       newUpdates.recurrenceStartDate = null;
     }
@@ -97,11 +145,10 @@ export function useTreeData() {
         completed.delete(forDate);
       }
       newUpdates.completedOccurrences = Array.from(completed);
-      delete newUpdates.isCompleted; // Not used for recurring tasks
-      delete newUpdates.completionDate; // Not used for recurring tasks
-    
+      delete newUpdates.isCompleted;
+      delete newUpdates.completionDate;
+
     } else {
-      // Non-recurring task logic
       if (newUpdates.isCompleted === true) {
         newUpdates.completionDate = forDate;
       } else if (newUpdates.isCompleted === false) {
@@ -120,7 +167,6 @@ export function useTreeData() {
       const result = addNodeRecursive(prev, parentId, selectedDate);
       newNodeId = result.newNodeId;
       const treeWithNewNode = result.nodes;
-      // When adding a subtask, un-complete the parent
       return updateNodeRecursive(treeWithNewNode, parentId, { isCompleted: false, completionDate: null });
     });
     return newNodeId;
@@ -129,7 +175,7 @@ export function useTreeData() {
   const handleDelete = (id) => {
     setTreeData(prev => deleteNodeRecursive(prev, id));
   };
-  
+
   const handleAddRoot = (selectedDate) => {
     const newRootTask = {
       id: generateId(),
@@ -145,7 +191,7 @@ export function useTreeData() {
     setTreeData(prev => [...prev, newRootTask]);
     return newRootTask.id;
   };
-  
+
   const handleUpdateField = (nodeId, fieldId, key, newValue) => {
     setTreeData(prevTreeData => {
       const targetNode = findNodeRecursive(prevTreeData, nodeId);
@@ -181,15 +227,17 @@ export function useTreeData() {
     });
   };
 
-  return { 
-    treeData, 
-    handleUpdate, 
-    handleAddSubtask, 
-    handleDelete, 
+  return {
+    treeData,
+    setTreeData,
+    isLoading,
+    syncStatus,
+    handleUpdate,
+    handleAddSubtask,
+    handleDelete,
     handleAddRoot,
     handleUpdateField,
     handleAddField,
     expandBranch,
   };
 }
-

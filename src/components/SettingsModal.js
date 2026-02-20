@@ -4,12 +4,13 @@ import {
   UploadCloud,
   DownloadCloud,
   Volume2,
+  LogOut,
 } from 'lucide-react';
 import { SOUND_OPTIONS, playNotificationSound, getNotificationSound, setNotificationSound } from '../utils/notificationSounds';
 import { getTimerDurations, setTimerDurations, getNudgeMinutes, setNudgeMinutes } from '../utils/timerSettings';
 
 // --- Component: Settings Modal ---
-const SettingsModal = ({ isOpen, onClose, onExport, onImport, simulatedToday, setSimulatedToday }) => {
+const SettingsModal = ({ isOpen, onClose, onExport, onImport, simulatedToday, setSimulatedToday, onLogout }) => {
   const importFileRef = useRef(null);
   const [selectedSound, setSelectedSound] = useState(() => getNotificationSound());
   const [durations, setDurations] = useState(() => {
@@ -151,6 +152,22 @@ const SettingsModal = ({ isOpen, onClose, onExport, onImport, simulatedToday, se
                 />
             </div>
             <p className="text-xs text-slate-500 mt-1">Simulate "Today" for testing logic.</p>
+          </div>
+
+          <div className="pt-4 border-t border-slate-800">
+            <label className="block text-sm font-medium text-slate-400 mb-2">Account</label>
+            <button
+              onClick={() => {
+                if (window.confirm('Switch to a different secret? You can always come back by entering the same secret.')) {
+                  onLogout();
+                }
+              }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors text-sm"
+            >
+              <LogOut size={16} />
+              <span>Change Secret</span>
+            </button>
+            <p className="text-xs text-slate-500 mt-1">Switch to a different workspace.</p>
           </div>
         </div>
       </div>

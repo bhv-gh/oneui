@@ -1,3 +1,5 @@
+import * as api from '../api/client';
+
 let audioContext = null;
 
 const getAudioContext = () => {
@@ -105,4 +107,5 @@ export const getNotificationSound = () => {
 
 export const setNotificationSound = (soundId) => {
   localStorage.setItem('flow-notification-sound', soundId);
+  api.updateSettings({ notificationSound: soundId }).catch(console.error);
 };
