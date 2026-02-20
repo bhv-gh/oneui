@@ -1,55 +1,160 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { X, Mic, MicOff, Square, Check, ChevronRight } from 'lucide-react';
+import { X, Mic, MicOff, Square, Check, ChevronRight, ChevronUp } from 'lucide-react';
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 // ── Parser ──────────────────────────────────────────────────
 
+const CHUNK_SEP = '\x1F'; // Marks natural pauses between speech chunks
+
+// Clean text for command matching (strips chunk markers and punctuation)
+function cleanTranscript(text) {
+  return text
+    .replace(/\x1F/g, ' ')
+    .replace(/[.,!?;:]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Command patterns
+const CMD_ROOT = 'another\\s+task|next\\s+task|new\\s+task|after\\s+that|and\\s+then|next\\s+one|next';
+const CMD_SUB = 'another\\s+subtask|another\\s+sub\\s+task|sub\\s+task|subtask|including|which\\s+includes';
+const CMD_UP = 'level\\s+up|go\\s+up|back\\s+up|go\\s+back|step\\s+back';
+const CMD_CONT = 'and\\s+also|also\\s+need\\s+to|i\\s+also\\s+need|another\\s+one|also';
+const CMD_PATTERN = new RegExp(`\\b(${CMD_ROOT}|${CMD_SUB}|${CMD_UP}|${CMD_CONT})\\b`, 'i');
+
+const ROOT_TEST = /^(next|next task|new task|another task|and then|after that|next one)$/;
+const SUB_TEST = /^(subtask|sub task|another subtask|another sub task|including|which includes)$/;
+const UP_TEST = /^(level up|go up|back up|go back|step back)$/;
+const CONT_TEST = /^(also|and also|also need to|i also need|another one)$/;
+
+// Prepositional starts — continue the previous task, not start a new one
+const MERGE_PREFIX = /^(with|from|by|using|at|in|on|into|through|during)\b/i;
+
+// Clean up task text: strip leading filler/intent phrases, capitalize
+function formatTaskText(text) {
+  let clean = text
+    .replace(/^(and|but|or|so|also|then|i need to|need to|i have to|have to|i want to|want to|i gotta|gotta)\s+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!clean) clean = text.replace(/\s+/g, ' ').trim();
+  if (!clean) return '';
+  return clean.charAt(0).toUpperCase() + clean.slice(1);
+}
+
 function parseTranscript(text) {
   const tasks = [];
-  let lastRoot = null;
+  const path = []; // stack of parent task refs for nesting
 
-  const normalized = text.replace(/\s+/g, ' ').trim();
-  if (!normalized) return tasks;
+  const prepared = text
+    .replace(/\x1F/g, ` ${CHUNK_SEP} `)
+    .replace(/[.!?;]+(?=\s|$)/g, ` ${CHUNK_SEP}`)
+    .replace(/[,:]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
-  // Split keeping command delimiters
-  const segments = normalized.split(/\b(next\s+task|subtask|sub\s+task|next)\b/i);
+  if (!prepared) return { tasks, depth: 0, parentText: null };
 
-  let mode = 'root';
+  // Get the last task at the current nesting level
+  function lastAtLevel() {
+    if (path.length === 0) {
+      return tasks.length > 0 ? tasks[tasks.length - 1] : null;
+    }
+    const parent = path[path.length - 1];
+    return parent.children.length > 0 ? parent.children[parent.children.length - 1] : null;
+  }
+
+  // Add a task at the current nesting level
+  function addTask(taskText) {
+    const task = { text: taskText, children: [] };
+    if (path.length === 0) {
+      tasks.push(task);
+    } else {
+      path[path.length - 1].children.push(task);
+    }
+    return task;
+  }
+
+  // Merge text into the last task at the current level
+  function mergeIntoLast(text) {
+    const last = lastAtLevel();
+    if (last) {
+      last.text += ' ' + text.charAt(0).toLowerCase() + text.slice(1);
+      return true;
+    }
+    return false;
+  }
+
+  const segments = prepared.split(CMD_PATTERN);
 
   for (const segment of segments) {
-    const trimmed = segment.trim();
-    if (!trimmed) continue;
+    const cmdCheck = segment.replace(/\x1F/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    if (!cmdCheck) continue;
 
-    const lower = trimmed.toLowerCase();
-    if (lower === 'next' || lower === 'next task') { mode = 'root'; continue; }
-    if (lower === 'subtask' || lower === 'sub task') { mode = 'sub'; continue; }
+    // Command handling
+    if (ROOT_TEST.test(cmdCheck)) { path.length = 0; continue; }
+    if (SUB_TEST.test(cmdCheck)) {
+      const last = lastAtLevel();
+      if (last) path.push(last);
+      continue;
+    }
+    if (UP_TEST.test(cmdCheck)) {
+      if (path.length > 0) path.pop();
+      continue;
+    }
+    if (CONT_TEST.test(cmdCheck)) { continue; }
 
-    // Capitalize first letter
-    const taskText = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+    // Split on chunk boundaries (pauses + sentence endings)
+    const chunks = segment
+      .split(CHUNK_SEP)
+      .map(c => c.trim())
+      .filter(c => c.length > 0);
 
-    if (mode === 'sub' && lastRoot) {
-      lastRoot.children.push({ text: taskText });
-    } else {
-      const root = { text: taskText, children: [] };
-      tasks.push(root);
-      lastRoot = root;
+    for (const chunk of chunks) {
+      if (MERGE_PREFIX.test(chunk)) {
+        if (!mergeIntoLast(chunk)) addTask(formatTaskText(chunk));
+        continue;
+      }
+
+      const taskText = formatTaskText(chunk);
+      if (!taskText) continue;
+      addTask(taskText);
     }
   }
 
-  return tasks;
+  return {
+    tasks,
+    depth: path.length,
+    parentText: path.length > 0 ? path[path.length - 1].text : null,
+  };
 }
 
 function countTasks(tasks) {
-  return tasks.reduce((n, t) => n + 1 + (t.children?.length || 0), 0);
+  return tasks.reduce((n, t) => n + 1 + countTasks(t.children || []), 0);
 }
 
-function getLastCommand(text) {
-  const matches = text.match(/\b(next\s+task|subtask|sub\s+task|next)\b/gi);
-  if (!matches) return null;
-  const last = matches[matches.length - 1].toLowerCase();
-  if (last === 'subtask' || last === 'sub task') return 'sub';
-  return 'root';
+// ── Recursive task renderer ─────────────────────────────────
+
+function renderTaskTree(items, depth = 0) {
+  return items.map((task, i) => (
+    <div key={i}>
+      <div className="flex items-center gap-2 py-1" style={{ paddingLeft: depth * 20 }}>
+        <div className={`rounded-full border-2 flex-shrink-0 ${
+          depth === 0 ? 'w-4 h-4 border-slate-600' :
+          depth === 1 ? 'w-3.5 h-3.5 border-slate-700' :
+          'w-3 h-3 border-slate-700/60'
+        }`} />
+        <span className={`text-sm ${
+          depth === 0 ? 'text-slate-200' :
+          depth === 1 ? 'text-slate-300' :
+          'text-slate-400'
+        }`}>
+          {task.text}
+        </span>
+      </div>
+      {task.children?.length > 0 && renderTaskTree(task.children, depth + 1)}
+    </div>
+  ));
 }
 
 // ── Component ───────────────────────────────────────────────
@@ -61,17 +166,16 @@ export default function RambleModal({ isOpen, onClose, onAddTasks }) {
   const [error, setError] = useState(null);
   const recognitionRef = useRef(null);
 
-  const parsedTasks = useMemo(() => parseTranscript(finalTranscript), [finalTranscript]);
+  const parsed = useMemo(() => parseTranscript(finalTranscript), [finalTranscript]);
+  const parsedTasks = parsed.tasks;
   const taskCount = useMemo(() => countTasks(parsedTasks), [parsedTasks]);
-  const currentMode = getLastCommand(finalTranscript) || 'root';
-  const lastRootText = parsedTasks.length > 0 ? parsedTasks[parsedTasks.length - 1].text : null;
+  const currentDepth = parsed.depth;
+  const parentText = parsed.parentText;
 
   // Determine what interim text would become
   const interimPreview = useMemo(() => {
     if (!interimTranscript.trim()) return null;
-    // Parse interim as if it were final to show preview
-    const preview = parseTranscript(finalTranscript + ' ' + interimTranscript);
-    return preview;
+    return parseTranscript(finalTranscript + ' ' + interimTranscript).tasks;
   }, [finalTranscript, interimTranscript]);
 
   const displayTasks = interimPreview && interimPreview.length > 0 ? interimPreview : parsedTasks;
@@ -101,7 +205,7 @@ export default function RambleModal({ isOpen, onClose, onAddTasks }) {
       }
 
       if (final) {
-        setFinalTranscript(prev => prev + final);
+        setFinalTranscript(prev => prev ? prev + CHUNK_SEP + final : final);
       }
       setInterimTranscript(interim);
     };
@@ -212,7 +316,7 @@ export default function RambleModal({ isOpen, onClose, onAddTasks }) {
         {/* Instructions */}
         <div className="px-5 pb-3">
           <p className="text-xs text-slate-500">
-            Say <span className="text-slate-300 font-medium">"next"</span> for a new task, <span className="text-slate-300 font-medium">"subtask"</span> for a child task
+            Pause between tasks to auto-split. Say <span className="text-slate-300 font-medium">"subtask"</span> for children, or use the buttons below.
           </p>
         </div>
 
@@ -223,23 +327,8 @@ export default function RambleModal({ isOpen, onClose, onAddTasks }) {
               <p className="text-slate-600 text-sm italic">Start speaking to add tasks...</p>
             </div>
           ) : (
-            <div className="space-y-1">
-              {displayTasks.map((task, i) => (
-                <div key={i}>
-                  {/* Root task */}
-                  <div className="flex items-center gap-2 py-1.5">
-                    <div className="w-4 h-4 rounded-full border-2 border-slate-600 flex-shrink-0" />
-                    <span className="text-sm text-slate-200">{task.text}</span>
-                  </div>
-                  {/* Subtasks */}
-                  {(task.children || []).map((child, j) => (
-                    <div key={j} className="flex items-center gap-2 py-1 pl-6">
-                      <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-700 flex-shrink-0" />
-                      <span className="text-sm text-slate-300">{child.text}</span>
-                    </div>
-                  ))}
-                </div>
-              ))}
+            <div className="space-y-0.5">
+              {renderTaskTree(displayTasks)}
             </div>
           )}
         </div>
@@ -258,9 +347,9 @@ export default function RambleModal({ isOpen, onClose, onAddTasks }) {
           <div className="flex items-center gap-1 mt-1">
             <ChevronRight size={12} className="text-slate-600" />
             <span className="text-xs text-slate-600">
-              {currentMode === 'sub' && lastRootText
-                ? `Subtask of "${lastRootText}"`
-                : 'New root task'}
+              {currentDepth > 0 && parentText
+                ? `Under "${parentText}" · depth ${currentDepth + 1}`
+                : 'Root level'}
             </span>
           </div>
         </div>
@@ -272,19 +361,44 @@ export default function RambleModal({ isOpen, onClose, onAddTasks }) {
         )}
 
         {/* Command buttons */}
-        <div className="px-5 py-3 border-t border-slate-800 flex items-center gap-2">
+        <div className="px-5 py-3 border-t border-slate-800 flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => handleCommandButton('next')}
-            className="px-3 py-1.5 rounded-full text-xs font-medium bg-slate-800 text-cyan-400 border border-slate-700 active:bg-slate-700 transition-colors"
+            onClick={() => handleCommandButton('next task')}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors active:scale-95 ${
+              currentDepth === 0
+                ? 'bg-cyan-950/50 text-cyan-400 border-cyan-800'
+                : 'bg-slate-800 text-cyan-400 border-slate-700 active:bg-slate-700'
+            }`}
           >
-            Next Task
+            + Task
           </button>
           <button
             onClick={() => handleCommandButton('subtask')}
-            className="px-3 py-1.5 rounded-full text-xs font-medium bg-slate-800 text-amber-400 border border-slate-700 active:bg-slate-700 transition-colors"
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors active:scale-95 ${
+              currentDepth > 0
+                ? 'bg-amber-950/50 text-amber-400 border-amber-800'
+                : 'bg-slate-800 text-amber-400 border-slate-700 active:bg-slate-700'
+            }`}
           >
-            Subtask
+            + Subtask
           </button>
+          {currentDepth > 0 && (
+            <>
+              <button
+                onClick={() => handleCommandButton('also')}
+                className="px-3 py-1.5 rounded-full text-xs font-medium bg-amber-950/50 text-amber-400 border border-amber-800 active:bg-amber-900/50 transition-colors active:scale-95"
+              >
+                + Another
+              </button>
+              <button
+                onClick={() => handleCommandButton('go up')}
+                className="px-3 py-1.5 rounded-full text-xs font-medium bg-slate-800 text-emerald-400 border border-slate-700 active:bg-slate-700 transition-colors active:scale-95 flex items-center gap-1"
+              >
+                <ChevronUp size={12} />
+                Up
+              </button>
+            </>
+          )}
           <div className="flex-1" />
           {isRecording ? (
             <button

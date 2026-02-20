@@ -104,31 +104,35 @@ export function useTreeData() {
     let newUpdates = { ...updates };
 
     const task = findNodeRecursive(treeData, id);
-    if (!task) return;
 
-    if (newUpdates.recurrence && !task.recurrence) {
-      newUpdates.recurrenceStartDate = task.scheduledDate || forDate || getTodayDateString();
-    }
-    if (newUpdates.recurrence === null) {
-      newUpdates.recurrenceStartDate = null;
-    }
-
-    if (task.recurrence) {
-      const completed = new Set(task.completedOccurrences || []);
-      if (newUpdates.isCompleted === true) {
-        completed.add(forDate);
-      } else if (newUpdates.isCompleted === false) {
-        completed.delete(forDate);
+    // Recurrence/completion logic requires the task snapshot —
+    // only run when the task is found in the current render's state.
+    // (The task may exist in pending state from a queued setTreeData.)
+    if (task) {
+      if (newUpdates.recurrence && !task.recurrence) {
+        newUpdates.recurrenceStartDate = task.scheduledDate || forDate || getTodayDateString();
       }
-      newUpdates.completedOccurrences = Array.from(completed);
-      delete newUpdates.isCompleted;
-      delete newUpdates.completionDate;
+      if (newUpdates.recurrence === null) {
+        newUpdates.recurrenceStartDate = null;
+      }
 
-    } else {
-      if (newUpdates.isCompleted === true) {
-        newUpdates.completionDate = forDate;
-      } else if (newUpdates.isCompleted === false) {
-        newUpdates.completionDate = null;
+      if (task.recurrence) {
+        const completed = new Set(task.completedOccurrences || []);
+        if (newUpdates.isCompleted === true) {
+          completed.add(forDate);
+        } else if (newUpdates.isCompleted === false) {
+          completed.delete(forDate);
+        }
+        newUpdates.completedOccurrences = Array.from(completed);
+        delete newUpdates.isCompleted;
+        delete newUpdates.completionDate;
+
+      } else {
+        if (newUpdates.isCompleted === true) {
+          newUpdates.completionDate = forDate;
+        } else if (newUpdates.isCompleted === false) {
+          newUpdates.completionDate = null;
+        }
       }
     }
 
@@ -166,6 +170,25 @@ export function useTreeData() {
     }
     setTreeData(prev => [...prev, newRootTask]);
     return newRootTask.id;
+  };
+
+  // Bulk-add an entire tree of tasks in a single state update (used by Ramble)
+  const handleAddTree = (rootTasks, selectedDate) => {
+    const today = getTodayDateString();
+    const isFuture = selectedDate > today;
+
+    const buildNodes = (items) => items.map(task => ({
+      id: generateId(),
+      text: task.text || '',
+      isCompleted: false,
+      isExpanded: true,
+      fields: [],
+      children: task.children?.length > 0 ? buildNodes(task.children) : [],
+      ...(isFuture ? { scheduledDate: selectedDate } : {}),
+    }));
+
+    const newNodes = buildNodes(rootTasks);
+    setTreeData(prev => [...prev, ...newNodes]);
   };
 
   const handleUpdateField = (nodeId, fieldId, key, newValue) => {
@@ -240,6 +263,7 @@ export function useTreeData() {
     handleAddSubtask,
     handleDelete,
     handleAddRoot,
+    handleAddTree,
     handleUpdateField,
     handleAddField,
     expandBranch,

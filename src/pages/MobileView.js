@@ -23,6 +23,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
     handleAddSubtask,
     handleDelete,
     handleAddRoot,
+    handleAddTree,
     syncStatus,
     forceSync: forceSyncTree,
   } = useContext(TreeDataContext);
@@ -95,15 +96,8 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
   const handleCloseNotes = useCallback(() => setNotesTaskId(null), []);
 
   const handleRambleAdd = useCallback((tasks) => {
-    for (const task of tasks) {
-      const rootId = handleAddRoot(selectedDate);
-      handleUpdate(rootId, { text: task.text });
-      for (const child of (task.children || [])) {
-        const childId = handleAddSubtask(rootId, selectedDate);
-        handleUpdate(childId, { text: child.text });
-      }
-    }
-  }, [handleAddRoot, handleAddSubtask, handleUpdate, selectedDate]);
+    handleAddTree(tasks, selectedDate);
+  }, [handleAddTree, selectedDate]);
 
   const handleSync = useCallback(async () => {
     if (isSyncing) return;

@@ -50,6 +50,7 @@ export default function MainPage({
         handleAddSubtask,
         handleDelete,
         handleAddRoot,
+        handleAddTree,
         expandBranch,
         syncStatus,
         forceSync: forceSyncTree,
@@ -127,15 +128,8 @@ export default function MainPage({
     }, []);
 
     const handleRambleAdd = useCallback((tasks) => {
-        for (const task of tasks) {
-            const rootId = handleAddRoot(selectedDate);
-            handleUpdate(rootId, { text: task.text });
-            for (const child of (task.children || [])) {
-                const childId = handleAddSubtask(rootId, selectedDate);
-                handleUpdate(childId, { text: child.text });
-            }
-        }
-    }, [handleAddRoot, handleAddSubtask, handleUpdate, selectedDate]);
+        handleAddTree(tasks, selectedDate);
+    }, [handleAddTree, selectedDate]);
 
     const handleSync = useCallback(async () => {
         if (isSyncing) return;
