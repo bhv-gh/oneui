@@ -19,6 +19,7 @@ export function getSupabase() {
   if (!supabaseUrl || !supabaseAnonKey) return null;
 
   const currentHash = getUserHash();
+  if (!currentHash) return null;
   if (cachedClient && cachedHash === currentHash) return cachedClient;
 
   cachedClient = createClient(supabaseUrl, supabaseAnonKey, {
@@ -30,4 +31,11 @@ export function getSupabase() {
   });
   cachedHash = currentHash;
   return cachedClient;
+}
+
+// Clears the cached client so the next getSupabase() call creates a fresh one.
+// Must be called on logout to prevent stale clients from persisting across sessions.
+export function resetClient() {
+  cachedClient = null;
+  cachedHash = null;
 }

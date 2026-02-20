@@ -15,6 +15,7 @@ import { playNotificationSound, getNotificationSound } from './utils/notificatio
 import { getTimerDurations, getNudgeMinutes, initSettingsFromSupabase } from './utils/timerSettings';
 import { getUserHash, clearUserHash } from './utils/userHash';
 import * as api from './api/client';
+import { resetClient } from './api/supabaseClient';
 
 import FocusView from './components/FocusView';
 import TriageModal from './components/TriageModal';
@@ -134,6 +135,7 @@ export default function TaskTreeApp() {
   const [userHash, setUserHashState] = useState(() => getUserHash());
 
   const handleLogout = () => {
+    resetClient();
     clearUserHash();
     setUserHashState('');
   };

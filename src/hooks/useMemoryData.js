@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import * as api from '../api/client';
 
-const MIGRATED_FLAG = 'flowMigratedToSupabase';
-
 export function useMemoryData() {
   const [memoryData, setMemoryData] = useState({ notes: [], qas: [] });
   const isInitialLoad = useRef(true);
@@ -10,36 +8,13 @@ export function useMemoryData() {
   useEffect(() => {
     const init = async () => {
       try {
-        const migrated = localStorage.getItem(MIGRATED_FLAG);
-
-        if (!migrated) {
-          // First time: migrate localStorage memory to Supabase
-          const localJSON = localStorage.getItem('flowAppMemoryV1');
-          const localData = localJSON ? JSON.parse(localJSON) : { notes: [], qas: [] };
-
-          for (const note of (localData.notes || [])) {
-            await api.createNote(note).catch(() => {});
-          }
-          for (const qa of (localData.qas || [])) {
-            await api.createQA(qa).catch(() => {});
-          }
-
-          setMemoryData(localData);
-          localStorage.removeItem('flowAppMemoryV1');
-        } else {
-          // Already migrated: load from Supabase only
-          const [notes, qas] = await Promise.all([api.getNotes(), api.getQAs()]);
-          setMemoryData({
-            notes: notes || [],
-            qas: qas || [],
-          });
-        }
+        const [notes, qas] = await Promise.all([api.getNotes(), api.getQAs()]);
+        setMemoryData({
+          notes: notes || [],
+          qas: qas || [],
+        });
       } catch (err) {
         console.error('Failed to init memory:', err);
-        try {
-          const fallback = localStorage.getItem('flowAppMemoryV1');
-          if (fallback) setMemoryData(JSON.parse(fallback));
-        } catch {}
       } finally {
         isInitialLoad.current = false;
       }

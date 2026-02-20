@@ -4,8 +4,6 @@ import { getTodayDateString } from '../utils/dateUtils';
 import { findNodeRecursive, findNodePath } from '../utils/treeUtils';
 import * as api from '../api/client';
 
-const MIGRATED_FLAG = 'flowMigratedToSupabase';
-
 export function useTreeData() {
   const [treeData, setTreeData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -17,34 +15,12 @@ export function useTreeData() {
   useEffect(() => {
     const init = async () => {
       try {
-        const migrated = localStorage.getItem(MIGRATED_FLAG);
-
-        if (!migrated) {
-          // First time: migrate localStorage data to Supabase
-          const localJSON = localStorage.getItem('taskTreeGraphDataV2');
-          const localData = localJSON ? JSON.parse(localJSON) : [];
-
-          if (localData.length > 0) {
-            await api.putTree(localData);
-            setTreeData(localData);
-          }
-
-          localStorage.setItem(MIGRATED_FLAG, 'true');
-          localStorage.removeItem('taskTreeGraphDataV2');
-        } else {
-          // Already migrated: load from Supabase only
-          const row = await api.getTree();
-          if (row && Array.isArray(row.data)) {
-            setTreeData(row.data);
-          }
+        const row = await api.getTree();
+        if (row && Array.isArray(row.data)) {
+          setTreeData(row.data);
         }
       } catch (err) {
         console.error('Failed to init tree:', err);
-        // Last resort fallback: try localStorage if it still exists
-        try {
-          const fallback = localStorage.getItem('taskTreeGraphDataV2');
-          if (fallback) setTreeData(JSON.parse(fallback));
-        } catch {}
       } finally {
         setIsLoading(false);
         isInitialLoad.current = false;

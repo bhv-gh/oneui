@@ -6,53 +6,21 @@ const DEFAULTS = {
   longBreak: 15 * 60,
 };
 
-const MIGRATED_FLAG = 'flowMigratedToSupabase';
-
-// On first load: push localStorage settings to Supabase, then clear them.
-// On subsequent loads: pull from Supabase only.
+// On load: pull settings from Supabase into localStorage for fast synchronous reads.
 export const initSettingsFromSupabase = async () => {
   try {
-    const migrated = localStorage.getItem(MIGRATED_FLAG);
-
-    if (!migrated) {
-      // First time: push local settings to Supabase
-      const localDurations = localStorage.getItem('flow-timer-durations');
-      const localNudge = localStorage.getItem('flow-nudge-minutes');
-      const localSound = localStorage.getItem('flow-notification-sound');
-      const localViewMode = localStorage.getItem('flowAppViewMode');
-
-      const updates = {};
-      if (localDurations) {
-        try { updates.timerDurations = JSON.parse(localDurations); } catch {}
-      }
-      if (localNudge !== null) updates.nudgeMinutes = parseInt(localNudge, 10) || 30;
-      if (localSound) updates.notificationSound = localSound;
-      if (localViewMode) updates.viewMode = localViewMode;
-
-      if (Object.keys(updates).length > 0) {
-        await api.updateSettings(updates);
-      }
-
-      // Clear local settings keys (migration flag is set by useTreeData)
-      localStorage.removeItem('flow-timer-durations');
-      localStorage.removeItem('flow-nudge-minutes');
-      localStorage.removeItem('flow-notification-sound');
-      localStorage.removeItem('flowAppViewMode');
-    } else {
-      // Already migrated: load from Supabase
-      const settings = await api.getSettings();
-      if (settings && settings.timerDurations) {
-        localStorage.setItem('flow-timer-durations', JSON.stringify(settings.timerDurations));
-      }
-      if (settings && settings.nudgeMinutes !== undefined) {
-        localStorage.setItem('flow-nudge-minutes', String(settings.nudgeMinutes));
-      }
-      if (settings && settings.notificationSound) {
-        localStorage.setItem('flow-notification-sound', settings.notificationSound);
-      }
-      if (settings && settings.viewMode) {
-        localStorage.setItem('flowAppViewMode', settings.viewMode);
-      }
+    const settings = await api.getSettings();
+    if (settings && settings.timerDurations) {
+      localStorage.setItem('flow-timer-durations', JSON.stringify(settings.timerDurations));
+    }
+    if (settings && settings.nudgeMinutes !== undefined) {
+      localStorage.setItem('flow-nudge-minutes', String(settings.nudgeMinutes));
+    }
+    if (settings && settings.notificationSound) {
+      localStorage.setItem('flow-notification-sound', settings.notificationSound);
+    }
+    if (settings && settings.viewMode) {
+      localStorage.setItem('flowAppViewMode', settings.viewMode);
     }
   } catch (e) {
     // Supabase unavailable, use whatever is in localStorage
