@@ -95,16 +95,23 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
         if (selectedDate === lastTodayRef.current) {
           setSelectedDate(currentToday);
         }
+        if (simulatedToday === lastTodayRef.current) {
+          setSimulatedToday(currentToday);
+        }
         lastTodayRef.current = currentToday;
       }
     };
     window.addEventListener('focus', checkForDayChange);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') checkForDayChange();
+    });
     const interval = setInterval(checkForDayChange, 60000);
     return () => {
       window.removeEventListener('focus', checkForDayChange);
+      document.removeEventListener('visibilitychange', checkForDayChange);
       clearInterval(interval);
     };
-  }, [selectedDate]);
+  }, [selectedDate, simulatedToday]);
 
   const displayedTreeData = useMemo(() => {
     const today = simulatedToday;
