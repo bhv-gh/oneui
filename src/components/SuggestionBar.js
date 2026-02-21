@@ -7,14 +7,14 @@ const SuggestionBar = ({ suggestions, onSuggestionClick }) => {
   }
 
   return (
-    <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 pointer-events-auto flex items-center gap-2 bg-slate-900/80 p-1.5 border border-slate-800 backdrop-blur-sm rounded-xl">
-      <span className="text-xs text-slate-400 px-2 font-medium">Suggestions:</span>
+    <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 pointer-events-auto flex items-center gap-2 bg-surface-overlay p-1.5 border border-edge-secondary backdrop-blur-sm rounded-xl">
+      <span className="text-xs text-content-tertiary px-2 font-medium">Suggestions:</span>
       <div className="flex items-center gap-1">
         {suggestions.map(task => (
-          <button 
+          <button
             key={task.id}
             onClick={() => onSuggestionClick(task.id)}
-            className="px-3 py-1 text-xs text-slate-300 bg-slate-800/50 rounded-md hover:bg-slate-700 hover:text-white transition-colors truncate max-w-xs"
+            className="px-3 py-1 text-xs text-content-secondary bg-surface-secondary rounded-md hover:bg-surface-secondary hover:text-content-inverse transition-colors truncate max-w-xs"
             title={task.text}
           >
             {task.text}

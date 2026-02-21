@@ -200,20 +200,20 @@ const QuickAddModal = ({ isOpen, onClose, treeData, onAddSubtask, onAddRoot, onU
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-start justify-center pt-[20vh] bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-[200] flex items-start justify-center pt-[20vh] bg-page-base backdrop-blur-sm animate-in fade-in duration-150"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-lg mx-4 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-top-2 duration-200">
+      <div className="w-full max-w-lg mx-4 bg-surface-primary border border-edge-primary rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-top-2 duration-200">
         {/* Confirmation flash */}
         {confirmation ? (
-          <div className="flex items-center gap-3 px-5 py-4 text-emerald-400 animate-in fade-in duration-150">
+          <div className="flex items-center gap-3 px-5 py-4 text-accent animate-in fade-in duration-150">
             <Check size={18} />
             <span className="text-sm font-medium">{confirmation}</span>
           </div>
         ) : (
           <>
             {/* Input */}
-            <div className="px-4 py-3 border-b border-slate-800 flex items-center gap-2">
+            <div className="px-4 py-3 border-b border-edge-secondary flex items-center gap-2">
               <input
                 ref={inputRef}
                 type="text"
@@ -221,21 +221,21 @@ const QuickAddModal = ({ isOpen, onClose, treeData, onAddSubtask, onAddRoot, onU
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Type a task..."
-                className="flex-1 bg-transparent text-base text-slate-200 outline-none placeholder-slate-500"
+                className="flex-1 bg-transparent text-base text-content-primary outline-none placeholder-content-muted"
               />
               {isSpeechSupported && (
                 <button
                   onClick={isRecording ? stopRecording : startRecording}
-                  className="flex-shrink-0 p-1.5 rounded-lg transition-colors hover:bg-slate-800 active:bg-slate-700"
+                  className="flex-shrink-0 p-1.5 rounded-lg transition-colors hover:bg-surface-secondary active:bg-surface-secondary"
                   title={isRecording ? 'Stop recording' : 'Voice input'}
                 >
                   {isRecording ? (
                     <span className="relative flex items-center justify-center">
-                      <span className="absolute w-6 h-6 rounded-full bg-rose-500/20 animate-pulse" />
-                      <MicOff size={16} className="text-rose-400 relative" />
+                      <span className="absolute w-6 h-6 rounded-full bg-danger/20 animate-pulse" />
+                      <MicOff size={16} className="text-danger relative" />
                     </span>
                   ) : (
-                    <Mic size={16} className="text-slate-400" />
+                    <Mic size={16} className="text-content-tertiary" />
                   )}
                 </button>
               )}
@@ -251,26 +251,26 @@ const QuickAddModal = ({ isOpen, onClose, treeData, onAddSubtask, onAddRoot, onU
                     onMouseEnter={() => setSelectedIndex(idx)}
                     className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors ${
                       idx === selectedIndex
-                        ? 'bg-slate-800'
-                        : 'hover:bg-slate-800/50'
+                        ? 'bg-surface-secondary'
+                        : 'hover:bg-surface-tertiary'
                     }`}
                   >
                     <span className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${
                       idx === selectedIndex
-                        ? 'border-emerald-400 bg-emerald-400'
-                        : 'border-slate-600'
+                        ? 'border-accent bg-accent-bold'
+                        : 'border-edge-primary'
                     }`} />
                     <div className="flex-1 min-w-0">
                       {opt.type === 'root' ? (
                         <div className="flex items-center gap-2">
-                          <TreePine size={14} className="text-emerald-400 flex-shrink-0" />
-                          <span className="text-sm text-slate-200 font-medium">New Root Task</span>
+                          <TreePine size={14} className="text-accent flex-shrink-0" />
+                          <span className="text-sm text-content-primary font-medium">New Root Task</span>
                         </div>
                       ) : (
                         <>
-                          <div className="text-sm text-slate-200 font-medium truncate">{opt.item.text}</div>
+                          <div className="text-sm text-content-primary font-medium truncate">{opt.item.text}</div>
                           {opt.item.path.length > 0 && (
-                            <div className="text-[11px] text-slate-500 truncate flex items-center gap-1">
+                            <div className="text-[11px] text-content-muted truncate flex items-center gap-1">
                               {opt.item.path.map((seg, i) => (
                                 <React.Fragment key={i}>
                                   {i > 0 && <ChevronRight size={10} className="flex-shrink-0" />}
@@ -290,10 +290,10 @@ const QuickAddModal = ({ isOpen, onClose, treeData, onAddSubtask, onAddRoot, onU
             )}
 
             {/* Hint */}
-            <div className="px-4 py-2 border-t border-slate-800 flex items-center gap-4 text-[11px] text-slate-500">
-              <span><kbd className="px-1 py-0.5 rounded bg-slate-800 text-slate-400">↑↓</kbd> navigate</span>
-              <span><kbd className="px-1 py-0.5 rounded bg-slate-800 text-slate-400">↵</kbd> confirm</span>
-              <span><kbd className="px-1 py-0.5 rounded bg-slate-800 text-slate-400">esc</kbd> close</span>
+            <div className="px-4 py-2 border-t border-edge-secondary flex items-center gap-4 text-[11px] text-content-muted">
+              <span><kbd className="px-1 py-0.5 rounded bg-surface-secondary text-content-tertiary">↑↓</kbd> navigate</span>
+              <span><kbd className="px-1 py-0.5 rounded bg-surface-secondary text-content-tertiary">↵</kbd> confirm</span>
+              <span><kbd className="px-1 py-0.5 rounded bg-surface-secondary text-content-tertiary">esc</kbd> close</span>
             </div>
           </>
         )}

@@ -2,7 +2,7 @@
   display: flex;
   width: 100%;
   height: calc(100vh - 6rem); /* Full viewport height minus header */
-  border: 1px solid #334155; /* slate-700 */
+  border: 1px solid var(--color-edge-primary);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -17,7 +17,7 @@
 }
 
 .left-panel {
-  border-right: 1px solid #334155; /* slate-700 */
+  border-right: 1px solid var(--color-edge-primary);
 }
 
 /* --- State Logic --- */
@@ -75,7 +75,7 @@
   text-align: center;
   font-size: 1.125rem; /* text-lg */
   font-weight: 600; /* font-semibold */
-  color: #94a3b8; /* slate-400 */
+  color: var(--color-content-tertiary);
   position: absolute;
   top: 50%;
   left: 50%;

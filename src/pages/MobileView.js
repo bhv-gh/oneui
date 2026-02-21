@@ -28,8 +28,8 @@ function MobileRootDropZone({ activeDragId }) {
       ref={setNodeRef}
       className={`mx-4 my-2 py-4 text-sm text-center rounded-lg border-2 border-dashed transition-all ${
         isOver
-          ? 'border-cyan-400 bg-cyan-400/10 text-cyan-400'
-          : 'border-slate-700 text-slate-500'
+          ? 'border-accent-secondary bg-accent-subtle text-accent-secondary'
+          : 'border-edge-primary text-content-muted'
       }`}
     >
       Drop here for root level
@@ -171,10 +171,10 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
   const isPastDate = selectedDate < simulatedToday;
 
   return (
-    <div className="h-screen w-screen bg-slate-900 text-slate-200 flex flex-col overflow-hidden">
+    <div className="h-screen w-screen bg-surface-primary text-content-primary flex flex-col overflow-hidden">
       {/* Sticky header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-slate-950 border-b border-slate-800 safe-area-top">
-        <h1 className="text-lg font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-page-base border-b border-edge-secondary safe-area-top">
+        <h1 className="text-lg font-bold bg-gradient-to-r from-brand-from to-brand-to bg-clip-text text-transparent">
           Flow
         </h1>
 
@@ -182,21 +182,21 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
           {/* Sync status + button */}
           {syncStatus !== 'idle' && !isSyncing && (
             <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md ${
-              syncStatus === 'saving' ? 'text-slate-400' :
-              syncStatus === 'saved' ? 'text-emerald-400' :
-              syncStatus === 'error' ? 'text-rose-400' : ''
+              syncStatus === 'saving' ? 'text-content-tertiary' :
+              syncStatus === 'saved' ? 'text-accent' :
+              syncStatus === 'error' ? 'text-danger' : ''
             }`}>
-              {syncStatus === 'saving' && <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse" />}
+              {syncStatus === 'saving' && <span className="w-1.5 h-1.5 rounded-full bg-content-tertiary animate-pulse" />}
               {syncStatus === 'saved' && (
                 <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
               )}
-              {syncStatus === 'error' && <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />}
+              {syncStatus === 'error' && <span className="w-1.5 h-1.5 rounded-full bg-danger" />}
             </div>
           )}
           <button
             onClick={handleSync}
             disabled={isSyncing}
-            className="p-2 rounded-lg text-slate-400 active:bg-slate-800 disabled:opacity-50"
+            className="p-2 rounded-lg text-content-tertiary active:bg-surface-secondary disabled:opacity-50"
             title="Sync"
           >
             <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
@@ -205,7 +205,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
           {/* Date selector */}
           <button
             onClick={() => setIsDatePickerOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-slate-400 active:bg-slate-800"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-content-tertiary active:bg-surface-secondary"
           >
             <CalendarDays size={16} />
             <span>{selectedDate === simulatedToday ? 'Today' : selectedDate.slice(5)}</span>
@@ -215,7 +215,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
           {isSpeechSupported && (
             <button
               onClick={() => setIsRambleOpen(true)}
-              className="p-2 rounded-lg text-slate-400 active:bg-slate-800"
+              className="p-2 rounded-lg text-content-tertiary active:bg-surface-secondary"
               title="Ramble"
             >
               <Mic size={18} />
@@ -225,7 +225,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
           {/* Settings */}
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="p-2 rounded-lg text-slate-400 active:bg-slate-800"
+            className="p-2 rounded-lg text-content-tertiary active:bg-surface-secondary"
           >
             <Settings2 size={18} />
           </button>
@@ -238,11 +238,11 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
         {flattenedTasks.length === 0 ? (
           <div className="flex-1 flex items-center justify-center h-full">
             {isPastDate ? (
-              <p className="text-slate-600 text-sm">No tasks were completed on this day.</p>
+              <p className="text-content-disabled text-sm">No tasks were completed on this day.</p>
             ) : (
               <button
                 onClick={() => setIsQuickAddOpen(true)}
-                className="flex flex-col items-center gap-2 text-slate-500 active:text-emerald-400 p-8"
+                className="flex flex-col items-center gap-2 text-content-muted active:text-accent p-8"
               >
                 <Plus size={28} />
                 <span className="text-sm font-medium">Add a Task</span>
@@ -265,6 +265,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
                 onFocusHandled={() => setNewlyAddedTaskId(null)}
                 onOpenNotes={handleOpenNotes}
                 activeDragId={activeDragId}
+                isPastDate={isPastDate}
               />
             ))}
             <MobileRootDropZone activeDragId={activeDragId} />
@@ -275,7 +276,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
         {activeDragId ? (() => {
           const dragNode = findNodeRecursive(treeData, activeDragId);
           return dragNode ? (
-            <div className="px-4 py-2 bg-slate-800 border border-cyan-400 rounded-lg shadow-lg text-sm text-slate-200 max-w-[200px] truncate">
+            <div className="px-4 py-2 bg-surface-secondary border border-accent-secondary rounded-lg shadow-lg text-sm text-content-primary max-w-[200px] truncate">
               {dragNode.text || 'Untitled Task'}
             </div>
           ) : null;
@@ -287,7 +288,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
       {!isPastDate && (
         <button
           onClick={() => setIsQuickAddOpen(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-emerald-600 active:bg-emerald-700 text-white shadow-lg shadow-emerald-900/40 flex items-center justify-center z-30"
+          className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-accent-bolder active:bg-accent-boldest text-content-inverse shadow-lg flex items-center justify-center z-30"
         >
           <Plus size={24} />
         </button>

@@ -37,7 +37,7 @@ const PomodoroTimer = ({
           <button
             key={mode}
             onClick={() => onSetMode(mode)}
-            className={`px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${timerMode === mode ? 'bg-emerald-500/10 text-emerald-400' : 'text-slate-400 hover:bg-slate-800'}`}
+            className={`px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${timerMode === mode ? 'bg-accent-subtle text-accent' : 'text-content-tertiary hover:bg-surface-secondary'}`}
           >
             {config.label}
           </button>
@@ -45,24 +45,24 @@ const PomodoroTimer = ({
       </div>
 
       <p
-        className="font-mono font-bold text-slate-100 mb-3 sm:mb-8 leading-none"
+        className="font-mono font-bold text-content-primary mb-3 sm:mb-8 leading-none"
         style={{ fontSize: 'clamp(2rem, 18vw, 8rem)' }}
       >
         {formatTime(timeRemaining)}
       </p>
 
       <div className="flex items-center justify-center gap-3 sm:gap-6">
-        <button onClick={onReset} className="p-2 sm:p-4 rounded-full text-slate-400 hover:bg-slate-800 hover:text-white transition-colors" title="Reset Timer">
+        <button onClick={onReset} className="p-2 sm:p-4 rounded-full text-content-tertiary hover:bg-surface-secondary hover:text-content-inverse transition-colors" title="Reset Timer">
           <TimerReset size={22} />
         </button>
         <button
           onClick={onStartPause}
-          className="px-6 py-3 sm:px-8 sm:py-4 flex items-center justify-center gap-2 rounded-full bg-emerald-500 text-white text-base sm:text-xl font-semibold shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all"
+          className="px-6 py-3 sm:px-8 sm:py-4 flex items-center justify-center gap-2 rounded-full bg-accent-bold text-content-inverse text-base sm:text-xl font-semibold shadow-lg shadow-accent-bold/20 hover:bg-accent-bolder transition-all"
         >
           {isTimerActive ? <Pause size={20} /> : <Play size={20} />}
           <span>{isTimerActive ? 'Pause' : 'Start'}</span>
         </button>
-        <button onClick={onTogglePip} className="p-2 sm:p-4 rounded-full text-slate-400 hover:bg-slate-800 hover:text-white transition-colors" title="Picture-in-Picture">
+        <button onClick={onTogglePip} className="p-2 sm:p-4 rounded-full text-content-tertiary hover:bg-surface-secondary hover:text-content-inverse transition-colors" title="Picture-in-Picture">
           <PictureInPicture size={22} />
         </button>
       </div>

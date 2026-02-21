@@ -16,11 +16,11 @@ export default function SecretScreen({ onAuthenticated }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-page-base flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-slate-100 mb-2">Flow</h1>
-          <p className="text-sm text-slate-400">
+          <h1 className="text-2xl font-bold text-content-primary mb-2">Flow</h1>
+          <p className="text-sm text-content-tertiary">
             Enter your secret to access your workspace.
             <br />
             A new secret creates a new workspace.
@@ -34,12 +34,12 @@ export default function SecretScreen({ onAuthenticated }) {
             onChange={(e) => setSecret(e.target.value)}
             placeholder="Enter your secret"
             autoFocus
-            className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+            className="w-full px-4 py-3 bg-surface-primary border border-edge-primary rounded-xl text-content-primary placeholder-content-muted focus:outline-none focus:border-edge-focus focus:ring-1 focus:ring-edge-focus text-sm"
           />
           <button
             type="submit"
             disabled={!secret.trim() || isLoading}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-xl transition-colors"
+            className="w-full py-3 bg-accent-bold hover:bg-accent-bolder disabled:bg-surface-secondary disabled:text-content-muted text-content-inverse text-sm font-medium rounded-xl transition-colors"
           >
             {isLoading ? 'Loading...' : 'Enter'}
           </button>

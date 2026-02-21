@@ -50,8 +50,8 @@ function RootDropZoneButton({ onClick, activeDragId }) {
             onClick={onClick}
             className={`w-64 h-24 rounded-2xl border-2 border-dashed flex items-center justify-center transition-all ${
                 isDropTarget
-                    ? 'border-cyan-400 bg-cyan-400/10 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]'
-                    : 'border-slate-800 text-slate-600 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5'
+                    ? 'border-accent-secondary bg-accent-subtle text-accent-secondary shadow-[0_0_15px_rgba(34,211,238,0.3)]'
+                    : 'border-edge-secondary text-content-disabled hover:text-accent hover:border-accent-bold hover:bg-accent-subtle'
             }`}
         >
             <div className="flex flex-col items-center gap-2">
@@ -202,7 +202,7 @@ export default function MainPage({
         if (selectedDate > today) return filterTreeByScheduledDate(treeData, selectedDate);
         return filterForTodayView(treeData, today);
       }, [treeData, selectedDate, simulatedToday]);
-    
+
       const allFieldKeys = useMemo(() => {
         const keys = new Set();
         const collectKeys = (nodes) => {
@@ -222,18 +222,18 @@ export default function MainPage({
         collectKeys(treeData);
         return Array.from(keys);
       }, [treeData]);
-    
+
       const suggestedTasks = useMemo(() => {
         const todayStr = simulatedToday;
-    
+
         if (selectedDate < todayStr) {
           return [];
         }
-    
+
         let tasksForSelectedDate = [];
         let overdueTasks = [];
         let otherPendingTasks = [];
-    
+
         const findTasksRecursive = (nodes) => {
           nodes.forEach(node => {
             if (node.isCompleted || !node.text || node.text.trim() === '') {
@@ -245,19 +245,19 @@ export default function MainPage({
             } else if (selectedDate === todayStr && !node.scheduledDate) {
               otherPendingTasks.push(node);
             }
-    
+
             if (node.children) {
               findTasksRecursive(node.children);
             }
           });
         };
-    
+
         findTasksRecursive(treeData);
-    
+
         if (selectedDate > todayStr) {
           return tasksForSelectedDate.slice(0, 3);
         }
-    
+
         if (selectedDate === todayStr) {
           overdueTasks.sort((a, b) => parseISO(a.scheduledDate) - parseISO(b.scheduledDate));
           // Stable shuffle seeded by date so suggestions don't reshuffle on every treeData change
@@ -267,14 +267,14 @@ export default function MainPage({
             const hashB = b.id.split('').reduce((s, c) => ((s << 5) - s + c.charCodeAt(0)) | 0, dateSeed);
             return hashA - hashB;
           });
-    
+
           const suggestions = [...overdueTasks, ...tasksForSelectedDate, ...shuffledPending];
           return suggestions.slice(0, 3);
         }
-    
+
         return [];
       }, [treeData, selectedDate]);
-    
+
       const handleSuggestionClick = (taskId) => {
         if (highlightTimeoutRef.current) {
           clearTimeout(highlightTimeoutRef.current);
@@ -284,11 +284,11 @@ export default function MainPage({
           setHighlightedTaskId(null);
         }, 3000);
       };
-    
+
       useEffect(() => {
         setSearchQuery('');
       }, [activeTab]);
-    
+
       useEffect(() => {
         const handleClickOutside = (event) => {
           if (datePickerRef.current && !datePickerRef.current.contains(event.target)) {
@@ -298,7 +298,7 @@ export default function MainPage({
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
       }, []);
-    
+
       useEffect(() => {
         const isAnyDragActive = isDragging || isTimelineInteracting;
         if (isAnyDragActive) {
@@ -310,7 +310,7 @@ export default function MainPage({
           document.body.classList.remove('user-select-none');
         };
       }, [isDragging, isTimelineInteracting]);
-    
+
       const flattenedTree = useMemo(() => {
         const list = [];
         const traverse = (nodes) => {
@@ -318,7 +318,7 @@ export default function MainPage({
             const fieldsText = (node.fields || [])
               .map(field => `${field.label || ''} ${field.value || ''}`)
               .join(' ');
-    
+
             list.push({ id: node.id, text: node.text, searchableText: `${node.text || ''} ${fieldsText}` });
             if (node.children) traverse(node.children);
           });
@@ -326,25 +326,25 @@ export default function MainPage({
         traverse(displayedTreeData);
         return list;
       }, [displayedTreeData]);
-    
+
       const memorySearchCorpus = useMemo(() => {
         const notes = memoryData.notes.map(n => ({ type: 'note', id: n.id, text: n.text }));
         const qas = memoryData.qas.map(qa => ({ type: 'qa', id: qa.id, text: `${qa.question} ${qa.answer}` }));
         return [...notes, ...qas];
       }, [memoryData]);
-    
+
       const fuse = useMemo(() => new Fuse(flattenedTree, {
         keys: ['searchableText'],
         includeScore: true,
         threshold: 0.4,
       }), [flattenedTree]);
-    
+
       const memoryFuse = useMemo(() => new Fuse(memorySearchCorpus, {
         keys: ['text'],
         includeScore: true,
         threshold: 0.4,
       }), [memorySearchCorpus]);
-    
+
       useEffect(() => {
         if (searchQuery) {
           let results;
@@ -360,24 +360,24 @@ export default function MainPage({
           setHighlightedTaskId(null);
         }
       }, [searchQuery, fuse, memoryFuse, activeTab]);
-      
+
       useEffect(() => {
         if (highlightedNodeRef.current) {
           const canvas = canvasRef.current;
           const nodeElement = highlightedNodeRef.current;
           const canvasRect = canvas.getBoundingClientRect();
           const nodeRect = nodeElement.getBoundingClientRect();
-          
+
           const targetX = (canvasRect.width / 2) - (nodeRect.width / 2) - (nodeRect.left - canvasRect.left);
           const targetY = (canvasRect.height / 2) - (nodeRect.height / 2) - (nodeRect.top - canvasRect.top);
-    
+
           setPan(prevPan => ({
             x: prevPan.x + targetX / scale,
             y: prevPan.y + targetY / scale,
           }));
         }
       }, [highlightedTaskId, scale]);
-    
+
       useEffect(() => {
         if (viewMode === 'list' && highlightedTaskId) {
           const listContainer = document.querySelector('[data-list-view-container]');
@@ -387,7 +387,7 @@ export default function MainPage({
           }
         }
       }, [highlightedTaskId, viewMode]);
-    
+
       useEffect(() => {
         if (searchResults.length > 0) {
           const newHighlightedTaskId = searchResults[searchIndex]?.item.id;
@@ -399,7 +399,7 @@ export default function MainPage({
           setHighlightedTaskId(null);
         }
       }, [searchIndex, searchResults, expandBranch, viewMode]);
-    
+
       useEffect(() => {
         const handleKeyDown = (e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -409,7 +409,7 @@ export default function MainPage({
           }
 
           if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable) return;
-    
+
           if (searchResults.length > 0) {
             if (e.key === 'ArrowDown') {
               e.preventDefault();
@@ -422,14 +422,14 @@ export default function MainPage({
               return;
             }
           }
-    
+
           if (activeTab === 'today') {
             if (e.key === 'Backspace') setSearchQuery(q => q.slice(0, -1));
             else if (e.key === 'Escape') setSearchQuery('');
             else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) setSearchQuery(q => q + e.key);
           }
         };
-    
+
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
       }, [searchResults, searchIndex, activeTab, viewMode, searchQuery]);
@@ -447,10 +447,10 @@ export default function MainPage({
         const canvas = canvasRef.current;
         const content = contentRef.current;
 
-        const canvasWidth = canvas.offsetWidth; 
+        const canvasWidth = canvas.offsetWidth;
         const canvasHeight = canvas.offsetHeight;
-        const contentWidth = content.offsetWidth * currentScale; 
-        const contentHeight = content.offsetHeight * currentScale; 
+        const contentWidth = content.offsetWidth * currentScale;
+        const contentHeight = content.offsetHeight * currentScale;
         const cardWidth = Math.max(250, Math.min(350, window.innerWidth * 0.15)); // Calculate card width based on vw, with min/max
         const padding = Math.min(canvasWidth, canvasHeight) * 0.2; // Allow 20% of the smaller canvas dimension as overscroll
         let minX, maxX, minY, maxY;
@@ -460,7 +460,7 @@ export default function MainPage({
             maxX = canvasWidth;
         } else {
             minX = canvasWidth - contentWidth - padding;
-            maxX = padding; 
+            maxX = padding;
         }
 
         if (contentHeight < canvasHeight) {
@@ -529,16 +529,16 @@ export default function MainPage({
     };
 
     const backgroundClasses = {
-        idle: 'bg-slate-900',
-        focusing: 'bg-emerald-950',
-        break: 'bg-sky-950',
-        paused: 'bg-slate-950',
+        idle: 'bg-surface-primary',
+        focusing: 'bg-page-focus',
+        break: 'bg-page-break',
+        paused: 'bg-page-paused',
     };
 
     const isSearching = searchQuery.length > 0;
 
     return (
-        <div className={`h-screen w-screen text-slate-200 font-sans overflow-hidden flex flex-col transition-colors duration-1000 ${backgroundClasses[appState]}`}>
+        <div className={`h-screen w-screen text-content-primary font-sans overflow-hidden flex flex-col transition-colors duration-1000 ${backgroundClasses[appState]}`}>
             {manualLogModal && (
                 (() => {
                 const isEditing = !!manualLogModal.logToEdit;
@@ -550,9 +550,9 @@ export default function MainPage({
 
                 return (
                     <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-200">
-                        <h3 className="text-lg font-semibold text-slate-100 mb-2">{isEditing ? 'Edit Log Entry' : 'Add Manual Log Entry'}</h3>
-                        <p className="text-sm text-slate-400 mb-4">
+                    <div className="bg-surface-primary border border-edge-primary rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-200">
+                        <h3 className="text-lg font-semibold text-content-primary mb-2">{isEditing ? 'Edit Log Entry' : 'Add Manual Log Entry'}</h3>
+                        <p className="text-sm text-content-tertiary mb-4">
                         For {format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')}
                         </p>
                         <form onSubmit={(e) => {
@@ -574,11 +574,11 @@ export default function MainPage({
                             autoFocus
                             defaultValue={initialText}
                             placeholder="What were you working on?"
-                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 mb-4"
+                            className="w-full bg-surface-secondary border border-edge-primary rounded-lg px-3 py-2 text-content-primary focus:outline-none focus:ring-2 focus:ring-edge-focus mb-4"
                         />
                         <div className="flex justify-end gap-3">
-                            <button type="button" onClick={() => setManualLogModal(null)} className="px-4 py-2 rounded-lg text-slate-300 hover:bg-slate-800 transition-colors">Cancel</button>
-                            <button type="submit" className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-2">
+                            <button type="button" onClick={() => setManualLogModal(null)} className="px-4 py-2 rounded-lg text-content-secondary hover:bg-surface-secondary transition-colors">Cancel</button>
+                            <button type="submit" className="px-4 py-2 rounded-lg bg-accent-bolder text-content-inverse hover:bg-accent-boldest flex items-center gap-2">
                              Save Log
                             </button>
                         </div>
@@ -589,34 +589,34 @@ export default function MainPage({
                 })()
             )}
 
-            <DeleteModal 
-                isOpen={!!deleteTargetId} 
-                onClose={() => setDeleteTargetId(null)} 
-                onConfirm={confirmDelete} 
+            <DeleteModal
+                isOpen={!!deleteTargetId}
+                onClose={() => setDeleteTargetId(null)}
+                onConfirm={confirmDelete}
             />
 
-            <div className="absolute top-0 left-0 right-0 p-6 z-50 pointer-events-none flex justify-between items-start bg-gradient-to-b from-slate-950 to-transparent">
+            <div className="absolute top-0 left-0 right-0 p-6 z-50 pointer-events-none flex justify-between items-start bg-gradient-to-b from-page-base to-transparent">
                 <div className="flex items-center gap-6 pointer-events-auto">
                     <div>
-                        <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                        <h1 className="text-3xl font-bold bg-gradient-to-r from-brand-from to-brand-to bg-clip-text text-transparent">
                             Flow
                         </h1>
                     </div>
-                    <div className="flex gap-1 rounded-lg bg-slate-900/80 p-1 border border-slate-800 backdrop-blur-sm">
-                        <button onClick={() => setActiveTab('today')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'today' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Today</button>
-                        <button onClick={() => setActiveTab('logs')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'logs' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Logs</button>
-                        <button onClick={() => setActiveTab('memory')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'memory' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Memory</button>
-                        <button onClick={() => setActiveTab('insights')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'insights' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Insights</button>
+                    <div className="flex gap-1 rounded-lg bg-surface-primary/80 p-1 border border-edge-secondary backdrop-blur-sm">
+                        <button onClick={() => setActiveTab('today')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'today' ? 'bg-surface-secondary text-content-inverse' : 'text-content-tertiary hover:text-content-inverse'}`}>Today</button>
+                        <button onClick={() => setActiveTab('logs')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'logs' ? 'bg-surface-secondary text-content-inverse' : 'text-content-tertiary hover:text-content-inverse'}`}>Logs</button>
+                        <button onClick={() => setActiveTab('memory')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'memory' ? 'bg-surface-secondary text-content-inverse' : 'text-content-tertiary hover:text-content-inverse'}`}>Memory</button>
+                        <button onClick={() => setActiveTab('insights')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'insights' ? 'bg-surface-secondary text-content-inverse' : 'text-content-tertiary hover:text-content-inverse'}`}>Insights</button>
                     </div>
                     {syncStatus !== 'idle' && (
                         <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-md transition-all duration-300 ${
-                            syncStatus === 'saving' ? 'text-slate-400' :
-                            syncStatus === 'saved' ? 'text-emerald-400' :
-                            syncStatus === 'error' ? 'text-rose-400' : ''
+                            syncStatus === 'saving' ? 'text-content-tertiary' :
+                            syncStatus === 'saved' ? 'text-accent' :
+                            syncStatus === 'error' ? 'text-danger' : ''
                         }`}>
                             {syncStatus === 'saving' && (
                                 <>
-                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse" />
+                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-content-tertiary animate-pulse" />
                                     Saving
                                 </>
                             )}
@@ -628,7 +628,7 @@ export default function MainPage({
                             )}
                             {syncStatus === 'error' && (
                                 <>
-                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-400" />
+                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-danger" />
                                     Sync failed
                                 </>
                             )}
@@ -637,7 +637,7 @@ export default function MainPage({
                     <button
                         onClick={handleSync}
                         disabled={isSyncing}
-                        className="p-2 rounded-lg text-slate-400 hover:bg-white/10 disabled:opacity-50"
+                        className="p-2 rounded-lg text-content-tertiary hover:bg-white/10 disabled:opacity-50"
                         title="Sync all data"
                     >
                         <RefreshCw size={18} className={isSyncing ? 'animate-spin' : ''} />
@@ -645,7 +645,7 @@ export default function MainPage({
                     {isSpeechSupported && (
                         <button
                             onClick={() => setIsRambleOpen(true)}
-                            className="p-2 rounded-lg text-slate-400 hover:bg-white/10"
+                            className="p-2 rounded-lg text-content-tertiary hover:bg-white/10"
                             title="Ramble — voice input"
                         >
                             <Mic size={18} />
@@ -653,46 +653,46 @@ export default function MainPage({
                     )}
                     <button
                         onClick={() => setIsSettingsOpen(true)}
-                        className="p-2 rounded-lg text-slate-400 hover:bg-white/10"
+                        className="p-2 rounded-lg text-content-tertiary hover:bg-white/10"
                     >
                         <Settings2 size={18} />
                     </button>
                 </div>
-                
+
                 {/* Centered View Mode Toggle */}
                 {activeTab === 'today' && (
-                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-lg bg-slate-900/80 p-1 border border-slate-800 backdrop-blur-sm pointer-events-auto">
-                        <button onClick={() => setViewMode('tree')} className={`p-2 rounded-md transition-colors ${viewMode === 'tree' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`} title="Tree View">
+                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-lg bg-surface-primary/80 p-1 border border-edge-secondary backdrop-blur-sm pointer-events-auto">
+                        <button onClick={() => setViewMode('tree')} className={`p-2 rounded-md transition-colors ${viewMode === 'tree' ? 'bg-surface-secondary text-content-inverse' : 'text-content-tertiary hover:text-content-inverse'}`} title="Tree View">
                         <GitMerge size={18} />
                         </button>
-                        <button onClick={() => setViewMode('list')} className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`} title="List View">
+                        <button onClick={() => setViewMode('list')} className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-surface-secondary text-content-inverse' : 'text-content-tertiary hover:text-content-inverse'}`} title="List View">
                         <LayoutGrid size={18} />
                         </button>
                     </div>
                 )}
 
                 {/* Right-aligned controls */}
-                <div className="pointer-events-auto flex items-center justify-end gap-2 bg-slate-900/90 backdrop-blur p-2 rounded-xl border border-slate-800">
+                <div className="pointer-events-auto flex items-center justify-end gap-2 bg-surface-primary/90 backdrop-blur p-2 rounded-xl border border-edge-secondary">
                     {activeTab === 'today' && viewMode === 'tree' && (
                         <div className="flex items-center gap-2 animate-in fade-in duration-200">
                             <button onClick={() => setScale(s => Math.max(0.5, s - 0.1))} className="p-2 hover:bg-white/10 rounded-lg" title="Zoom Out"><Minimize size={18} /></button>
-                            <span className="flex items-center px-2 text-sm font-mono text-slate-400 w-12 text-center justify-center">{Math.round(scale * 100)}%</span>
+                            <span className="flex items-center px-2 text-sm font-mono text-content-tertiary w-12 text-center justify-center">{Math.round(scale * 100)}%</span>
                             <button onClick={() => setScale(s => Math.min(2, s + 0.1))} className="p-2 hover:bg-white/10 rounded-lg" title="Zoom In"><Maximize size={18} /></button>
                         </div>
                     )}
 
                     {activeTab !== 'memory' && (
                         <div className="relative" ref={datePickerRef}>
-                        <button 
+                        <button
                         onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                        className="flex items-center gap-2 cursor-pointer rounded-lg px-3 py-2 text-sm text-slate-400 hover:bg-white/10 transition-colors"
+                        className="flex items-center gap-2 cursor-pointer rounded-lg px-3 py-2 text-sm text-content-tertiary hover:bg-white/10 transition-colors"
                         >
                         <CalendarDays size={16} />
                         <span>{selectedDate === simulatedToday ? 'Today' : selectedDate}</span>
                         </button>
                         {isDatePickerOpen && (
                         <div className="absolute top-full right-0 mt-2 z-30 animate-in fade-in duration-100">
-                            <CustomDatePicker 
+                            <CustomDatePicker
                             selected={selectedDate ? parseISO(selectedDate) : undefined}
                             onSelect={(date) => {
                                 if (date) setSelectedDate(format(date, 'yyyy-MM-dd'));
@@ -714,7 +714,7 @@ export default function MainPage({
                 <div
                     data-canvas-area
                     ref={canvasRef}
-                    className={`no-scrollbar flex-1 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:2vmin_2vmin] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} animate-in fade-in duration-300 overflow-auto overscroll-x-contain`}
+                    className={`no-scrollbar flex-1 bg-[radial-gradient(var(--color-canvas-dot)_1px,transparent_1px)] [background-size:2vmin_2vmin] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} animate-in fade-in duration-300 overflow-auto overscroll-x-contain`}
                     onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUpOrLeave}
                     onMouseLeave={handleMouseUpOrLeave} onWheel={handleWheel}
                 >
@@ -753,11 +753,11 @@ export default function MainPage({
                         </>
                         ) : (
                         selectedDate < simulatedToday ? (
-                            <div className="text-slate-600">No tasks were completed on this day.</div>
+                            <div className="text-content-disabled">No tasks were completed on this day.</div>
                         ) : (
-                            <button 
+                            <button
                             onClick={() => handleAddTaskAndFocus(() => handleAddRoot(selectedDate))}
-                            className="w-64 h-24 rounded-2xl border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-600 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all"
+                            className="w-64 h-24 rounded-2xl border-2 border-dashed border-edge-secondary flex items-center justify-center text-content-disabled hover:text-accent hover:border-accent-bold hover:bg-accent-subtle transition-all"
                             >
                             <div className="flex flex-col items-center gap-2">
                                 <Plus size={24} />
@@ -772,7 +772,7 @@ export default function MainPage({
                 )}
                 {activeTab === 'today' && viewMode === 'list' && (
                 (() => {
-                    const listTasks = isSearching 
+                    const listTasks = isSearching
                     ? searchResults.map(result => findNodeRecursive(displayedTreeData, result.item.id)).filter(Boolean)
                     : displayedTreeData;
 
@@ -826,8 +826,8 @@ export default function MainPage({
                 return (
                     <div className="flex flex-col h-full">
                         <MemorySearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
-                        <CollapsiblePanels 
-                            leftPanelContent={notesContent} 
+                        <CollapsiblePanels
+                            leftPanelContent={notesContent}
                             leftTitle="Notes"
                             rightPanelContent={qaContent}
                             rightTitle="Q&A"
@@ -850,7 +850,7 @@ export default function MainPage({
                 {activeDragId ? (() => {
                     const dragNode = findNodeRecursive(treeData, activeDragId);
                     return dragNode ? (
-                        <div className="px-4 py-2 bg-slate-800 border border-cyan-400 rounded-lg shadow-lg text-sm text-slate-200 max-w-[200px] truncate">
+                        <div className="px-4 py-2 bg-surface-secondary border border-accent-secondary rounded-lg shadow-lg text-sm text-content-primary max-w-[200px] truncate">
                             {dragNode.text || 'Untitled Task'}
                         </div>
                     ) : null;

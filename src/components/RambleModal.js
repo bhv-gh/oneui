@@ -140,14 +140,14 @@ function renderTaskTree(items, depth = 0) {
     <div key={i}>
       <div className="flex items-center gap-2 py-1" style={{ paddingLeft: depth * 20 }}>
         <div className={`rounded-full border-2 flex-shrink-0 ${
-          depth === 0 ? 'w-4 h-4 border-slate-600' :
-          depth === 1 ? 'w-3.5 h-3.5 border-slate-700' :
-          'w-3 h-3 border-slate-700/60'
+          depth === 0 ? 'w-4 h-4 border-edge-primary' :
+          depth === 1 ? 'w-3.5 h-3.5 border-edge-secondary' :
+          'w-3 h-3 border-edge-secondary'
         }`} />
         <span className={`text-sm ${
-          depth === 0 ? 'text-slate-200' :
-          depth === 1 ? 'text-slate-300' :
-          'text-slate-400'
+          depth === 0 ? 'text-content-primary' :
+          depth === 1 ? 'text-content-secondary' :
+          'text-content-tertiary'
         }`}>
           {task.text}
         </span>
@@ -286,14 +286,14 @@ export default function RambleModal({ isOpen, onClose, onAddTasks }) {
   if (!SpeechRecognition) {
     return (
       <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div className="bg-surface-primary border border-edge-primary rounded-2xl shadow-2xl w-full max-w-md p-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-slate-100">Ramble</h3>
-            <button onClick={handleClose} className="p-1 text-slate-500 hover:text-white rounded-full">
+            <h3 className="text-lg font-semibold text-content-primary">Ramble</h3>
+            <button onClick={handleClose} className="p-1 text-content-muted hover:text-content-inverse rounded-full">
               <X size={20} />
             </button>
           </div>
-          <p className="text-slate-400 text-sm">Speech recognition is not supported in this browser. Try Chrome or Safari.</p>
+          <p className="text-content-tertiary text-sm">Speech recognition is not supported in this browser. Try Chrome or Safari.</p>
         </div>
       </div>
     );
@@ -301,22 +301,22 @@ export default function RambleModal({ isOpen, onClose, onAddTasks }) {
 
   return (
     <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-surface-primary border border-edge-primary rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="flex justify-between items-center px-5 pt-5 pb-3">
           <div className="flex items-center gap-2">
-            <Mic size={18} className="text-emerald-400" />
-            <h3 className="text-lg font-semibold text-slate-100">Ramble</h3>
+            <Mic size={18} className="text-accent" />
+            <h3 className="text-lg font-semibold text-content-primary">Ramble</h3>
           </div>
-          <button onClick={handleClose} className="p-1 text-slate-500 hover:text-white rounded-full">
+          <button onClick={handleClose} className="p-1 text-content-muted hover:text-content-inverse rounded-full">
             <X size={20} />
           </button>
         </div>
 
         {/* Instructions */}
         <div className="px-5 pb-3">
-          <p className="text-xs text-slate-500">
-            Pause between tasks to auto-split. Say <span className="text-slate-300 font-medium">"subtask"</span> for children, or use the buttons below.
+          <p className="text-xs text-content-muted">
+            Pause between tasks to auto-split. Say <span className="text-content-secondary font-medium">"subtask"</span> for children, or use the buttons below.
           </p>
         </div>
 
@@ -324,7 +324,7 @@ export default function RambleModal({ isOpen, onClose, onAddTasks }) {
         <div className="flex-1 overflow-y-auto px-5 min-h-[120px] max-h-[40vh]">
           {displayTasks.length === 0 ? (
             <div className="flex items-center justify-center h-full py-8">
-              <p className="text-slate-600 text-sm italic">Start speaking to add tasks...</p>
+              <p className="text-content-disabled text-sm italic">Start speaking to add tasks...</p>
             </div>
           ) : (
             <div className="space-y-0.5">
@@ -334,19 +334,19 @@ export default function RambleModal({ isOpen, onClose, onAddTasks }) {
         </div>
 
         {/* Live transcript */}
-        <div className="px-5 py-3 border-t border-slate-800">
+        <div className="px-5 py-3 border-t border-edge-secondary">
           <div className="flex items-start gap-2">
             {isRecording && (
-              <span className="mt-1.5 flex-shrink-0 w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+              <span className="mt-1.5 flex-shrink-0 w-2 h-2 rounded-full bg-danger animate-pulse" />
             )}
-            <p className="text-sm text-slate-500 italic min-h-[1.25rem]">
+            <p className="text-sm text-content-muted italic min-h-[1.25rem]">
               {interimTranscript || (isRecording ? 'Listening...' : 'Stopped')}
             </p>
           </div>
           {/* Mode indicator */}
           <div className="flex items-center gap-1 mt-1">
-            <ChevronRight size={12} className="text-slate-600" />
-            <span className="text-xs text-slate-600">
+            <ChevronRight size={12} className="text-content-disabled" />
+            <span className="text-xs text-content-disabled">
               {currentDepth > 0 && parentText
                 ? `Under "${parentText}" · depth ${currentDepth + 1}`
                 : 'Root level'}
@@ -356,18 +356,18 @@ export default function RambleModal({ isOpen, onClose, onAddTasks }) {
 
         {error && (
           <div className="px-5 py-2">
-            <p className="text-xs text-rose-400">{error}</p>
+            <p className="text-xs text-danger">{error}</p>
           </div>
         )}
 
         {/* Command buttons */}
-        <div className="px-5 py-3 border-t border-slate-800 flex items-center gap-2 flex-wrap">
+        <div className="px-5 py-3 border-t border-edge-secondary flex items-center gap-2 flex-wrap">
           <button
             onClick={() => handleCommandButton('next task')}
             className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors active:scale-95 ${
               currentDepth === 0
-                ? 'bg-cyan-950/50 text-cyan-400 border-cyan-800'
-                : 'bg-slate-800 text-cyan-400 border-slate-700 active:bg-slate-700'
+                ? 'bg-accent-secondary-subtle text-accent-secondary border-accent-secondary'
+                : 'bg-surface-secondary text-accent-secondary border-edge-primary active:bg-surface-secondary'
             }`}
           >
             + Task
@@ -377,7 +377,7 @@ export default function RambleModal({ isOpen, onClose, onAddTasks }) {
             className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors active:scale-95 ${
               currentDepth > 0
                 ? 'bg-amber-950/50 text-amber-400 border-amber-800'
-                : 'bg-slate-800 text-amber-400 border-slate-700 active:bg-slate-700'
+                : 'bg-surface-secondary text-amber-400 border-edge-primary active:bg-surface-secondary'
             }`}
           >
             + Subtask
@@ -392,7 +392,7 @@ export default function RambleModal({ isOpen, onClose, onAddTasks }) {
               </button>
               <button
                 onClick={() => handleCommandButton('go up')}
-                className="px-3 py-1.5 rounded-full text-xs font-medium bg-slate-800 text-emerald-400 border border-slate-700 active:bg-slate-700 transition-colors active:scale-95 flex items-center gap-1"
+                className="px-3 py-1.5 rounded-full text-xs font-medium bg-surface-secondary text-accent border border-edge-primary active:bg-surface-secondary transition-colors active:scale-95 flex items-center gap-1"
               >
                 <ChevronUp size={12} />
                 Up
@@ -403,7 +403,7 @@ export default function RambleModal({ isOpen, onClose, onAddTasks }) {
           {isRecording ? (
             <button
               onClick={stopRecording}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-rose-400 border border-slate-700 active:bg-slate-700"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-secondary text-danger border border-edge-primary active:bg-surface-secondary"
             >
               <Square size={12} />
               Stop
@@ -411,7 +411,7 @@ export default function RambleModal({ isOpen, onClose, onAddTasks }) {
           ) : (
             <button
               onClick={startRecording}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-emerald-400 border border-slate-700 active:bg-slate-700"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-secondary text-accent border border-edge-primary active:bg-surface-secondary"
             >
               <Mic size={12} />
               Resume
@@ -424,7 +424,7 @@ export default function RambleModal({ isOpen, onClose, onAddTasks }) {
           <button
             onClick={handleAddAll}
             disabled={parsedTasks.length === 0}
-            className="w-full py-3 rounded-xl text-sm font-medium bg-emerald-600 text-white active:bg-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+            className="w-full py-3 rounded-xl text-sm font-medium bg-accent-bolder text-content-inverse active:bg-accent-boldest disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
           >
             <Check size={16} />
             {taskCount > 0 ? `Add ${taskCount} Task${taskCount > 1 ? 's' : ''}` : 'Add Tasks'}

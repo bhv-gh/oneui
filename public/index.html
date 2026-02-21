@@ -11,6 +11,15 @@
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <link rel="icon" href="%PUBLIC_URL%/logo.svg" />
     <title>Flow</title>
+    <script>
+      // Theme flash prevention — set data-theme before first paint
+      try {
+        var theme = localStorage.getItem('flow-theme');
+        if (theme === 'personal') {
+          document.documentElement.setAttribute('data-theme', 'personal');
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

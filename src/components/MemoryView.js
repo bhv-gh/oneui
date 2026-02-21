@@ -50,7 +50,7 @@ const MemoryView = ({ memoryData, onUpdate, searchQuery, viewType }) => {
       <span>
         {parts.map((part, i) =>
           part.toLowerCase() === query.toLowerCase() ? (
-            <span key={i} className="bg-emerald-500/30 text-emerald-200">{part}</span>
+            <span key={i} className="bg-accent-subtle text-accent">{part}</span>
           ) : (
             part
           )
@@ -88,7 +88,7 @@ const MemoryView = ({ memoryData, onUpdate, searchQuery, viewType }) => {
           onBlur={handleBlur}
           autoFocus
           placeholder={placeholder}
-          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="w-full bg-surface-secondary border border-edge-primary rounded-lg p-2 text-content-primary focus:outline-none focus:ring-2 focus:ring-edge-focus"
         />
       );
     }
@@ -97,7 +97,7 @@ const MemoryView = ({ memoryData, onUpdate, searchQuery, viewType }) => {
         {value ? (
           highlightText(value, searchQuery)
         ) : (
-          <span className="text-slate-500">{placeholder}</span>
+          <span className="text-content-muted">{placeholder}</span>
         )}
       </div>
     );
@@ -113,15 +113,15 @@ const MemoryView = ({ memoryData, onUpdate, searchQuery, viewType }) => {
       {(viewType === 'notes' || !viewType) && (
         <div>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-slate-200 flex items-center gap-2"><Lightbulb /> Notes</h2>
-            <button onClick={handleAddNote} className="px-4 py-2 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Note</button>
+            <h2 className="text-2xl font-bold text-content-primary flex items-center gap-2"><Lightbulb /> Notes</h2>
+            <button onClick={handleAddNote} className="px-4 py-2 text-sm rounded-lg bg-accent-bolder text-content-inverse hover:bg-accent-boldest flex items-center gap-2"><Plus size={16} /> Add Note</button>
           </div>
           <div className="space-y-4">
             {sortedNotes.map(note => (
-              <RichTextNote 
-                key={note.id} 
-                note={note} 
-                onUpdate={handleUpdateNote} 
+              <RichTextNote
+                key={note.id}
+                note={note}
+                onUpdate={handleUpdateNote}
                 onDelete={handleDeleteNote}
                 placeholder="Type your note here..."
               />
@@ -134,21 +134,21 @@ const MemoryView = ({ memoryData, onUpdate, searchQuery, viewType }) => {
       {(viewType === 'qas' || !viewType) && (
         <div>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-slate-200 flex items-center gap-2"><HelpCircle /> Q & A</h2>
-            <button onClick={handleAddQA} className="px-4 py-2 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-2"><Plus size={16} /> Add Q&A</button>
+            <h2 className="text-2xl font-bold text-content-primary flex items-center gap-2"><HelpCircle /> Q & A</h2>
+            <button onClick={handleAddQA} className="px-4 py-2 text-sm rounded-lg bg-accent-bolder text-content-inverse hover:bg-accent-boldest flex items-center gap-2"><Plus size={16} /> Add Q&A</button>
           </div>
           <div className="space-y-4">
             {sortedQAs.map(qa => (
-              <div key={qa.id} className="bg-slate-900/50 rounded-xl group relative transition-all hover:bg-slate-800/50">
+              <div key={qa.id} className="bg-surface-primary rounded-xl group relative transition-all hover:bg-surface-secondary">
                 <div className="p-4">
-                  <label className="text-sm font-semibold text-emerald-400">Question</label>
+                  <label className="text-sm font-semibold text-accent">Question</label>
                   <EditableField value={qa.question} onChange={(val) => handleUpdateQA(qa.id, 'question', val)} placeholder="Type your question..."/>
                 </div>
-                <div className="bg-slate-900/70 p-4 border-t border-slate-800 rounded-b-xl">
-                  <label className="text-sm font-semibold text-cyan-400">Answer</label>
+                <div className="bg-surface-primary p-4 border-t border-edge-secondary rounded-b-xl">
+                  <label className="text-sm font-semibold text-accent-secondary">Answer</label>
                   <EditableField value={qa.answer} onChange={(val) => handleUpdateQA(qa.id, 'answer', val)} placeholder="Type your answer..."/>
                 </div>
-                <button onClick={() => handleDeleteQA(qa.id)} className="absolute top-3 right-3 p-1 text-slate-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => handleDeleteQA(qa.id)} className="absolute top-3 right-3 p-1 text-content-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity">
                   <Trash2 size={14} />
                 </button>
               </div>

@@ -47,19 +47,19 @@ const TaskNotesPanel = ({ taskId, taskTitle, initialNotes, onUpdate, onClose }) 
       {/* Panel */}
       <div
         ref={panelRef}
-        className="fixed top-0 right-0 z-[101] h-full w-full max-w-lg bg-slate-900 border-l border-slate-700 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
+        className="fixed top-0 right-0 z-[101] h-full w-full max-w-lg bg-surface-primary border-l border-edge-primary shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-edge-secondary">
           <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-semibold text-slate-200 truncate">
+            <h2 className="text-sm font-semibold text-content-primary truncate">
               {taskTitle || 'Untitled Task'}
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">Notes</p>
+            <p className="text-xs text-content-muted mt-0.5">Notes</p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
+            className="p-2 rounded-lg text-content-tertiary hover:text-content-inverse hover:bg-surface-secondary transition-colors flex-shrink-0"
           >
             <X size={18} />
           </button>

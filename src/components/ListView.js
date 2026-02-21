@@ -36,11 +36,11 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAdd
     return (
       <div className="flex-1 flex items-center justify-center">
         {selectedDate < getTodayDateString() ? (
-          <div className="text-slate-600">No tasks were completed on this day.</div>
+          <div className="text-content-disabled">No tasks were completed on this day.</div>
         ) : (
-          <button 
+          <button
             onClick={onAddRoot}
-            className="w-64 h-24 rounded-2xl border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-600 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all"
+            className="w-64 h-24 rounded-2xl border-2 border-dashed border-edge-secondary flex items-center justify-center text-content-disabled hover:text-accent hover:border-edge-focus hover:bg-accent-subtler transition-all"
           >
             <div className="flex flex-col items-center gap-2">
               <Plus size={24} />
@@ -72,7 +72,7 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAdd
           />
         ))}
         {selectedDate >= getTodayDateString() && (
-          <button onClick={onAddRoot} className="w-full mt-4 py-3 text-sm text-slate-500 hover:text-emerald-400 border border-dashed border-slate-800 hover:border-emerald-500/30 rounded-lg flex items-center justify-center gap-2 transition-colors">
+          <button onClick={onAddRoot} className="w-full mt-4 py-3 text-sm text-content-muted hover:text-accent border border-dashed border-edge-secondary hover:border-edge-focus rounded-lg flex items-center justify-center gap-2 transition-colors">
             <Plus size={16} />
             <span>Add New Task</span>
           </button>
@@ -82,8 +82,8 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAdd
             ref={setRootDropRef}
             className={`w-full mt-2 py-4 text-sm text-center rounded-lg border-2 border-dashed transition-all ${
               isRootOver
-                ? 'border-cyan-400 bg-cyan-400/10 text-cyan-400'
-                : 'border-slate-700 text-slate-500'
+                ? 'border-accent-secondary bg-accent-secondary-subtle text-accent-secondary'
+                : 'border-edge-primary text-content-muted'
             }`}
           >
             Drop here for root level

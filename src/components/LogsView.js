@@ -431,7 +431,7 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
       ref={scrollContainerRef}
       className="flex-1 h-0 px-8 md:px-12 pb-8 overflow-y-auto animate-in fade-in duration-300"
     >
-      <h2 className="text-2xl font-bold text-slate-200 mb-6">
+      <h2 className="text-2xl font-bold text-content-primary mb-6">
         Activity Log for {format(validDateForLogs, 'MMMM d, yyyy')}
       </h2>
 
@@ -447,21 +447,21 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
               { icon: Trophy, label: 'Longest', value: stats.longestSession > 0 ? formatDuration(stats.longestSession) : '--' },
               { icon: TrendingUp, label: 'Peak Hour', value: formatHour(stats.peakHour) },
             ].map(({ icon: Icon, label, value }) => (
-              <div key={label} className="bg-slate-800/60 border border-slate-700/50 rounded-lg px-3 py-2.5 flex items-center gap-2">
-                <div className="p-1.5 rounded-md bg-slate-700/50">
-                  <Icon size={14} className="text-emerald-400" />
+              <div key={label} className="bg-surface-tertiary border border-edge-primary rounded-lg px-3 py-2.5 flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-surface-secondary">
+                  <Icon size={14} className="text-accent" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[10px] text-slate-400 leading-tight">{label}</p>
-                  <p className="text-sm font-semibold text-slate-100 truncate">{value}</p>
+                  <p className="text-[10px] text-content-tertiary leading-tight">{label}</p>
+                  <p className="text-sm font-semibold text-content-primary truncate">{value}</p>
                 </div>
               </div>
             ))}
           </div>
 
           {/* --- 2. Weekly Activity Mini-Chart --- */}
-          <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg px-3 py-3">
-            <p className="text-[10px] text-slate-400 mb-2 font-medium">This Week</p>
+          <div className="bg-surface-tertiary border border-edge-primary rounded-lg px-3 py-3">
+            <p className="text-[10px] text-content-tertiary mb-2 font-medium">This Week</p>
             <div className="flex items-end justify-between gap-1.5" style={{ height: 64 }}>
               {weekData.days.map(day => {
                 const barHeight = day.totalHours > 0 ? Math.max((day.totalHours / weekData.maxHours) * 100, 5) : 0;
@@ -470,15 +470,15 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
                     <div className="w-full flex items-end justify-center" style={{ height: 48 }}>
                       {barHeight > 0 ? (
                         <div
-                          className={`w-full max-w-[20px] rounded-t-sm transition-all ${day.isSelected ? 'bg-emerald-500' : 'bg-slate-700'}`}
+                          className={`w-full max-w-[20px] rounded-t-sm transition-all ${day.isSelected ? 'bg-accent-bold' : 'bg-surface-secondary'}`}
                           style={{ height: `${barHeight}%` }}
                           title={`${day.totalHours.toFixed(1)}h`}
                         />
                       ) : (
-                        <div className="w-full max-w-[20px] h-[2px] rounded bg-slate-800" />
+                        <div className="w-full max-w-[20px] h-[2px] rounded bg-surface-secondary" />
                       )}
                     </div>
-                    <span className={`text-[9px] ${day.isSelected ? 'text-emerald-400 font-semibold' : 'text-slate-500'}`}>
+                    <span className={`text-[9px] ${day.isSelected ? 'text-accent font-semibold' : 'text-content-muted'}`}>
                       {day.label}
                     </span>
                   </div>
@@ -495,20 +495,20 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
                 {streak} day streak
               </span>
             )}
-            <p className="text-slate-400 italic">{quip}</p>
+            <p className="text-content-tertiary italic">{quip}</p>
           </div>
 
           {/* --- 5. Task Breakdown --- */}
           {taskBreakdown.length > 0 && (
             <div>
-              <p className="text-[10px] text-slate-400 font-medium mb-2">Task Breakdown</p>
+              <p className="text-[10px] text-content-tertiary font-medium mb-2">Task Breakdown</p>
               <div className="space-y-2.5">
                 {taskBreakdown.map(category => (
                   <div key={category.categoryName}>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${category.hasTaskId ? 'bg-emerald-400' : 'bg-sky-400'}`} />
-                      <span className="text-xs text-slate-200 font-medium flex-1 truncate" title={category.categoryName}>{category.categoryName}</span>
-                      <span className="text-[10px] text-slate-400 flex-shrink-0">{formatDuration(category.totalMs)}</span>
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${category.hasTaskId ? 'bg-accent' : 'bg-info'}`} />
+                      <span className="text-xs text-content-primary font-medium flex-1 truncate" title={category.categoryName}>{category.categoryName}</span>
+                      <span className="text-[10px] text-content-tertiary flex-shrink-0">{formatDuration(category.totalMs)}</span>
                     </div>
                     {Object.keys(category.tasks).length > 1 && (
                       <div className="ml-3.5 space-y-0.5">
@@ -516,8 +516,8 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
                           .sort(([,a], [,b]) => b - a)
                           .map(([taskName, ms]) => (
                             <div key={taskName} className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-slate-500 flex-1 truncate" title={taskName}>{taskName}</span>
-                              <span className="text-[10px] text-slate-600 flex-shrink-0">{formatDuration(ms)}</span>
+                              <span className="text-[10px] text-content-muted flex-1 truncate" title={taskName}>{taskName}</span>
+                              <span className="text-[10px] text-content-disabled flex-shrink-0">{formatDuration(ms)}</span>
                             </div>
                           ))}
                       </div>
@@ -532,7 +532,7 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
         {/* --- Right: Timeline --- */}
         <div className="flex-1 flex gap-4 min-w-0">
           {/* Timeline Axis */}
-          <div className="flex flex-col text-xs text-slate-500">
+          <div className="flex flex-col text-xs text-content-muted">
             {hours.map(hour => (
               <div key={hour} className="h-24 flex-shrink-0 -translate-y-2">
                 {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
@@ -543,23 +543,23 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
           {/* Timeline Grid */}
           <div
             ref={timelineRef}
-            className="relative flex-1 bg-slate-900/50 rounded-2xl"
+            className="relative flex-1 bg-surface-primary rounded-2xl"
             onMouseDown={handleTimelineMouseDown}
             onMouseMove={handleTimelineMouseMove}
             onMouseUp={handleTimelineMouseUp}
           >
             {/* Hour lines */}
             {hours.map(hour => (
-              <div key={hour} className="h-24 border-t border-slate-800/80"></div>
+              <div key={hour} className="h-24 border-t border-edge-secondary"></div>
             ))}
 
             {/* Current Time Indicator */}
             {selectedDate === getTodayDateString() && (
               <div
-                className="absolute w-full h-px bg-rose-400 z-10"
+                className="absolute w-full h-px bg-danger z-10"
                 style={{ top: `${currentTimeTop}%` }}
               >
-                <div className="absolute -left-1.5 -top-1.5 w-3 h-3 bg-rose-400 rounded-full border-2 border-slate-900"></div>
+                <div className="absolute -left-1.5 -top-1.5 w-3 h-3 bg-danger rounded-full border-2 border-surface-primary"></div>
               </div>
             )}
 
@@ -567,9 +567,9 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
             {processedLogs.length === 0 && !isDragging && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="text-center px-6 py-8">
-                  <div className="text-slate-600 text-4xl mb-3">○</div>
-                  <p className="text-slate-500 text-sm">No sessions logged.</p>
-                  <p className="text-slate-600 text-xs mt-1">Drag to create one, or start a Pomodoro.</p>
+                  <div className="text-content-disabled text-4xl mb-3">○</div>
+                  <p className="text-content-muted text-sm">No sessions logged.</p>
+                  <p className="text-content-disabled text-xs mt-1">Drag to create one, or start a Pomodoro.</p>
                 </div>
               </div>
             )}
@@ -588,19 +588,19 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
                 >
                   <div
                     onMouseDown={(e) => startInteraction(e, log, 'move')}
-                    className={`group relative h-full border-l-2 rounded-lg p-2 flex flex-col justify-center cursor-move ${log.taskId ? 'bg-emerald-500/10 border-emerald-400' : 'bg-sky-500/10 border-sky-400/50'}`}
+                    className={`group relative h-full border-l-2 rounded-lg p-2 flex flex-col justify-center cursor-move ${log.taskId ? 'bg-accent-subtle border-accent' : 'bg-info-subtle border-info'}`}
                   >
                     {/* Resize Handles */}
                     <div onMouseDown={(e) => startInteraction(e, log, 'resize-top')} className="absolute -top-1 left-0 w-full h-2 cursor-row-resize" />
                     <div onMouseDown={(e) => startInteraction(e, log, 'resize-bottom')} className="absolute -bottom-1 left-0 w-full h-2 cursor-row-resize" />
 
-                    <p className={`text-sm font-medium truncate ${log.taskId ? 'text-emerald-300' : 'text-sky-300'}`}>{log.taskText}</p>
-                    <p className={`text-xs ${log.taskId ? 'text-emerald-500' : 'text-sky-500'}`}>
+                    <p className={`text-sm font-medium truncate ${log.taskId ? 'text-accent' : 'text-info'}`}>{log.taskText}</p>
+                    <p className={`text-xs ${log.taskId ? 'text-accent-bold' : 'text-info'}`}>
                       {format(currentLog.startTime, 'h:mm a')} - {format(currentLog.endTime, 'h:mm a')}
                     </p>
 
                     {/* Duration Badge */}
-                    <span className={`absolute bottom-1 right-2 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${log.taskId ? 'bg-emerald-500/20 text-emerald-400' : 'bg-sky-500/20 text-sky-400'}`}>
+                    <span className={`absolute bottom-1 right-2 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${log.taskId ? 'bg-accent-subtle text-accent' : 'bg-info-subtle text-info'}`}>
                       {formatDuration(durationMs)}
                     </span>
 
@@ -608,14 +608,14 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
                     <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => onEditLog(log)}
-                        className="p-1 rounded bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-white"
+                        className="p-1 rounded bg-surface-secondary text-content-tertiary hover:bg-surface-secondary hover:text-content-inverse"
                         title="Edit Log"
                       >
                         <Pencil size={12} />
                       </button>
                       <button
                         onClick={() => onDeleteLog(log.id)}
-                        className="p-1 rounded bg-slate-800/50 text-rose-400/70 hover:bg-rose-500/50 hover:text-white"
+                        className="p-1 rounded bg-surface-secondary text-danger hover:bg-danger-subtle hover:text-content-inverse"
                         title="Delete Log"
                       >
                         <Trash size={12} />
@@ -635,7 +635,7 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
               const { top, height } = getPositionAndHeight(start, end);
               return (
                 <div
-                  className="absolute w-full bg-sky-500/30 rounded-r-lg pointer-events-none"
+                  className="absolute w-full bg-info-subtle rounded-r-lg pointer-events-none"
                   style={{ top, height }}
                 ></div>
               );

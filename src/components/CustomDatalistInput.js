@@ -34,22 +34,22 @@ const CustomDatalistInput = ({ value, onChange, options, placeholder, onKeyDown 
         onFocus={() => setIsOpen(true)}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
-        className="w-full bg-slate-950/50 text-xs text-slate-400 border border-slate-800 rounded px-2 py-1 focus:border-emerald-500/50 focus:outline-none transition-colors"
+        className="w-full bg-surface-inset text-xs text-content-tertiary border border-edge-secondary rounded px-2 py-1 focus:border-edge-focus focus:outline-none transition-colors"
       />
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1.5 z-20 bg-slate-900 border border-slate-700 rounded-lg shadow-lg max-h-40 overflow-y-auto animate-in fade-in duration-100">
+        <div className="absolute top-full left-0 right-0 mt-1.5 z-20 bg-surface-primary border border-edge-primary rounded-lg shadow-lg max-h-40 overflow-y-auto animate-in fade-in duration-100">
           {filteredOptions.length > 0 ? (
             filteredOptions.map(option => (
               <button
                 key={option}
                 onClick={() => handleSelect(option)}
-                className="w-full text-left text-xs px-3 py-1.5 text-slate-300 hover:bg-emerald-500/10"
+                className="w-full text-left text-xs px-3 py-1.5 text-content-secondary hover:bg-accent-subtle"
               >
                 {option}
               </button>
             ))
           ) : (
-            <div className="text-xs text-slate-500 px-3 py-1.5 italic">
+            <div className="text-xs text-content-muted px-3 py-1.5 italic">
               No matching keys.
             </div>
           )}
@@ -57,7 +57,7 @@ const CustomDatalistInput = ({ value, onChange, options, placeholder, onKeyDown 
            {value && !options.includes(value) && (
              <button
                 onClick={() => handleSelect(value)}
-                className="w-full text-left text-xs px-3 py-1.5 text-emerald-400 hover:bg-emerald-500/10 border-t border-slate-800"
+                className="w-full text-left text-xs px-3 py-1.5 text-accent hover:bg-accent-subtle border-t border-edge-secondary"
               >
                 Create new key: "{value}"
               </button>

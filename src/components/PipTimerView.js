@@ -14,6 +14,7 @@ const PipTimerView = ({
   onCapture,
   capturedCount,
   appState,
+  themeColors,
 }) => {
   const [minimized, setMinimized] = React.useState(false);
   const [jotOpen, setJotOpen] = React.useState(false);
@@ -70,15 +71,15 @@ const PipTimerView = ({
       cursor: 'pointer',
       fontSize: 'clamp(10px, 2.8vw, 14px)',
       fontWeight: 500,
-      background: active ? 'rgba(16,185,129,0.12)' : 'transparent',
-      color: active ? '#34d399' : '#94a3b8',
+      background: active ? themeColors.accentSubtle : 'transparent',
+      color: active ? themeColors.accent : themeColors.contentTertiary,
       transition: 'all 0.2s',
     }),
     timer: {
       fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
       fontSize: 'clamp(2.5rem, 18vw, 5rem)',
       fontWeight: 700,
-      color: '#f1f5f9',
+      color: themeColors.contentPrimary,
       lineHeight: 1,
       marginBottom: '3vh',
       letterSpacing: '-0.02em',
@@ -99,7 +100,7 @@ const PipTimerView = ({
       alignItems: 'center',
       justifyContent: 'center',
       background: 'transparent',
-      color: '#94a3b8',
+      color: themeColors.contentTertiary,
       transition: 'all 0.2s',
     },
     mainBtn: {
@@ -111,11 +112,11 @@ const PipTimerView = ({
       alignItems: 'center',
       justifyContent: 'center',
       gap: '0.5em',
-      background: '#10b981',
-      color: 'white',
+      background: themeColors.accentBold,
+      color: themeColors.contentInverse,
       fontSize: 'clamp(12px, 3.5vw, 18px)',
       fontWeight: 600,
-      boxShadow: '0 4px 14px rgba(16,185,129,0.25)',
+      boxShadow: `0 4px 14px ${themeColors.accentShadow}`,
       transition: 'all 0.2s',
     },
     jotArea: {
@@ -131,9 +132,9 @@ const PipTimerView = ({
       gap: '6px',
       padding: '6px 14px',
       borderRadius: '9999px',
-      border: '1px solid #334155',
-      background: 'rgba(30,41,59,0.8)',
-      color: '#94a3b8',
+      border: `1px solid ${themeColors.edgePrimary}`,
+      background: themeColors.surfaceSecondary,
+      color: themeColors.contentTertiary,
       cursor: 'pointer',
       fontSize: '12px',
       fontWeight: 500,
@@ -141,8 +142,8 @@ const PipTimerView = ({
     },
     jotBadge: {
       fontSize: '10px',
-      background: 'rgba(16,185,129,0.2)',
-      color: '#34d399',
+      background: themeColors.accentMuted,
+      color: themeColors.accent,
       padding: '1px 6px',
       borderRadius: '9999px',
       fontWeight: 500,
@@ -151,8 +152,8 @@ const PipTimerView = ({
       display: 'flex',
       alignItems: 'center',
       gap: '8px',
-      background: 'rgba(30,41,59,0.9)',
-      border: '1px solid #334155',
+      background: themeColors.surfaceSecondary,
+      border: `1px solid ${themeColors.edgePrimary}`,
       borderRadius: '12px',
       padding: '6px 12px',
     },
@@ -160,7 +161,7 @@ const PipTimerView = ({
       background: 'transparent',
       border: 'none',
       outline: 'none',
-      color: '#e2e8f0',
+      color: themeColors.contentPrimary,
       fontSize: '13px',
       flex: 1,
       minWidth: '160px',
@@ -174,8 +175,8 @@ const PipTimerView = ({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'rgba(16,185,129,0.2)',
-      color: '#34d399',
+      background: themeColors.accentMuted,
+      color: themeColors.accent,
       transition: 'all 0.2s',
     },
   };
@@ -214,10 +215,10 @@ const PipTimerView = ({
   );
 
   const barColors = {
-    focusing: '#10b981',
-    break: '#0ea5e9',
-    paused: '#f59e0b',
-    idle: '#64748b',
+    focusing: themeColors.accentBold,
+    break: themeColors.accentSecondary,
+    paused: themeColors.warning,
+    idle: themeColors.contentMuted,
   };
 
   const handleMinimize = () => {
@@ -241,7 +242,7 @@ const PipTimerView = ({
         style={{
           width: '100%',
           height: '100%',
-          background: '#0f172a',
+          background: themeColors.surfaceElevated,
           cursor: 'pointer',
           position: 'relative',
           overflow: 'hidden',
@@ -281,7 +282,7 @@ const PipTimerView = ({
           alignItems: 'center',
           justifyContent: 'center',
           background: 'transparent',
-          color: '#475569',
+          color: themeColors.contentDisabled,
           transition: 'color 0.2s',
         }}
       >

@@ -34,30 +34,30 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
         onOpenNotes={onOpenNotes}
         activeDragId={activeDragId}
       />
-      
+
       {/* Children Container */}
       {node.isExpanded && hasChildren && (
         <div className="flex items-start pt-0 relative">
           {/* Horizontal Connector Line */}
           {visibleChildren.length > 1 && (
-            <div className="absolute top-0 left-0 right-0 h-px bg-slate-700 translate-y-0"></div>
+            <div className="absolute top-0 left-0 right-0 h-px bg-surface-secondary translate-y-0"></div>
           )}
 
           {visibleChildren.map((child, index) => (
             <div key={child.id} className="flex flex-col items-center relative px-[2vw]">
               {/* 1. Vertical line going UP from child to the horizontal bar */}
-              <div className="w-px h-8 bg-slate-700 mb-0"></div>
+              <div className="w-px h-8 bg-surface-secondary mb-0"></div>
 
               {/* 2. Horizontal Connectors (The "Arms") */}
               {visibleChildren.length > 1 && (
                 <>
                   {/* Right arm (for all except last child) */}
                   {index !== visibleChildren.length - 1 && (
-                    <div className="absolute top-0 right-0 w-1/2 h-px bg-slate-700"></div>
+                    <div className="absolute top-0 right-0 w-1/2 h-px bg-surface-secondary"></div>
                   )}
                   {/* Left arm (for all except first child) */}
                   {index !== 0 && (
-                    <div className="absolute top-0 left-0 w-1/2 h-px bg-slate-700"></div>
+                    <div className="absolute top-0 left-0 w-1/2 h-px bg-surface-secondary"></div>
                   )}
                 </>
               )}

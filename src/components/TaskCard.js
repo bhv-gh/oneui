@@ -131,7 +131,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
   };
 
   const handleUpdateField = (fieldId, key, newValue) => {
-    const updatedFields = (node.fields || []).map(f => 
+    const updatedFields = (node.fields || []).map(f =>
       f.id === fieldId ? { ...f, [key]: newValue } : f
     );
     onUpdate(node.id, { fields: updatedFields });
@@ -181,14 +181,14 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
       {/* The Card Box */}
       <div
         className={`
-          relative w-full bg-slate-900/90 backdrop-blur-md border rounded-2xl p-3 shadow-xl transition-all duration-300
+          relative w-full bg-surface-primary/90 backdrop-blur-md border rounded-2xl p-3 shadow-xl transition-all duration-300
           ${isDropTarget
-            ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]'
+            ? 'border-accent-secondary shadow-[0_0_15px_rgba(34,211,238,0.3)]'
             : isHighlighted
-            ? 'border-cyan-400 shadow-[0_0_25px_rgba(56,189,248,0.4)]'
+            ? 'border-accent-secondary shadow-[0_0_25px_rgba(56,189,248,0.4)]'
             : hasPausedTimer && !isCurrentlyRunningInFocus
-              ? 'border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)] animate-border-pulse'
-              : (isCompleted ? 'border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'border-slate-700 hover:border-slate-500 hover:shadow-2xl hover:shadow-emerald-500/5')}
+              ? 'border-edge-focus shadow-[0_0_15px_rgba(16,185,129,0.15)] animate-border-pulse'
+              : (isCompleted ? 'border-edge-focus shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'border-edge-primary hover:border-content-muted hover:shadow-2xl hover:shadow-accent-bold/5')}
         `}
       >
         <div className="flex items-start gap-3">
@@ -198,14 +198,14 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
             {...listeners}
             {...attributes}
             data-drag-handle
-            className="mt-1 flex-shrink-0 cursor-grab active:cursor-grabbing text-slate-600 hover:text-slate-400 transition-colors"
+            className="mt-1 flex-shrink-0 cursor-grab active:cursor-grabbing text-content-disabled hover:text-content-tertiary transition-colors"
           >
             <GripVertical size={14} />
           </div>
 
           {/* Checkbox with Tooltip Wrapper */}
           <div className="relative flex-shrink-0">
-            <button 
+            <button
               onClick={(e) => {
                 e.stopPropagation();
                 // If trying to complete a parent task
@@ -242,15 +242,15 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
               }}
               className={`
                 mt-1 flex items-center justify-center w-5 h-5 rounded-full border transition-all duration-300
-                ${isCompleted 
-                  ? 'bg-emerald-500 border-emerald-500 text-white' 
-                  : 'border-slate-500 text-transparent hover:border-emerald-400'}
+                ${isCompleted
+                  ? 'bg-accent-bold border-accent-bold text-content-inverse'
+                  : 'border-content-muted text-transparent hover:border-accent'}
               `}
             >
               <Check size={12} strokeWidth={4} />
             </button>
             {incompleteWarning && (
-              <div className="absolute top-1/2 -right-2 transform translate-x-full -translate-y-1/2 w-max bg-slate-800 text-slate-200 text-xs px-3 py-1.5 rounded-lg shadow-lg z-20 animate-in fade-in slide-in-from-left-2 duration-200">
+              <div className="absolute top-1/2 -right-2 transform translate-x-full -translate-y-1/2 w-max bg-surface-secondary text-content-primary text-xs px-3 py-1.5 rounded-lg shadow-lg z-20 animate-in fade-in slide-in-from-left-2 duration-200">
                 {incompleteWarning}
               </div>
             )}
@@ -258,7 +258,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
 
           {/* Indicator for currently running timer */}
           {isCurrentlyRunningInFocus && (
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></div>
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></div>
           )}
 
           {/* Text Content */}
@@ -273,7 +273,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                   onBlur={() => setIsEditing(false)}
                   onKeyDown={handleKeyDown}
                   onPaste={handlePaste}
-                  className="bg-transparent text-slate-200 text-sm w-full outline-none border-b border-emerald-500/50 pb-1"
+                  className="bg-transparent text-content-primary text-sm w-full outline-none border-b border-edge-focus pb-1"
                   placeholder="Task name..."
                   autoFocus
                   onClick={(e) => e.stopPropagation()}
@@ -282,8 +282,8 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                   <div className="flex flex-col gap-0.5 mt-1">
                     {node.links.map((l, i) => (
                       <div key={i} className="flex items-center gap-1">
-                        <ExternalLink size={10} className="text-cyan-500 flex-shrink-0" />
-                        <span className="text-[10px] text-cyan-500/70 truncate flex-1">{l.title !== l.url ? `${l.title} — ${l.url}` : l.url}</span>
+                        <ExternalLink size={10} className="text-accent-secondary-bold flex-shrink-0" />
+                        <span className="text-[10px] text-accent-secondary/70 truncate flex-1">{l.title !== l.url ? `${l.title} — ${l.url}` : l.url}</span>
                         <button
                           onMouseDown={(e) => {
                             e.preventDefault();
@@ -291,7 +291,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                             const updated = node.links.filter((_, j) => j !== i);
                             onUpdate(node.id, { links: updated.length ? updated : null });
                           }}
-                          className="text-slate-600 hover:text-rose-400 transition-colors flex-shrink-0"
+                          className="text-content-disabled hover:text-danger transition-colors flex-shrink-0"
                           title="Remove link"
                         >
                           <X size={10} />
@@ -310,8 +310,8 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 }}
                 className={`
                   cursor-text text-sm font-medium break-words pb-1 min-h-[1.5rem]
-                  ${node.text ? 'text-slate-200' : 'text-slate-500 italic'}
-                  ${isCompleted ? 'line-through text-slate-500' : ''}
+                  ${node.text ? 'text-content-primary' : 'text-content-muted italic'}
+                  ${isCompleted ? 'line-through text-content-muted' : ''}
                 `}
               >
                 {(() => {
@@ -325,7 +325,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="text-cyan-400 hover:text-cyan-300 hover:underline"
+                          className="text-accent-secondary hover:text-accent-secondary hover:underline"
                         >
                           {seg.content}
                           <ExternalLink size={10} className="inline ml-0.5 mb-0.5" />
@@ -340,7 +340,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
               </div>
             )}
           </div>
-          
+
           {/* Fields Toggle */}
           <div className="flex items-center gap-0.5 flex-shrink-0">
             {isCompleted && (
@@ -349,7 +349,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                   e.stopPropagation();
                   onRequestDelete(node.id);
                 }}
-                className="p-1 rounded-md text-slate-600 hover:text-rose-400 hover:bg-rose-400/10 transition-colors"
+                className="p-1 rounded-md text-content-disabled hover:text-danger hover:bg-danger/10 transition-colors"
                 title="Clean up completed task"
               >
                 <Sparkles size={14} />
@@ -362,7 +362,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
               }}
               className={`
                 p-1 rounded-md transition-colors
-                ${showFields ? 'text-emerald-400 bg-emerald-400/10' : 'text-slate-600 hover:text-slate-300 hover:bg-slate-800'}
+                ${showFields ? 'text-accent bg-accent-subtle' : 'text-content-disabled hover:text-content-secondary hover:bg-surface-secondary'}
               `}
               title="Custom Fields"
             >
@@ -373,7 +373,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
 
         {/* Custom Fields Section */}
         {showFields && (
-          <div className="mt-3 pt-3 border-t border-slate-800/60 space-y-2 animate-in slide-in-from-top-2 duration-200">
+          <div className="mt-3 pt-3 border-t border-edge-secondary space-y-2 animate-in slide-in-from-top-2 duration-200">
             <div className="space-y-1.5">
               {(node.fields || []).map((field) => (
                 <div key={field.id} className="flex items-center gap-2 group/field">
@@ -384,18 +384,18 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                     onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
                     placeholder="Label"
                   />
-                  <span className="text-slate-600 text-xs">:</span>
+                  <span className="text-content-disabled text-xs">:</span>
                   <input
                     type="text"
                     value={field.value}
                     onChange={(e) => handleUpdateField(field.id, 'value', e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
                     placeholder="Value"
-                    className="flex-1 bg-slate-950/50 text-xs text-slate-200 border border-slate-800 rounded px-2 py-1 focus:border-emerald-500/50 focus:outline-none transition-colors"
+                    className="flex-1 bg-surface-elevated/50 text-xs text-content-primary border border-edge-secondary rounded px-2 py-1 focus:border-edge-focus focus:outline-none transition-colors"
                   />
                   <button
                     onClick={() => handleDeleteField(field.id)}
-                    className="opacity-0 group-hover/field:opacity-100 p-1 text-slate-500 hover:text-rose-400 transition-opacity"
+                    className="opacity-0 group-hover/field:opacity-100 p-1 text-content-muted hover:text-danger transition-opacity"
                   >
                     <X size={12} />
                   </button>
@@ -404,38 +404,38 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
             </div>
             <button
               onClick={handleAddField}
-              className="w-full py-1 text-xs text-slate-500 hover:text-emerald-400 border border-dashed border-slate-800 hover:border-emerald-500/30 rounded flex items-center justify-center gap-1 transition-colors"
+              className="w-full py-1 text-xs text-content-muted hover:text-accent border border-dashed border-edge-secondary hover:border-edge-focus rounded flex items-center justify-center gap-1 transition-colors"
             >
               <ListPlus size={12} />
               <span>Add Field</span>
             </button>
           </div>
         )}
-        
+
         {/* Collapsed Fields Preview (Only show when collapsed and fields exist) */}
         {!showFields && fieldsCount > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {node.fields.slice(0, 3).map(field => (
-               <span key={field.id} className="text-[10px] px-1.5 py-0.5 bg-slate-800/50 text-slate-400 rounded border border-slate-800 truncate max-w-[100px]">
+               <span key={field.id} className="text-[10px] px-1.5 py-0.5 bg-surface-tertiary text-content-tertiary rounded border border-edge-secondary truncate max-w-[100px]">
                  {field.label || 'Key'}: {field.value || 'Value'}
                </span>
             ))}
-            {fieldsCount > 3 && <span className="text-[10px] text-slate-600">+{fieldsCount - 3}</span>}
+            {fieldsCount > 3 && <span className="text-[10px] text-content-disabled">+{fieldsCount - 3}</span>}
           </div>
         )}
 
         {/* Scheduled Date Display */}
         {node.scheduledDate && (
-          <div className="mt-2 text-xs flex items-center gap-1.5 text-slate-500"><CalendarDays size={12} /><span>{node.scheduledDate}</span></div>
+          <div className="mt-2 text-xs flex items-center gap-1.5 text-content-muted"><CalendarDays size={12} /><span>{node.scheduledDate}</span></div>
         )}
 
         {/* Recurrence Info Display */}
         {node.recurrence && (
-          <div className="mt-1 text-xs flex items-center gap-1.5 text-cyan-500"><Repeat size={12} /><span>Recurring</span></div>
+          <div className="mt-1 text-xs flex items-center gap-1.5 text-accent-secondary-bold"><Repeat size={12} /><span>Recurring</span></div>
         )}
 
         {/* Footer Actions & Info */}
-        <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-800">
+        <div className="flex items-center justify-between mt-3 pt-2 border-t border-edge-secondary">
           {/* Collapse Toggle */}
           {node.children.length > 0 && (
             <div className="flex items-center gap-1">
@@ -444,7 +444,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                   e.stopPropagation();
                   onUpdate(node.id, { isExpanded: !node.isExpanded });
                 }}
-                className="text-xs flex items-center gap-1 text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 px-2 py-1 rounded-md transition-colors"
+                className="text-xs flex items-center gap-1 text-content-tertiary hover:text-content-inverse bg-surface-tertiary hover:bg-surface-secondary px-2 py-1 rounded-md transition-colors"
               >
                 {node.isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                 <span>{node.children.length}</span>
@@ -458,7 +458,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                   className={`text-xs flex items-center gap-1 px-2 py-1 rounded-md transition-colors ${
                     node.hideCompleted
                       ? 'text-amber-400 bg-amber-400/10 hover:bg-amber-400/20'
-                      : 'text-slate-400 bg-slate-800/50 hover:bg-slate-800 hover:text-white'
+                      : 'text-content-tertiary bg-surface-tertiary hover:bg-surface-secondary hover:text-content-inverse'
                   }`}
                   title={node.hideCompleted ? 'Show completed subtasks' : 'Hide completed subtasks'}
                 >
@@ -467,12 +467,12 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
               )}
             </div>
           )}
-          
+
           {/* Progress Bar (if no children, empty space) */}
           {node.children.length > 0 ? (
-             <div className="flex-1 mx-3 h-1 bg-slate-800 rounded-full overflow-hidden">
-               <div 
-                 className="h-full bg-emerald-500 transition-all duration-500" 
+             <div className="flex-1 mx-3 h-1 bg-surface-secondary rounded-full overflow-hidden">
+               <div
+                 className="h-full bg-accent-bold transition-all duration-500"
                  style={{ width: `${progress}%` }}
                />
              </div>
@@ -485,7 +485,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 e.stopPropagation();
                 onAdd(node.id);
               }}
-              className="p-1 text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-md transition-colors"
+              className="p-1 text-content-tertiary hover:text-accent hover:bg-accent-subtle rounded-md transition-colors"
               title="Add Subtask"
             >
               <Plus size={14} />
@@ -495,7 +495,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 e.stopPropagation();
                 onRequestDelete(node.id);
               }}
-              className="p-1 text-slate-400 hover:text-rose-400 hover:bg-rose-400/10 rounded-md transition-colors"
+              className="p-1 text-content-tertiary hover:text-danger hover:bg-danger/10 rounded-md transition-colors"
               title="Delete"
             >
               <Trash2 size={14} />
@@ -503,7 +503,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
             <div className="relative" ref={schedulePickerRef}>
               <button
                 onClick={(e) => { e.stopPropagation(); setIsSchedulePickerOpen(!isSchedulePickerOpen); }}
-                className="p-1 text-slate-400 hover:text-cyan-400 hover:bg-cyan-400/10 rounded-md transition-colors"
+                className="p-1 text-content-tertiary hover:text-accent-secondary hover:bg-accent-secondary/10 rounded-md transition-colors"
                 title="Schedule Task"
               >
                 <CalendarPlus size={14} />
@@ -524,7 +524,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
             <div className="relative" ref={recurrenceEditorRef}>
               <button
                 onClick={(e) => { e.stopPropagation(); setIsRecurrenceEditorOpen(!isRecurrenceEditorOpen); }}
-                className="p-1 text-slate-400 hover:text-cyan-400 hover:bg-cyan-400/10 rounded-md transition-colors"
+                className="p-1 text-content-tertiary hover:text-accent-secondary hover:bg-accent-secondary/10 rounded-md transition-colors"
                 title="Set Recurrence"
               >
                 <Repeat size={14} />
@@ -544,7 +544,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 e.stopPropagation();
                 onStartFocus(node.id);
               }}
-              className="p-1 text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-md transition-colors"
+              className="p-1 text-content-tertiary hover:text-accent hover:bg-accent-subtle rounded-md transition-colors"
               title="Focus on this task"
             >
               <Play size={14} />
@@ -554,7 +554,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 e.stopPropagation();
                 if (onOpenNotes) onOpenNotes(node.id);
               }}
-              className="relative p-1 text-slate-400 hover:text-amber-400 hover:bg-amber-400/10 rounded-md transition-colors"
+              className="relative p-1 text-content-tertiary hover:text-amber-400 hover:bg-amber-400/10 rounded-md transition-colors"
               title="Notes"
             >
               <StickyNote size={14} />
@@ -565,10 +565,10 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
           </div>
         </div>
       </div>
-      
+
       {/* Vertical Connector from Card to Children Line */}
       {node.isExpanded && node.children.length > 0 && (
-        <div className="w-px h-8 bg-slate-700"></div>
+        <div className="w-px h-8 bg-surface-secondary"></div>
       )}
     </div>
   );

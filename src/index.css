@@ -1,3 +1,164 @@
+/* ================================================================
+   THEME SYSTEM — CSS Custom Properties
+   ================================================================
+   Work theme (default): Dark slate/emerald/cyan
+   Personal theme: Light blue-toned, clean, airy
+   ================================================================ */
+
+:root {
+  /* --- Page Backgrounds (state-dependent) --- */
+  --color-page-base: #0f172a;          /* slate-900 */
+  --color-page-focus: #022c22;         /* emerald-950 */
+  --color-page-break: #082f49;         /* sky-950 */
+  --color-page-paused: #020617;        /* slate-950 */
+
+  /* --- Surfaces --- */
+  --color-surface-primary: #0f172a;    /* slate-900 */
+  --color-surface-secondary: #1e293b;  /* slate-800 */
+  --color-surface-tertiary: #1e293b99; /* slate-800/60 */
+  --color-surface-elevated: #020617;   /* slate-950 */
+  --color-surface-inset: #020617cc;    /* slate-950/80 */
+  --color-surface-overlay: #0f172ae6;  /* slate-900/90 */
+
+  /* --- Content (text) --- */
+  --color-content-primary: #e2e8f0;    /* slate-200 */
+  --color-content-secondary: #cbd5e1;  /* slate-300 */
+  --color-content-tertiary: #94a3b8;   /* slate-400 */
+  --color-content-muted: #64748b;      /* slate-500 */
+  --color-content-disabled: #475569;   /* slate-600 */
+  --color-content-inverse: #ffffff;
+
+  /* --- Borders --- */
+  --color-edge-primary: #334155;       /* slate-700 */
+  --color-edge-secondary: #1e293b;     /* slate-800 */
+  --color-edge-focus: #10b981;         /* emerald-500 */
+
+  /* --- Accent (primary = emerald) --- */
+  --color-accent: #34d399;            /* emerald-400 */
+  --color-accent-bold: #10b981;       /* emerald-500 */
+  --color-accent-bolder: #059669;     /* emerald-600 */
+  --color-accent-boldest: #047857;    /* emerald-700 */
+  --color-accent-subtle: rgba(16,185,129,0.1);
+  --color-accent-subtler: rgba(16,185,129,0.05);
+
+  /* --- Accent Secondary (cyan) --- */
+  --color-accent-secondary: #22d3ee;  /* cyan-400 */
+  --color-accent-secondary-bold: #06b6d4; /* cyan-500 */
+  --color-accent-secondary-subtle: rgba(34,211,238,0.1);
+
+  /* --- Brand Gradient --- */
+  --color-brand-from: #34d399;        /* emerald-400 */
+  --color-brand-to: #22d3ee;          /* cyan-400 */
+
+  /* --- Status Colors --- */
+  --color-success: #10b981;           /* emerald-500 */
+  --color-success-subtle: rgba(16,185,129,0.1);
+  --color-danger: #f43f5e;            /* rose-500 */
+  --color-danger-subtle: rgba(244,63,94,0.1);
+  --color-warning: #f59e0b;           /* amber-500 */
+  --color-warning-subtle: rgba(245,158,11,0.1);
+  --color-info: #0ea5e9;              /* sky-500 */
+  --color-info-subtle: rgba(14,165,233,0.1);
+
+  /* --- Timer Border Pulse --- */
+  --color-timer-border-pulse-from: rgba(16,185,129,0.4);
+  --color-timer-border-pulse-to: rgba(16,185,129,1);
+
+  /* --- Scrollbar --- */
+  --color-scrollbar-thumb: #a0a0a0;
+  --color-scrollbar-thumb-hover: #808080;
+
+  /* --- Shimmer --- */
+  --color-shimmer-base: rgba(30,41,59,0.4);
+  --color-shimmer-highlight: rgba(51,65,85,0.6);
+
+  /* --- Canvas Dots --- */
+  --color-canvas-dot: #1e293b;
+
+  /* --- Quill Editor --- */
+  --color-quill-border: #334155;
+  --color-quill-text: #cbd5e1;
+  --color-quill-icon: #94a3b8;
+  --color-quill-placeholder: #64748b;
+}
+
+[data-theme="personal"] {
+  /* --- Page Backgrounds (state-dependent) --- */
+  --color-page-base: #f8fafc;          /* slate-50 */
+  --color-page-focus: #eff6ff;         /* blue-50 */
+  --color-page-break: #f0f9ff;         /* sky-50 */
+  --color-page-paused: #f1f5f9;        /* slate-100 */
+
+  /* --- Surfaces --- */
+  --color-surface-primary: #ffffff;
+  --color-surface-secondary: #f1f5f9;  /* slate-100 */
+  --color-surface-tertiary: #f8fafc;   /* slate-50 */
+  --color-surface-elevated: #ffffff;
+  --color-surface-inset: #f1f5f9;      /* slate-100 */
+  --color-surface-overlay: rgba(255,255,255,0.95);
+
+  /* --- Content (text) --- */
+  --color-content-primary: #0f172a;    /* slate-900 */
+  --color-content-secondary: #334155;  /* slate-700 */
+  --color-content-tertiary: #64748b;   /* slate-500 */
+  --color-content-muted: #94a3b8;      /* slate-400 */
+  --color-content-disabled: #cbd5e1;   /* slate-300 */
+  --color-content-inverse: #ffffff;
+
+  /* --- Borders --- */
+  --color-edge-primary: #e2e8f0;       /* slate-200 */
+  --color-edge-secondary: #f1f5f9;     /* slate-100 */
+  --color-edge-focus: #3b82f6;         /* blue-500 */
+
+  /* --- Accent (primary = blue) --- */
+  --color-accent: #3b82f6;            /* blue-500 */
+  --color-accent-bold: #2563eb;       /* blue-600 */
+  --color-accent-bolder: #1d4ed8;     /* blue-700 */
+  --color-accent-boldest: #1e40af;    /* blue-800 */
+  --color-accent-subtle: rgba(59,130,246,0.1);
+  --color-accent-subtler: rgba(59,130,246,0.05);
+
+  /* --- Accent Secondary (sky/cyan) --- */
+  --color-accent-secondary: #0ea5e9;  /* sky-500 */
+  --color-accent-secondary-bold: #0284c7; /* sky-600 */
+  --color-accent-secondary-subtle: rgba(14,165,233,0.1);
+
+  /* --- Brand Gradient --- */
+  --color-brand-from: #3b82f6;        /* blue-500 */
+  --color-brand-to: #0ea5e9;          /* sky-500 */
+
+  /* --- Status Colors --- */
+  --color-success: #22c55e;           /* green-500 */
+  --color-success-subtle: rgba(34,197,94,0.1);
+  --color-danger: #ef4444;            /* red-500 */
+  --color-danger-subtle: rgba(239,68,68,0.1);
+  --color-warning: #f59e0b;           /* amber-500 */
+  --color-warning-subtle: rgba(245,158,11,0.1);
+  --color-info: #0ea5e9;              /* sky-500 */
+  --color-info-subtle: rgba(14,165,233,0.1);
+
+  /* --- Timer Border Pulse --- */
+  --color-timer-border-pulse-from: rgba(59,130,246,0.3);
+  --color-timer-border-pulse-to: rgba(59,130,246,0.8);
+
+  /* --- Scrollbar --- */
+  --color-scrollbar-thumb: #cbd5e1;
+  --color-scrollbar-thumb-hover: #94a3b8;
+
+  /* --- Shimmer --- */
+  --color-shimmer-base: rgba(226,232,240,0.5);
+  --color-shimmer-highlight: rgba(241,245,249,0.8);
+
+  /* --- Canvas Dots --- */
+  --color-canvas-dot: #e2e8f0;
+
+  /* --- Quill Editor --- */
+  --color-quill-border: #e2e8f0;
+  --color-quill-text: #334155;
+  --color-quill-icon: #64748b;
+  --color-quill-placeholder: #94a3b8;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',

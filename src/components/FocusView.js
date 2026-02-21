@@ -32,10 +32,13 @@ const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onC
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    const style = getComputedStyle(document.documentElement);
+    const dotColor = style.getPropertyValue('--color-canvas-dot').trim();
+    const textColor = style.getPropertyValue('--color-content-primary').trim();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#1E293B';
+    ctx.fillStyle = dotColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = 'white';
+    ctx.fillStyle = textColor;
     ctx.font = 'bold 60px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -65,7 +68,13 @@ const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onC
 
   useEffect(() => {
     if (pipWindowRef.current) {
-      const backgrounds = { focusing: '#020617', break: '#082f49', paused: '#022c22', idle: '#022c22' };
+      const style = getComputedStyle(document.documentElement);
+      const backgrounds = {
+        focusing: style.getPropertyValue('--color-page-base').trim(),
+        break: style.getPropertyValue('--color-page-break').trim(),
+        paused: style.getPropertyValue('--color-page-focus').trim(),
+        idle: style.getPropertyValue('--color-page-focus').trim(),
+      };
       pipWindowRef.current.document.body.style.background = backgrounds[appState];
       pipWindowRef.current.document.body.style.transition = 'background 1s';
     }
@@ -173,9 +182,20 @@ const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onC
   const handleExitClick = () => { closePip(); onExit(); };
 
   const backgroundClasses = {
-    focusing: 'bg-slate-950', break: 'bg-sky-950',
-    paused: 'bg-emerald-950', idle: 'bg-emerald-950',
+    focusing: 'bg-page-base', break: 'bg-page-break',
+    paused: 'bg-page-focus', idle: 'bg-page-focus',
   };
+
+  // Resolve CSS variable values for PiP window (which lacks access to the main document's CSS vars)
+  const resolvedPipColors = (() => {
+    const style = getComputedStyle(document.documentElement);
+    return {
+      surfacePrimary: style.getPropertyValue('--color-surface-primary').trim(),
+      contentPrimary: style.getPropertyValue('--color-content-primary').trim(),
+      accentBold: style.getPropertyValue('--color-accent-bold').trim(),
+      edgePrimary: style.getPropertyValue('--color-edge-primary').trim(),
+    };
+  })();
 
   return (
     <div className={`fixed inset-0 z-[200] flex flex-col items-center justify-center p-8 animate-in fade-in duration-300 transition-colors duration-1000 ${backgroundClasses[appState]}`}>
@@ -194,24 +214,25 @@ const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onC
           onCapture={onCaptureTask}
           capturedCount={capturedTasks.length}
           appState={appState}
+          pipColors={resolvedPipColors}
         />,
         pipPortalRoot
       )}
 
-      <button onClick={handleExitClick} className="absolute top-6 right-6 text-slate-600 hover:text-slate-300 transition-colors">
+      <button onClick={handleExitClick} className="absolute top-6 right-6 text-content-disabled hover:text-content-secondary transition-colors">
         <XCircle size={32} />
       </button>
 
       <div className="text-center">
-        <p className="text-slate-500 text-lg mb-2">Focusing on:</p>
-        <h1 className="text-4xl font-bold text-slate-100 mb-12 truncate max-w-2xl">{task.text || "Untitled Task"}</h1>
+        <p className="text-content-muted text-lg mb-2">Focusing on:</p>
+        <h1 className="text-4xl font-bold text-content-primary mb-12 truncate max-w-2xl">{task.text || "Untitled Task"}</h1>
 
         {isPipActive ? (
           <div className="flex flex-col items-center gap-4 animate-in fade-in duration-300">
-            <p className="text-slate-400">Timer is in Picture-in-Picture mode.</p>
+            <p className="text-content-tertiary">Timer is in Picture-in-Picture mode.</p>
             <button
               onClick={closePip}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-secondary text-content-secondary hover:bg-surface-secondary transition-colors"
             >
               <PictureInPicture size={18} />
               <span>Bring Timer Back</span>

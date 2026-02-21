@@ -9,7 +9,7 @@ const RecurrenceEditor = ({ recurrence, onSave, onClose }) => {
   const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
   const handleDayToggle = (dayIndex) => {
-    setDaysOfWeek(prev => 
+    setDaysOfWeek(prev =>
       prev.includes(dayIndex) ? prev.filter(d => d !== dayIndex) : [...prev, dayIndex]
     );
   };
@@ -29,12 +29,12 @@ const RecurrenceEditor = ({ recurrence, onSave, onClose }) => {
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-64 p-4 space-y-4">
+    <div className="bg-surface-primary border border-edge-primary rounded-xl shadow-2xl w-64 p-4 space-y-4">
       <div>
-        <label className="text-xs text-slate-400">Frequency</label>
-        <div className="flex bg-slate-800 rounded-md p-1 mt-1">
+        <label className="text-xs text-content-tertiary">Frequency</label>
+        <div className="flex bg-surface-secondary rounded-md p-1 mt-1">
           {['daily', 'weekly', 'monthly'].map(f => (
-            <button key={f} onClick={() => setFreq(f)} className={`flex-1 text-xs capitalize py-1 rounded ${freq === f ? 'bg-slate-600 text-white' : 'text-slate-300'}`}>
+            <button key={f} onClick={() => setFreq(f)} className={`flex-1 text-xs capitalize py-1 rounded ${freq === f ? 'bg-surface-secondary text-content-inverse' : 'text-content-secondary'}`}>
               {f}
             </button>
           ))}
@@ -42,28 +42,28 @@ const RecurrenceEditor = ({ recurrence, onSave, onClose }) => {
       </div>
 
       <div>
-        <label className="text-xs text-slate-400">Repeat Every</label>
+        <label className="text-xs text-content-tertiary">Repeat Every</label>
         <div className="flex items-center gap-2 mt-1">
-          <input 
+          <input
             type="number"
             value={interval}
             onChange={(e) => setInterval(parseInt(e.target.value, 10))}
-            className="w-16 bg-slate-800 rounded-md p-2 text-center text-sm"
+            className="w-16 bg-surface-secondary rounded-md p-2 text-center text-sm"
             min="1"
           />
-          <span className="text-sm text-slate-300">{freq === 'daily' ? 'day(s)' : freq === 'weekly' ? 'week(s)' : 'month(s)'}</span>
+          <span className="text-sm text-content-secondary">{freq === 'daily' ? 'day(s)' : freq === 'weekly' ? 'week(s)' : 'month(s)'}</span>
         </div>
       </div>
 
       {freq === 'weekly' && (
         <div>
-          <label className="text-xs text-slate-400">Repeat On</label>
+          <label className="text-xs text-content-tertiary">Repeat On</label>
           <div className="flex justify-between gap-1 mt-2">
             {weekDays.map((day, index) => (
-              <button 
+              <button
                 key={index}
                 onClick={() => handleDayToggle(index)}
-                className={`w-7 h-7 text-xs rounded-full transition-colors ${daysOfWeek.includes(index) ? 'bg-emerald-500 text-white' : 'bg-slate-800 hover:bg-slate-700'}`}
+                className={`w-7 h-7 text-xs rounded-full transition-colors ${daysOfWeek.includes(index) ? 'bg-accent-bold text-content-inverse' : 'bg-surface-secondary hover:bg-surface-secondary'}`}
               >
                 {day}
               </button>
@@ -72,12 +72,12 @@ const RecurrenceEditor = ({ recurrence, onSave, onClose }) => {
         </div>
       )}
 
-      <div className="flex flex-col gap-2 pt-3 border-t border-slate-800">
-        <button onClick={handleSave} className="w-full bg-emerald-600 text-white rounded-md py-2 text-sm font-semibold hover:bg-emerald-700">
+      <div className="flex flex-col gap-2 pt-3 border-t border-edge-secondary">
+        <button onClick={handleSave} className="w-full bg-accent-bolder text-content-inverse rounded-md py-2 text-sm font-semibold hover:bg-accent-boldest">
           Save
         </button>
         {recurrence && (
-          <button onClick={handleRemove} className="w-full text-slate-400 text-xs hover:text-rose-400">
+          <button onClick={handleRemove} className="w-full text-content-tertiary text-xs hover:text-danger">
             Remove Recurrence
           </button>
         )}

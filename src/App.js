@@ -6,9 +6,11 @@ import 'react-day-picker/dist/style.css';
 import { useTreeData } from './hooks/useTreeData';
 import { useLogs } from './hooks/useLogs';
 import { useMemoryData } from './hooks/useMemoryData';
+import { useTheme } from './hooks/useTheme';
 import TreeDataContext from './contexts/TreeDataContext';
 import LogsContext from './contexts/LogsContext';
 import MemoryContext from './contexts/MemoryContext';
+import ThemeContext from './contexts/ThemeContext';
 import { findNodeRecursive } from './utils/treeUtils';
 import { generateId } from './utils/idGenerator';
 import { playNotificationSound, getNotificationSound } from './utils/notificationSounds';
@@ -152,6 +154,7 @@ function AppContent({ onLogout }) {
   const treeDataHook = useTreeData();
   const logsHook = useLogs();
   const memoryDataHook = useMemoryData();
+  const themeValue = useTheme();
 
   const { treeData, handleUpdate, handleUpdateField, handleAddField } = treeDataHook;
 
@@ -534,55 +537,56 @@ function AppContent({ onLogout }) {
   const quillStyle = `
     .rich-text-editor .ql-toolbar {
       border-radius: 8px 8px 0 0;
-      border-color: #334155;
+      border-color: var(--color-quill-border);
     }
     .rich-text-editor .ql-container {
       border-radius: 0 0 8px 8px;
-      border-color: #334155;
-      color: #cbd5e1;
+      border-color: var(--color-quill-border);
+      color: var(--color-quill-text);
       min-height: 150px;
     }
     .rich-text-editor .ql-editor {
       font-size: 14px;
     }
     .rich-text-editor .ql-snow .ql-stroke {
-      stroke: #94a3b8;
+      stroke: var(--color-quill-icon);
     }
     .rich-text-editor .ql-snow .ql-picker-label {
-      color: #94a3b8;
+      color: var(--color-quill-icon);
     }
     .rich-text-editor .ql-editor.ql-blank::before {
-      color: #64748b; /* slate-500 */
+      color: var(--color-quill-placeholder);
       font-style: italic;
-      left: 1rem; /* Corresponds to ql-editor's padding */
+      left: 1rem;
       pointer-events: none;
     }
   `;
 
   return (
+    <ThemeContext.Provider value={themeValue}>
     <TreeDataContext.Provider value={treeDataHook}>
       <LogsContext.Provider value={logsHook}>
         <MemoryContext.Provider value={memoryDataHook}>
           <style>{scrollbarHideStyle}</style>
           <style>{quillStyle}</style>
           {treeDataHook.isLoading ? (
-            <div className="min-h-screen bg-slate-950 flex flex-col">
-              <div className="h-14 border-b border-slate-800 flex items-center px-6 gap-4">
-                <div className="shimmer h-5 w-24 rounded-md bg-slate-800" />
+            <div className="min-h-screen bg-page-base flex flex-col">
+              <div className="h-14 border-b border-edge-secondary flex items-center px-6 gap-4">
+                <div className="shimmer h-5 w-24 rounded-md" />
                 <div className="flex-1" />
-                <div className="shimmer h-5 w-16 rounded-md bg-slate-800" />
-                <div className="shimmer h-5 w-16 rounded-md bg-slate-800" />
-                <div className="shimmer h-5 w-16 rounded-md bg-slate-800" />
+                <div className="shimmer h-5 w-16 rounded-md" />
+                <div className="shimmer h-5 w-16 rounded-md" />
+                <div className="shimmer h-5 w-16 rounded-md" />
               </div>
               <div className="flex-1 p-8 space-y-4">
-                <div className="shimmer h-10 w-64 rounded-lg bg-slate-800" />
+                <div className="shimmer h-10 w-64 rounded-lg" />
                 <div className="space-y-3 mt-6">
-                  <div className="shimmer h-14 w-full rounded-xl bg-slate-800/60" />
-                  <div className="shimmer h-14 w-full rounded-xl bg-slate-800/60" style={{ animationDelay: '0.15s' }} />
-                  <div className="shimmer h-14 w-5/6 rounded-xl bg-slate-800/60 ml-8" style={{ animationDelay: '0.3s' }} />
-                  <div className="shimmer h-14 w-5/6 rounded-xl bg-slate-800/60 ml-8" style={{ animationDelay: '0.45s' }} />
-                  <div className="shimmer h-14 w-full rounded-xl bg-slate-800/60" style={{ animationDelay: '0.6s' }} />
-                  <div className="shimmer h-14 w-4/6 rounded-xl bg-slate-800/60 ml-8" style={{ animationDelay: '0.75s' }} />
+                  <div className="shimmer h-14 w-full rounded-xl" />
+                  <div className="shimmer h-14 w-full rounded-xl" style={{ animationDelay: '0.15s' }} />
+                  <div className="shimmer h-14 w-5/6 rounded-xl ml-8" style={{ animationDelay: '0.3s' }} />
+                  <div className="shimmer h-14 w-5/6 rounded-xl ml-8" style={{ animationDelay: '0.45s' }} />
+                  <div className="shimmer h-14 w-full rounded-xl" style={{ animationDelay: '0.6s' }} />
+                  <div className="shimmer h-14 w-4/6 rounded-xl ml-8" style={{ animationDelay: '0.75s' }} />
                 </div>
               </div>
             </div>
@@ -624,5 +628,6 @@ function AppContent({ onLogout }) {
         </MemoryContext.Provider>
       </LogsContext.Provider>
     </TreeDataContext.Provider>
+    </ThemeContext.Provider>
   );
 }
