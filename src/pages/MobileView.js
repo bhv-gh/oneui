@@ -65,6 +65,15 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
   const [activeDragId, setActiveDragId] = useState(null);
   const datePickerRef = useRef(null);
   const lastTodayRef = useRef(getTodayDateString());
+  const keyboardProxyRef = useRef(null);
+
+  // Focus a hidden input synchronously to open the iOS keyboard.
+  // The real input will steal focus when it mounts.
+  const prepareKeyboard = useCallback(() => {
+    if (keyboardProxyRef.current) {
+      keyboardProxyRef.current.focus();
+    }
+  }, []);
 
   // DnD sensors and handlers
   const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } });
@@ -266,6 +275,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
                 onOpenNotes={handleOpenNotes}
                 activeDragId={activeDragId}
                 isPastDate={isPastDate}
+                onPrepareKeyboard={prepareKeyboard}
               />
             ))}
             <MobileRootDropZone activeDragId={activeDragId} />
@@ -361,6 +371,14 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
         onAddRoot={handleAddRoot}
         onUpdate={handleUpdate}
         selectedDate={selectedDate}
+      />
+
+      {/* Hidden input to trigger iOS keyboard during swipe-to-add */}
+      <input
+        ref={keyboardProxyRef}
+        style={{ position: 'fixed', top: 0, left: 0, opacity: 0, width: 1, height: 1, border: 'none', outline: 'none', padding: 0, fontSize: 16, pointerEvents: 'none' }}
+        tabIndex={-1}
+        aria-hidden="true"
       />
     </div>
   );

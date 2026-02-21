@@ -17,7 +17,7 @@ import CustomDatePicker from './CustomDatePicker';
 import RecurrenceEditor from './RecurrenceEditor';
 import { getLinkedSegments } from '../utils/linkUtils';
 
-const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId, isPastDate }) => {
+const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId, isPastDate, onPrepareKeyboard }) => {
   const isCompleted = task.recurrence
     ? task.completedOccurrences?.includes(selectedDate)
     : task.isCompleted;
@@ -64,12 +64,13 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
 
   const handleTouchEnd = useCallback(() => {
     if (swipeOffset >= 80) {
+      if (onPrepareKeyboard) onPrepareKeyboard();
       onAdd(task.id);
     }
     setSwipeOffset(0);
     touchStartRef.current = null;
     swipeActiveRef.current = false;
-  }, [swipeOffset, onAdd, task.id]);
+  }, [swipeOffset, onAdd, task.id, onPrepareKeyboard]);
 
   // DnD hooks
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: task.id });
