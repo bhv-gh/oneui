@@ -234,7 +234,7 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
                   )
                 );
               }
-              return task.text || "Untitled Task";
+              return task.text || <span className="text-content-disabled italic font-normal">Untitled Task</span>;
             })()}
           </p>
         )}

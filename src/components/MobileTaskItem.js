@@ -224,7 +224,7 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
                     )
                   );
                 }
-                return task.text || 'Untitled Task';
+                return task.text || <span className="text-content-disabled italic">Untitled Task</span>;
               })()}
             </p>
           )}
