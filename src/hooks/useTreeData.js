@@ -63,12 +63,13 @@ export function useTreeData() {
     });
   };
 
-  const addNodeRecursive = (nodes, parentId, selectedDate) => {
-    let newNodeId = null;
+  const addNodeRecursive = (nodes, parentId, selectedDate, newNodeId) => {
+    let found = false;
     const newNodes = nodes.map(node => {
       if (node.id === parentId) {
+        found = true;
         const newNode = {
-          id: generateId(),
+          id: newNodeId,
           text: '',
           isCompleted: false,
           isExpanded: true,
@@ -76,22 +77,21 @@ export function useTreeData() {
           children: [],
           scheduledDate: node.scheduledDate || null
         };
-        newNodeId = newNode.id;
         if (selectedDate > getTodayDateString() && !newNode.scheduledDate) {
           newNode.scheduledDate = selectedDate;
         }
         return { ...node, isExpanded: true, children: [...node.children, newNode] };
       }
       if (node.children.length > 0) {
-        const result = addNodeRecursive(node.children, parentId, selectedDate);
-        if (result.newNodeId) {
-          newNodeId = result.newNodeId;
+        const result = addNodeRecursive(node.children, parentId, selectedDate, newNodeId);
+        if (result.found) {
+          found = true;
         }
         return { ...node, children: result.nodes };
       }
       return node;
     });
-    return { nodes: newNodes, newNodeId };
+    return { nodes: newNodes, found };
   };
 
   const deleteNodeRecursive = (nodes, id) => {
@@ -142,10 +142,9 @@ export function useTreeData() {
   };
 
   const handleAddSubtask = (parentId, selectedDate) => {
-    let newNodeId;
+    const newNodeId = generateId();
     setTreeData(prev => {
-      const result = addNodeRecursive(prev, parentId, selectedDate);
-      newNodeId = result.newNodeId;
+      const result = addNodeRecursive(prev, parentId, selectedDate, newNodeId);
       const treeWithNewNode = result.nodes;
       return updateNodeRecursive(treeWithNewNode, parentId, { isCompleted: false, completionDate: null });
     });
