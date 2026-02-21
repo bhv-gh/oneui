@@ -17,7 +17,7 @@ import CustomDatePicker from './CustomDatePicker';
 import RecurrenceEditor from './RecurrenceEditor';
 import { getLinkedSegments } from '../utils/linkUtils';
 
-const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId, isPastDate, onPrepareKeyboard }) => {
+const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, onDeleteEmpty, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId, isPastDate, onPrepareKeyboard }) => {
   const isCompleted = task.recurrence
     ? task.completedOccurrences?.includes(selectedDate)
     : task.isCompleted;
@@ -34,6 +34,7 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
   const [swipeOffset, setSwipeOffset] = useState(0);
   const touchStartRef = useRef(null);
   const swipeActiveRef = useRef(false);
+  const isNewlyCreatedRef = useRef(false);
 
   const handleTouchStart = useCallback((e) => {
     if (isPastDate) return;
@@ -91,6 +92,7 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
   useEffect(() => {
     if (newlyAddedTaskId === task.id) {
       setIsEditing(true);
+      isNewlyCreatedRef.current = true;
       if (onFocusHandled) onFocusHandled();
     }
   }, [newlyAddedTaskId, task.id, onFocusHandled]);
@@ -111,6 +113,14 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
       document.removeEventListener('touchstart', handleClickOutside);
     };
   }, []);
+
+  const handleBlur = useCallback(() => {
+    setIsEditing(false);
+    if (isNewlyCreatedRef.current && !task.text.trim()) {
+      onDeleteEmpty(task.id);
+    }
+    isNewlyCreatedRef.current = false;
+  }, [task.text, task.id, onDeleteEmpty]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') setIsEditing(false);
@@ -184,7 +194,7 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
               type="text"
               value={task.text}
               onChange={(e) => onUpdate(task.id, { text: e.target.value })}
-              onBlur={() => setIsEditing(false)}
+              onBlur={handleBlur}
               onKeyDown={handleKeyDown}
               className="bg-transparent text-content-primary text-base w-full outline-none border-b border-edge-focus py-1"
             />

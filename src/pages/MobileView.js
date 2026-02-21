@@ -269,6 +269,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
                 onStartFocus={handleStartFocus}
                 onAdd={(parentId) => handleAddTaskAndFocus(() => handleAddSubtask(parentId, selectedDate))}
                 onRequestDelete={setDeleteTargetId}
+                onDeleteEmpty={handleDelete}
                 selectedDate={selectedDate}
                 newlyAddedTaskId={newlyAddedTaskId}
                 onFocusHandled={() => setNewlyAddedTaskId(null)}
