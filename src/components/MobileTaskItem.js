@@ -15,6 +15,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import CustomDatePicker from './CustomDatePicker';
+import HighlightedInput from './HighlightedInput';
 import RecurrenceEditor from './RecurrenceEditor';
 import { getLinkedSegments } from '../utils/linkUtils';
 import { getTodayDateString, getDeadlineStatus } from '../utils/dateUtils';
@@ -202,9 +203,8 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
         {/* Task text */}
         <div className="flex-1 min-w-0">
           {isEditing ? (
-            <input
+            <HighlightedInput
               ref={inputRef}
-              type="text"
               value={task.text}
               onChange={(e) => onUpdate(task.id, { text: e.target.value })}
               onBlur={handleBlur}

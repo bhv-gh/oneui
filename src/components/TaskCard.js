@@ -25,6 +25,7 @@ import {
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import CustomDatalistInput from './CustomDatalistInput';
 import CustomDatePicker from './CustomDatePicker';
+import HighlightedInput from './HighlightedInput';
 import RecurrenceEditor from './RecurrenceEditor';
 import { getTimerDurations } from '../utils/timerSettings';
 import { generateId } from '../utils/idGenerator';
@@ -288,9 +289,8 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
           <div className="flex-1 min-w-0">
             {isEditing ? (
               <>
-                <input
+                <HighlightedInput
                   ref={inputRef}
-                  type="text"
                   value={node.text}
                   onChange={(e) => onUpdate(node.id, { text: e.target.value })}
                   onBlur={handleFinishEditing}

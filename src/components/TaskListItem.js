@@ -19,6 +19,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import CustomDatePicker from './CustomDatePicker';
+import HighlightedInput from './HighlightedInput';
 import RecurrenceEditor from './RecurrenceEditor';
 import { getTodayDateString, getDeadlineStatus } from '../utils/dateUtils';
 import { isUrl, fetchPageTitle, getLinkedSegments } from '../utils/linkUtils';
@@ -205,9 +206,8 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
         )}
         {isEditing ? (
           <div>
-            <input
+            <HighlightedInput
               ref={inputRef}
-              type="text"
               value={task.text}
               onChange={(e) => onUpdate(task.id, { text: e.target.value })}
               onBlur={handleFinishEditing}

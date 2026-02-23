@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { Hash, AtSign, Bookmark, X, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Hash, AtSign, Bookmark, X, Filter, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react';
 import { generateId } from '../utils/idGenerator';
 
 // ============================================================
@@ -465,9 +465,46 @@ const FilterSidebar = ({ treeData, activeFilter, onFilterChange, savedFilters, o
   const [newFilterName, setNewFilterName] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [filterText, setFilterText] = useState(() => serializeExpression(activeFilter));
+  const [dragPos, setDragPos] = useState(null); // { x, y } when dragged
+  const dragRef = useRef(null);
+  const dragStartRef = useRef(null);
 
   // Track whether the last filter change came from typing (internal) vs external (saved filter applied)
   const isInternalChangeRef = useRef(false);
+
+  // Drag-to-reposition handlers
+  const handleDragStart = useCallback((e) => {
+    if (e.target.closest('input, button, [data-no-drag]')) return;
+    e.preventDefault();
+    const el = dragRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      startX: rect.left,
+      startY: rect.top,
+    };
+
+    const handleDragMove = (moveEvt) => {
+      if (!dragStartRef.current) return;
+      const dx = moveEvt.clientX - dragStartRef.current.mouseX;
+      const dy = moveEvt.clientY - dragStartRef.current.mouseY;
+      setDragPos({
+        x: dragStartRef.current.startX + dx,
+        y: dragStartRef.current.startY + dy,
+      });
+    };
+
+    const handleDragEnd = () => {
+      dragStartRef.current = null;
+      document.removeEventListener('mousemove', handleDragMove);
+      document.removeEventListener('mouseup', handleDragEnd);
+    };
+
+    document.addEventListener('mousemove', handleDragMove);
+    document.addEventListener('mouseup', handleDragEnd);
+  }, []);
 
   // Only sync filterText from activeFilter when it changed externally (e.g. saved filter click)
   useEffect(() => {
@@ -582,7 +619,10 @@ const FilterSidebar = ({ treeData, activeFilter, onFilterChange, savedFilters, o
   // Collapsed state
   if (isCollapsed) {
     return (
-      <div className="fixed left-3 top-[6.5rem] z-40 animate-in fade-in duration-200">
+      <div
+        className="fixed z-40 animate-in fade-in duration-200"
+        style={dragPos ? { left: dragPos.x, top: dragPos.y } : { left: 12, top: '6.5rem' }}
+      >
         <button
           onClick={() => setIsCollapsed(false)}
           className={`p-2 rounded-xl border shadow-lg backdrop-blur-md transition-all ${
@@ -605,12 +645,20 @@ const FilterSidebar = ({ treeData, activeFilter, onFilterChange, savedFilters, o
   }
 
   return (
-    <div className="fixed left-3 top-[6.5rem] bottom-4 z-40 flex flex-col animate-in slide-in-from-left-2 duration-300 pointer-events-none">
+    <div
+      ref={dragRef}
+      className="fixed z-40 flex flex-col animate-in slide-in-from-left-2 duration-300 pointer-events-none"
+      style={dragPos ? { left: dragPos.x, top: dragPos.y, bottom: 'auto' } : { left: 12, top: '6.5rem', bottom: 16 }}
+    >
       <div className="bg-surface-primary/90 backdrop-blur-md border border-edge-secondary rounded-xl shadow-lg overflow-hidden pointer-events-auto w-64">
         <div className="p-3 max-h-[calc(100vh-8rem)] overflow-y-auto no-scrollbar">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-2">
+          {/* Header — draggable */}
+          <div
+            className="flex items-center justify-between mb-2 cursor-grab active:cursor-grabbing select-none"
+            onMouseDown={handleDragStart}
+          >
             <div className="flex items-center gap-1.5">
+              <GripVertical size={10} className="text-content-disabled" />
               <Filter size={12} className="text-content-tertiary" />
               <span className="text-[10px] font-semibold text-content-secondary uppercase tracking-widest">Filters</span>
             </div>
