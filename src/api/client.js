@@ -162,6 +162,8 @@ export async function getQAs() {
     id: row.id,
     question: row.question,
     answer: row.answer,
+    taskId: row.task_id || null,
+    taskLabel: row.task_label || null,
     lastModified: row.last_modified,
   }));
 }
@@ -170,12 +172,15 @@ export async function createQA(qa) {
   const supabase = getSupabase();
   if (!supabase) return;
   const userHash = getUserHash();
-  const { error } = await supabase.from('qa').insert({
+  const row = {
     id: qa.id,
     question: qa.question || '',
     answer: qa.answer || '',
     user_hash: userHash,
-  });
+  };
+  if (qa.taskId) row.task_id = qa.taskId;
+  if (qa.taskLabel) row.task_label = qa.taskLabel;
+  const { error } = await supabase.from('qa').insert(row);
   if (error) throw error;
 }
 
@@ -186,6 +191,8 @@ export async function updateQA(id, updates) {
   const row = { last_modified: new Date().toISOString() };
   if (updates.question !== undefined) row.question = updates.question;
   if (updates.answer !== undefined) row.answer = updates.answer;
+  if (updates.taskId !== undefined) row.task_id = updates.taskId;
+  if (updates.taskLabel !== undefined) row.task_label = updates.taskLabel;
   const { error } = await supabase.from('qa').update(row).eq('id', id).eq('user_hash', userHash);
   if (error) throw error;
 }
@@ -242,6 +249,48 @@ export async function updateSettings(updates) {
     const { error } = await supabase.from('user_settings').insert({ ...row, user_hash: userHash });
     if (error) throw error;
   }
+}
+
+// ── Saved Filters ─────────────────────────────────────────
+
+export async function getSavedFilters() {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const userHash = getUserHash();
+  const { data, error } = await supabase
+    .from('saved_filter')
+    .select('*')
+    .eq('user_hash', userHash)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data.map(row => ({
+    id: row.id,
+    name: row.name,
+    expression: row.expression,
+    text: row.filter_text,
+  }));
+}
+
+export async function createSavedFilter(filter) {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const userHash = getUserHash();
+  const { error } = await supabase.from('saved_filter').insert({
+    id: filter.id,
+    name: filter.name || '',
+    expression: filter.expression || {},
+    filter_text: filter.text || '',
+    user_hash: userHash,
+  });
+  if (error) throw error;
+}
+
+export async function deleteSavedFilter(id) {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const userHash = getUserHash();
+  const { error } = await supabase.from('saved_filter').delete().eq('id', id).eq('user_hash', userHash);
+  if (error) throw error;
 }
 
 // ── Bulk Export / Import ───────────────────────────────────

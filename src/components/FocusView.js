@@ -189,11 +189,24 @@ const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onC
   // Resolve CSS variable values for PiP window (which lacks access to the main document's CSS vars)
   const resolvedPipColors = (() => {
     const style = getComputedStyle(document.documentElement);
+    const g = (v) => style.getPropertyValue(v).trim() || undefined;
     return {
-      surfacePrimary: style.getPropertyValue('--color-surface-primary').trim(),
-      contentPrimary: style.getPropertyValue('--color-content-primary').trim(),
-      accentBold: style.getPropertyValue('--color-accent-bold').trim(),
-      edgePrimary: style.getPropertyValue('--color-edge-primary').trim(),
+      surfacePrimary: g('--color-surface-primary'),
+      surfaceSecondary: g('--color-surface-secondary'),
+      surfaceElevated: g('--color-surface-elevated'),
+      contentPrimary: g('--color-content-primary'),
+      contentInverse: g('--color-content-inverse'),
+      contentTertiary: g('--color-content-tertiary'),
+      contentDisabled: g('--color-content-disabled'),
+      contentMuted: g('--color-content-muted'),
+      accent: g('--color-accent'),
+      accentBold: g('--color-accent-bold'),
+      accentSubtle: g('--color-accent-subtle'),
+      accentMuted: g('--color-accent-muted'),
+      accentShadow: g('--color-accent-shadow') || 'rgba(0,0,0,0.2)',
+      accentSecondary: g('--color-accent-secondary'),
+      edgePrimary: g('--color-edge-primary'),
+      warning: g('--color-warning'),
     };
   })();
 
@@ -214,7 +227,7 @@ const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onC
           onCapture={onCaptureTask}
           capturedCount={capturedTasks.length}
           appState={appState}
-          pipColors={resolvedPipColors}
+          themeColors={resolvedPipColors}
         />,
         pipPortalRoot
       )}

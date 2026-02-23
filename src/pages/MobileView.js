@@ -16,7 +16,7 @@ import RambleModal, { isSpeechSupported } from '../components/RambleModal';
 import QuickAddModal from '../components/QuickAddModal';
 
 import { getTodayDateString } from '../utils/dateUtils';
-import { filterTreeByCompletionDate, filterTreeByScheduledDate, filterForTodayView } from '../utils/treeFilters';
+import { filterTreeByDate, filterForTodayView } from '../utils/treeFilters';
 import { findNodeRecursive } from '../utils/treeUtils';
 
 // Root drop zone for mobile view
@@ -124,9 +124,8 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
 
   const displayedTreeData = useMemo(() => {
     const today = simulatedToday;
-    if (selectedDate < today) return filterTreeByCompletionDate(treeData, selectedDate);
-    if (selectedDate > today) return filterTreeByScheduledDate(treeData, selectedDate);
-    return filterForTodayView(treeData, today);
+    if (selectedDate === today) return filterForTodayView(treeData, today);
+    return filterTreeByDate(treeData, selectedDate, today);
   }, [treeData, selectedDate, simulatedToday]);
 
   // Flatten tree for rendering

@@ -68,8 +68,8 @@ export function useMemoryData() {
             api.createQA(qa).catch(console.error);
           } else {
             const prevQA = prev.qas.find(q => q.id === qa.id);
-            if (prevQA && (prevQA.question !== qa.question || prevQA.answer !== qa.answer)) {
-              api.updateQA(qa.id, { question: qa.question, answer: qa.answer }).catch(console.error);
+            if (prevQA && (prevQA.question !== qa.question || prevQA.answer !== qa.answer || prevQA.taskId !== qa.taskId || prevQA.taskLabel !== qa.taskLabel)) {
+              api.updateQA(qa.id, { question: qa.question, answer: qa.answer, taskId: qa.taskId, taskLabel: qa.taskLabel }).catch(console.error);
             }
           }
         }

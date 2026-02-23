@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import Fuse from 'fuse.js';
 import { TreePine, ChevronRight, Check, Mic, MicOff } from 'lucide-react';
+import { parseTaskInput } from '../utils/taskParser';
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 export const isSpeechSupported = !!SpeechRecognition;
@@ -151,15 +152,19 @@ const QuickAddModal = ({ isOpen, onClose, treeData, onAddSubtask, onAddRoot, onU
     stopRecording();
 
     const selected = options[selectedIndex];
+    const { text: cleanText, project, tags } = parseTaskInput(inputText.trim());
+    const taskUpdates = { text: cleanText };
+    if (project) taskUpdates.project = project;
+    if (tags.length > 0) taskUpdates.tags = tags;
     let confirmMsg;
 
     if (selected.type === 'root') {
       const id = onAddRoot(selectedDate);
-      onUpdate(id, { text: inputText.trim() }, selectedDate);
+      onUpdate(id, taskUpdates, selectedDate);
       confirmMsg = 'Added as root task';
     } else {
       const id = onAddSubtask(selected.item.id, selectedDate);
-      onUpdate(id, { text: inputText.trim() }, selectedDate);
+      onUpdate(id, taskUpdates, selectedDate);
       confirmMsg = `Added under "${selected.item.text}"`;
     }
 

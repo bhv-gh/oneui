@@ -33,9 +33,11 @@ import InsightsView from '../components/InsightsView';
 import TaskNotesPanel from '../components/TaskNotesPanel';
 import RambleModal, { isSpeechSupported } from '../components/RambleModal';
 import QuickAddModal from '../components/QuickAddModal';
+import FilterSidebar from '../components/FilterSidebar';
 
 import { getTodayDateString, isDateAnOccurrence } from '../utils/dateUtils';
-import { filterTreeByCompletionDate, filterTreeByScheduledDate, filterForTodayView } from '../utils/treeFilters';
+import { filterTreeByDate, filterForTodayView, filterTreeByExpression, collectFilterMatchIds } from '../utils/treeFilters';
+import { migrateLegacyFilter } from '../components/FilterSidebar';
 import { findNodeRecursive } from '../utils/treeUtils';
 import * as api from '../api/client';
 import Fuse from 'fuse.js';
@@ -113,6 +115,29 @@ export default function MainPage({
     const [isTimelineInteracting, setIsTimelineInteracting] = useState(false);
     const [notesTaskId, setNotesTaskId] = useState(null);
     const [activeDragId, setActiveDragId] = useState(null);
+    const [activeFilter, setActiveFilter] = useState({ id: 'root', type: 'group', operator: 'AND', children: [] });
+    const [savedFilters, setSavedFilters] = useState(() => {
+        try {
+            // Load from localStorage as fallback until DB loads
+            const raw = JSON.parse(localStorage.getItem('flowAppSavedFilters') || '[]');
+            return raw.map(f => {
+                if (!f.expression && (f.project || (f.tags && f.tags.length > 0))) {
+                    return { ...f, expression: migrateLegacyFilter(f) };
+                }
+                return f;
+            });
+        } catch { return []; }
+    });
+
+    // Load saved filters from DB on mount
+    useEffect(() => {
+        api.getSavedFilters().then(filters => {
+            if (filters && filters.length > 0) {
+                setSavedFilters(filters);
+                localStorage.setItem('flowAppSavedFilters', JSON.stringify(filters));
+            }
+        }).catch(console.error);
+    }, []);
     const highlightedNodeRef = useRef(null);
     const datePickerRef = useRef(null);
     const contentRef = useRef(null);
@@ -196,12 +221,39 @@ export default function MainPage({
         }
     }, [isSyncing, forceSyncTree, forceSyncLogs, forceSyncMemory]);
 
+    // Persist saved filters to localStorage
+    useEffect(() => {
+        localStorage.setItem('flowAppSavedFilters', JSON.stringify(savedFilters));
+    }, [savedFilters]);
+
+    const handleSaveFilter = useCallback((filter) => {
+        setSavedFilters(prev => [...prev, filter]);
+        api.createSavedFilter(filter).catch(console.error);
+    }, []);
+
+    const handleDeleteFilter = useCallback((filterId) => {
+        setSavedFilters(prev => prev.filter(f => f.id !== filterId));
+        api.deleteSavedFilter(filterId).catch(console.error);
+    }, []);
+
       const displayedTreeData = useMemo(() => {
         const today = simulatedToday;
-        if (selectedDate < today) return filterTreeByCompletionDate(treeData, selectedDate);
-        if (selectedDate > today) return filterTreeByScheduledDate(treeData, selectedDate);
-        return filterForTodayView(treeData, today);
-      }, [treeData, selectedDate, simulatedToday]);
+        let filtered;
+        if (selectedDate === today) filtered = filterForTodayView(treeData, today);
+        else filtered = filterTreeByDate(treeData, selectedDate, today);
+
+        // Apply expression-based filter
+        if (activeFilter.children && activeFilter.children.length > 0) {
+          filtered = filterTreeByExpression(filtered, activeFilter);
+        }
+        return filtered;
+      }, [treeData, selectedDate, simulatedToday, activeFilter]);
+
+      // IDs of nodes that directly match the active filter (vs ancestors shown for context)
+      const filterMatchIds = useMemo(() => {
+        if (!activeFilter.children || activeFilter.children.length === 0) return null;
+        return collectFilterMatchIds(displayedTreeData, activeFilter);
+      }, [displayedTreeData, activeFilter]);
 
       const allFieldKeys = useMemo(() => {
         const keys = new Set();
@@ -318,8 +370,10 @@ export default function MainPage({
             const fieldsText = (node.fields || [])
               .map(field => `${field.label || ''} ${field.value || ''}`)
               .join(' ');
+            const projectText = node.project ? `@${node.project}` : '';
+            const tagsText = (node.tags || []).map(t => `#${t}`).join(' ');
 
-            list.push({ id: node.id, text: node.text, searchableText: `${node.text || ''} ${fieldsText}` });
+            list.push({ id: node.id, text: node.text, searchableText: `${node.text || ''} ${fieldsText} ${projectText} ${tagsText}` });
             if (node.children) traverse(node.children);
           });
         };
@@ -708,6 +762,17 @@ export default function MainPage({
 
             {activeTab === 'today' && <SuggestionBar suggestions={suggestedTasks} onSuggestionClick={handleSuggestionClick} />}
 
+            {activeTab === 'today' && (
+                <FilterSidebar
+                    treeData={treeData}
+                    activeFilter={activeFilter}
+                    onFilterChange={setActiveFilter}
+                    savedFilters={savedFilters}
+                    onSaveFilter={handleSaveFilter}
+                    onDeleteFilter={handleDeleteFilter}
+                />
+            )}
+
             <div className="pt-24 flex-1 flex flex-col min-h-0">
               <DndContext sensors={dndSensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
                 {activeTab === 'today' && viewMode === 'tree' && (
@@ -745,6 +810,7 @@ export default function MainPage({
                                 onFocusHandled={() => setNewlyAddedTaskId(null)}
                                 onOpenNotes={handleOpenNotes}
                                 activeDragId={activeDragId}
+                                filterMatchIds={filterMatchIds}
                             />
                             ))}
                             {selectedDate >= simulatedToday && (
@@ -869,6 +935,9 @@ export default function MainPage({
                         initialNotes={notesTask.notes || ''}
                         onUpdate={handleUpdate}
                         onClose={handleCloseNotes}
+                        memoryData={memoryData}
+                        onMemoryUpdate={(newMemory) => setMemoryData({ ...memoryData, ...newMemory })}
+                        treeData={treeData}
                     />
                 );
             })()}
@@ -886,6 +955,10 @@ export default function MainPage({
                 isOpen={isRambleOpen}
                 onClose={() => setIsRambleOpen(false)}
                 onAddTasks={handleRambleAdd}
+                treeData={treeData}
+                onUpdate={(id, updates, forDate) => handleUpdate(id, updates, forDate || selectedDate)}
+                onSaveLog={handleSaveLog}
+                selectedDate={selectedDate}
             />
             <SearchOverlay query={searchQuery} resultCount={searchResults.length} currentIndex={searchIndex} />
             <QuickAddModal

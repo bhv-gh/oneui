@@ -184,6 +184,8 @@ export function useTreeData() {
       fields: [],
       children: task.children?.length > 0 ? buildNodes(task.children) : [],
       ...(isFuture ? { scheduledDate: selectedDate } : {}),
+      ...(task.project ? { project: task.project } : {}),
+      ...(task.tags?.length > 0 ? { tags: task.tags } : {}),
     }));
 
     const newNodes = buildNodes(rootTasks);

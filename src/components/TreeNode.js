@@ -2,7 +2,7 @@ import React from 'react';
 import TaskCard from './TaskCard';
 
 // --- Component: Recursive Tree Node ---
-const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, highlightedTaskId, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId }) => {
+const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, highlightedTaskId, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId, filterMatchIds }) => {
   const visibleChildren = node.hideCompleted
     ? node.children.filter(child => {
         if (child.recurrence) {
@@ -12,6 +12,7 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
       })
     : node.children;
   const hasChildren = visibleChildren.length > 0;
+  const isFilterMatch = filterMatchIds ? filterMatchIds.has(node.id) : null;
 
   return (
     <div className="flex flex-col items-center">
@@ -33,6 +34,7 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
         onFocusHandled={onFocusHandled}
         onOpenNotes={onOpenNotes}
         activeDragId={activeDragId}
+        isFilterMatch={isFilterMatch}
       />
 
       {/* Children Container */}
@@ -80,6 +82,7 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 onFocusHandled={onFocusHandled}
                 onOpenNotes={onOpenNotes}
                 activeDragId={activeDragId}
+                filterMatchIds={filterMatchIds}
               />
             </div>
           ))}

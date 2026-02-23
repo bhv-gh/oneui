@@ -18,6 +18,8 @@ import {
   ExternalLink,
   StickyNote,
   GripVertical,
+  AtSign,
+  Hash,
 } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import CustomDatalistInput from './CustomDatalistInput';
@@ -28,9 +30,10 @@ import { generateId } from '../utils/idGenerator';
 import { startOfToday, parseISO } from 'date-fns';
 import { getTodayDateString } from '../utils/dateUtils';
 import { isUrl, fetchPageTitle, getLinkedSegments } from '../utils/linkUtils';
+import { parseTaskInput } from '../utils/taskParser';
 
 // --- Component: Task Card (The actual node content) ---
-const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, isHighlighted, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId }) => {
+const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, isHighlighted, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId, isFilterMatch }) => {
   const isCompleted = node.recurrence
     ? node.completedOccurrences?.includes(selectedDate)
     : node.isCompleted;
@@ -99,8 +102,19 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleFinishEditing = () => {
+    setIsEditing(false);
+    const { text: cleanText, project, tags } = parseTaskInput(node.text);
+    if (cleanText !== node.text || project || tags.length > 0) {
+      const updates = { text: cleanText };
+      if (project) updates.project = project;
+      if (tags.length > 0) updates.tags = tags;
+      onUpdate(node.id, updates);
+    }
+  };
+
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') setIsEditing(false);
+    if (e.key === 'Enter') handleFinishEditing();
   };
 
   const handlePaste = (e) => {
@@ -176,6 +190,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
         ${isHighlighted ? 'opacity-100' : ''}
         ${isCompleted && !isHighlighted ? 'opacity-70' : ''}
         ${isDragging ? '!opacity-40' : ''}
+        ${isFilterMatch === false ? 'opacity-40' : ''}
       `}
     >
       {/* The Card Box */}
@@ -186,7 +201,9 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
             ? 'border-accent-secondary shadow-[0_0_15px_rgba(34,211,238,0.3)]'
             : isHighlighted
             ? 'border-accent-secondary shadow-[0_0_25px_rgba(56,189,248,0.4)]'
-            : hasPausedTimer && !isCurrentlyRunningInFocus
+            : isFilterMatch === true
+              ? 'border-accent shadow-[0_0_12px_rgba(99,102,241,0.2)]'
+              : hasPausedTimer && !isCurrentlyRunningInFocus
               ? 'border-edge-focus shadow-[0_0_15px_rgba(16,185,129,0.15)] animate-border-pulse'
               : (isCompleted ? 'border-edge-focus shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'border-edge-primary hover:border-content-muted hover:shadow-2xl hover:shadow-accent-bold/5')}
         `}
@@ -270,7 +287,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                   type="text"
                   value={node.text}
                   onChange={(e) => onUpdate(node.id, { text: e.target.value })}
-                  onBlur={() => setIsEditing(false)}
+                  onBlur={handleFinishEditing}
                   onKeyDown={handleKeyDown}
                   onPaste={handlePaste}
                   className="bg-transparent text-content-primary text-sm w-full outline-none border-b border-edge-focus pb-1"
@@ -421,6 +438,36 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                </span>
             ))}
             {fieldsCount > 3 && <span className="text-[10px] text-content-disabled">+{fieldsCount - 3}</span>}
+          </div>
+        )}
+
+        {/* Project & Tags */}
+        {(node.project || (node.tags && node.tags.length > 0)) && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {node.project && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 bg-accent-secondary-subtle text-accent-secondary-bold rounded-full group/badge">
+                <AtSign size={8} />
+                {node.project}
+                <button
+                  onClick={(e) => { e.stopPropagation(); onUpdate(node.id, { project: null }); }}
+                  className="ml-0.5 opacity-0 group-hover/badge:opacity-100 hover:text-danger transition-all"
+                >
+                  <X size={8} />
+                </button>
+              </span>
+            )}
+            {(node.tags || []).map(tag => (
+              <span key={tag} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 border border-edge-secondary text-content-tertiary rounded-full group/badge">
+                <Hash size={8} />
+                {tag}
+                <button
+                  onClick={(e) => { e.stopPropagation(); onUpdate(node.id, { tags: (node.tags || []).filter(t => t !== tag) }); }}
+                  className="ml-0.5 opacity-0 group-hover/badge:opacity-100 hover:text-danger transition-all"
+                >
+                  <X size={8} />
+                </button>
+              </span>
+            ))}
           </div>
         )}
 

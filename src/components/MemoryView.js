@@ -9,6 +9,76 @@ import RichTextNote from './RichTextNote';
 import { generateId } from '../utils/idGenerator';
 import { useDebounce } from '../hooks/useDebounce';
 
+// EditableField must be defined outside MemoryView so React keeps a stable
+// component reference and doesn't unmount/remount on every parent re-render.
+const EditableField = ({ value, onChange, placeholder, searchQuery }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [text, setText] = useState(value);
+  const debouncedText = useDebounce(text, 500);
+  const isInitialMount = useRef(true);
+
+  // Sync external value changes when not editing
+  useEffect(() => {
+    if (!isEditing) {
+      setText(value);
+    }
+  }, [value, isEditing]);
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    onChange(debouncedText);
+  }, [debouncedText]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleBlur = () => {
+    setIsEditing(false);
+    if (text !== value) {
+      onChange(text);
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={handleBlur}
+        autoFocus
+        placeholder={placeholder}
+        className="w-full bg-surface-secondary border border-edge-primary rounded-lg p-2 text-content-primary focus:outline-none focus:ring-2 focus:ring-edge-focus"
+      />
+    );
+  }
+
+  const highlightText = (displayText, query) => {
+    if (!query || !displayText) return displayText;
+    const parts = displayText.split(new RegExp(`(${query})`, 'gi'));
+    return (
+      <span>
+        {parts.map((part, i) =>
+          part.toLowerCase() === query.toLowerCase() ? (
+            <span key={i} className="bg-accent-subtle text-accent">{part}</span>
+          ) : (
+            part
+          )
+        )}
+      </span>
+    );
+  };
+
+  return (
+    <div onClick={() => setIsEditing(true)} className="w-full p-2 cursor-text whitespace-pre-wrap">
+      {value ? (
+        highlightText(value, searchQuery)
+      ) : (
+        <span className="text-content-muted">{placeholder}</span>
+      )}
+    </div>
+  );
+};
+
 // --- Component: Memory View ---
 const MemoryView = ({ memoryData, onUpdate, searchQuery, viewType }) => {
   const { notes, qas } = memoryData;
@@ -39,68 +109,6 @@ const MemoryView = ({ memoryData, onUpdate, searchQuery, viewType }) => {
 
   const handleDeleteQA = (id) => {
     onUpdate({ qas: qas.filter(qa => qa.id !== id) });
-  };
-
-  const highlightText = (text, query) => {
-    if (!query || !text) {
-      return text;
-    }
-    const parts = text.split(new RegExp(`(${query})`, 'gi'));
-    return (
-      <span>
-        {parts.map((part, i) =>
-          part.toLowerCase() === query.toLowerCase() ? (
-            <span key={i} className="bg-accent-subtle text-accent">{part}</span>
-          ) : (
-            part
-          )
-        )}
-      </span>
-    );
-  };
-
-  const EditableField = ({ value, onChange, placeholder }) => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [text, setText] = useState(value);
-    const debouncedText = useDebounce(text, 500);
-    const isInitialMount = useRef(true);
-
-    useEffect(() => {
-        if (isInitialMount.current) {
-            isInitialMount.current = false;
-            return;
-        }
-        onChange(debouncedText);
-    }, [debouncedText]);
-
-    const handleBlur = () => {
-      setIsEditing(false);
-      if (text !== value) {
-        onChange(text);
-      }
-    };
-
-    if (isEditing) {
-      return (
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={handleBlur}
-          autoFocus
-          placeholder={placeholder}
-          className="w-full bg-surface-secondary border border-edge-primary rounded-lg p-2 text-content-primary focus:outline-none focus:ring-2 focus:ring-edge-focus"
-        />
-      );
-    }
-    return (
-      <div onClick={() => setIsEditing(true)} className="w-full p-2 cursor-text whitespace-pre-wrap">
-        {value ? (
-          highlightText(value, searchQuery)
-        ) : (
-          <span className="text-content-muted">{placeholder}</span>
-        )}
-      </div>
-    );
   };
 
   // Sort notes and Q&As by last modified date, newest first
@@ -142,12 +150,19 @@ const MemoryView = ({ memoryData, onUpdate, searchQuery, viewType }) => {
               <div key={qa.id} className="bg-surface-primary rounded-xl group relative transition-all hover:bg-surface-secondary">
                 <div className="p-4">
                   <label className="text-sm font-semibold text-accent">Question</label>
-                  <EditableField value={qa.question} onChange={(val) => handleUpdateQA(qa.id, 'question', val)} placeholder="Type your question..."/>
+                  <EditableField value={qa.question} onChange={(val) => handleUpdateQA(qa.id, 'question', val)} placeholder="Type your question..." searchQuery={searchQuery}/>
                 </div>
                 <div className="bg-surface-primary p-4 border-t border-edge-secondary rounded-b-xl">
                   <label className="text-sm font-semibold text-accent-secondary">Answer</label>
-                  <EditableField value={qa.answer} onChange={(val) => handleUpdateQA(qa.id, 'answer', val)} placeholder="Type your answer..."/>
+                  <EditableField value={qa.answer} onChange={(val) => handleUpdateQA(qa.id, 'answer', val)} placeholder="Type your answer..." searchQuery={searchQuery}/>
                 </div>
+                {qa.taskId && (
+                  <div className="px-4 pb-2">
+                    <span className="text-[10px] text-content-disabled bg-surface-secondary px-2 py-0.5 rounded-full">
+                      Task: {qa.taskLabel || qa.taskId}
+                    </span>
+                  </div>
+                )}
                 <button onClick={() => handleDeleteQA(qa.id)} className="absolute top-3 right-3 p-1 text-content-muted hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity">
                   <Trash2 size={14} />
                 </button>

@@ -12,6 +12,8 @@ import {
   X,
   StickyNote,
   GripVertical,
+  AtSign,
+  Hash,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -19,6 +21,7 @@ import CustomDatePicker from './CustomDatePicker';
 import RecurrenceEditor from './RecurrenceEditor';
 import { getTodayDateString } from '../utils/dateUtils';
 import { isUrl, fetchPageTitle, getLinkedSegments } from '../utils/linkUtils';
+import { parseTaskInput } from '../utils/taskParser';
 
 // --- Component: Task List Item (for List View) ---
 const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId }) => {
@@ -74,9 +77,20 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleFinishEditing = () => {
+    setIsEditing(false);
+    const { text: cleanText, project, tags } = parseTaskInput(task.text);
+    if (cleanText !== task.text || project || tags.length > 0) {
+      const updates = { text: cleanText };
+      if (project) updates.project = project;
+      if (tags.length > 0) updates.tags = tags;
+      onUpdate(task.id, updates);
+    }
+  };
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
-      setIsEditing(false);
+      handleFinishEditing();
     }
   };
 
@@ -175,7 +189,7 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
               type="text"
               value={task.text}
               onChange={(e) => onUpdate(task.id, { text: e.target.value })}
-              onBlur={() => setIsEditing(false)}
+              onBlur={handleFinishEditing}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               className="bg-transparent text-content-primary font-medium w-full outline-none border-b border-edge-focus"
@@ -237,6 +251,35 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
               return task.text || <span className="text-content-disabled italic font-normal">Untitled Task</span>;
             })()}
           </p>
+        )}
+        {/* Project & Tags */}
+        {(task.project || (task.tags && task.tags.length > 0)) && (
+          <div className="flex flex-wrap gap-1 mt-0.5">
+            {task.project && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 bg-accent-secondary-subtle text-accent-secondary-bold rounded-full group/badge">
+                <AtSign size={8} />
+                {task.project}
+                <button
+                  onClick={(e) => { e.stopPropagation(); onUpdate(task.id, { project: null }); }}
+                  className="ml-0.5 opacity-0 group-hover/badge:opacity-100 hover:text-danger transition-all"
+                >
+                  <X size={8} />
+                </button>
+              </span>
+            )}
+            {(task.tags || []).map(tag => (
+              <span key={tag} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 border border-edge-secondary text-content-tertiary rounded-full group/badge">
+                <Hash size={8} />
+                {tag}
+                <button
+                  onClick={(e) => { e.stopPropagation(); onUpdate(task.id, { tags: (task.tags || []).filter(t => t !== tag) }); }}
+                  className="ml-0.5 opacity-0 group-hover/badge:opacity-100 hover:text-danger transition-all"
+                >
+                  <X size={8} />
+                </button>
+              </span>
+            ))}
+          </div>
         )}
       </div>
 
