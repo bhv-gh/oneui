@@ -21,6 +21,7 @@ import {
   AtSign,
   Hash,
   Flag,
+  Ellipsis,
 } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import CustomDatalistInput from './CustomDatalistInput';
@@ -48,9 +49,11 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
   const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false);
   const [isDeadlinePickerOpen, setIsDeadlinePickerOpen] = useState(false);
   const [isRecurrenceEditorOpen, setIsRecurrenceEditorOpen] = useState(false);
+  const [isMoreActionsOpen, setIsMoreActionsOpen] = useState(false);
   const schedulePickerRef = useRef(null);
   const deadlinePickerRef = useRef(null);
   const recurrenceEditorRef = useRef(null);
+  const moreActionsRef = useRef(null);
 
   // DnD hooks
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: node.id });
@@ -93,6 +96,9 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
       }
       if (deadlinePickerRef.current && !deadlinePickerRef.current.contains(event.target)) {
         setIsDeadlinePickerOpen(false);
+      }
+      if (moreActionsRef.current && !moreActionsRef.current.contains(event.target)) {
+        setIsMoreActionsOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -558,7 +564,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
           ) : <div className="flex-1" />}
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -568,86 +574,6 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
               title="Add Subtask"
             >
               <Plus size={14} />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onRequestDelete(node.id);
-              }}
-              className="p-1 text-content-tertiary hover:text-danger hover:bg-danger/10 rounded-md transition-colors"
-              title="Delete"
-            >
-              <Trash2 size={14} />
-            </button>
-            <div className="relative" ref={schedulePickerRef}>
-              <button
-                onClick={(e) => { e.stopPropagation(); setIsSchedulePickerOpen(!isSchedulePickerOpen); }}
-                className="p-1 text-content-tertiary hover:text-accent-secondary hover:bg-accent-secondary/10 rounded-md transition-colors"
-                title="Schedule Task"
-              >
-                <CalendarPlus size={14} />
-              </button>
-              {isSchedulePickerOpen && (
-                <div className="absolute bottom-full right-0 mb-2 z-30 animate-in fade-in duration-100">
-                  <CustomDatePicker
-                    selected={node.scheduledDate ? new Date(node.scheduledDate) : undefined}
-                    onSelect={(date) => {
-                      const newScheduledDate = date ? date.toISOString().split('T')[0] : null;
-                      onUpdate(node.id, { scheduledDate: newScheduledDate });
-                      setIsSchedulePickerOpen(false);
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-            <div className="relative" ref={deadlinePickerRef}>
-              <button
-                onClick={(e) => { e.stopPropagation(); setIsDeadlinePickerOpen(!isDeadlinePickerOpen); }}
-                className="p-1 text-content-tertiary hover:text-warning hover:bg-warning/10 rounded-md transition-colors"
-                title="Set Deadline"
-              >
-                <Flag size={14} />
-              </button>
-              {isDeadlinePickerOpen && (
-                <div className="absolute bottom-full right-0 mb-2 z-30 animate-in fade-in duration-100">
-                  <CustomDatePicker
-                    selected={node.deadline ? new Date(node.deadline) : undefined}
-                    onSelect={(date) => {
-                      const newDeadline = date ? date.toISOString().split('T')[0] : null;
-                      onUpdate(node.id, { deadline: newDeadline });
-                      setIsDeadlinePickerOpen(false);
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-            <div className="relative" ref={recurrenceEditorRef}>
-              <button
-                onClick={(e) => { e.stopPropagation(); setIsRecurrenceEditorOpen(!isRecurrenceEditorOpen); }}
-                className="p-1 text-content-tertiary hover:text-accent-secondary hover:bg-accent-secondary/10 rounded-md transition-colors"
-                title="Set Recurrence"
-              >
-                <Repeat size={14} />
-              </button>
-              {isRecurrenceEditorOpen && (
-                <div className="absolute bottom-full right-0 mb-2 z-30 animate-in fade-in duration-100">
-                  <RecurrenceEditor
-                    recurrence={node.recurrence}
-                    onSave={(newRecurrence) => onUpdate(node.id, { recurrence: newRecurrence })}
-                    onClose={() => setIsRecurrenceEditorOpen(false)}
-                  />
-                </div>
-              )}
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onStartFocus(node.id);
-              }}
-              className="p-1 text-content-tertiary hover:text-accent hover:bg-accent-subtle rounded-md transition-colors"
-              title="Focus on this task"
-            >
-              <Play size={14} />
             </button>
             <button
               onClick={(e) => {
@@ -662,6 +588,102 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-400 rounded-full" />
               )}
             </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onStartFocus(node.id);
+              }}
+              className="p-1 text-content-tertiary hover:text-accent hover:bg-accent-subtle rounded-md transition-colors"
+              title="Focus on this task"
+            >
+              <Play size={14} />
+            </button>
+            <div className="relative" ref={moreActionsRef}>
+              <button
+                onClick={(e) => { e.stopPropagation(); setIsMoreActionsOpen(!isMoreActionsOpen); }}
+                className={`p-1 rounded-md transition-colors ${isMoreActionsOpen ? 'text-accent bg-accent-subtle' : 'text-content-tertiary hover:text-content-inverse hover:bg-surface-secondary'}`}
+                title="More actions"
+              >
+                <Ellipsis size={14} />
+              </button>
+              {isMoreActionsOpen && (
+                <div className="absolute bottom-full right-0 mb-2 z-30 animate-in fade-in duration-100 bg-surface-primary border border-edge-primary rounded-lg shadow-xl p-1 flex flex-col gap-0.5 min-w-[150px]">
+                  <div className="relative" ref={schedulePickerRef}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setIsSchedulePickerOpen(!isSchedulePickerOpen); }}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-content-secondary hover:text-accent-secondary hover:bg-surface-secondary rounded-md transition-colors"
+                    >
+                      <CalendarPlus size={13} />
+                      <span>Schedule</span>
+                    </button>
+                    {isSchedulePickerOpen && (
+                      <div className="absolute bottom-full right-0 mb-1 z-40 animate-in fade-in duration-100">
+                        <CustomDatePicker
+                          selected={node.scheduledDate ? new Date(node.scheduledDate) : undefined}
+                          onSelect={(date) => {
+                            const newScheduledDate = date ? date.toISOString().split('T')[0] : null;
+                            onUpdate(node.id, { scheduledDate: newScheduledDate });
+                            setIsSchedulePickerOpen(false);
+                            setIsMoreActionsOpen(false);
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="relative" ref={deadlinePickerRef}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setIsDeadlinePickerOpen(!isDeadlinePickerOpen); }}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-content-secondary hover:text-warning hover:bg-surface-secondary rounded-md transition-colors"
+                    >
+                      <Flag size={13} />
+                      <span>Deadline</span>
+                    </button>
+                    {isDeadlinePickerOpen && (
+                      <div className="absolute bottom-full right-0 mb-1 z-40 animate-in fade-in duration-100">
+                        <CustomDatePicker
+                          selected={node.deadline ? new Date(node.deadline) : undefined}
+                          onSelect={(date) => {
+                            const newDeadline = date ? date.toISOString().split('T')[0] : null;
+                            onUpdate(node.id, { deadline: newDeadline });
+                            setIsDeadlinePickerOpen(false);
+                            setIsMoreActionsOpen(false);
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="relative" ref={recurrenceEditorRef}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setIsRecurrenceEditorOpen(!isRecurrenceEditorOpen); }}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-content-secondary hover:text-accent-secondary hover:bg-surface-secondary rounded-md transition-colors"
+                    >
+                      <Repeat size={13} />
+                      <span>Recurrence</span>
+                    </button>
+                    {isRecurrenceEditorOpen && (
+                      <div className="absolute bottom-full right-0 mb-1 z-40 animate-in fade-in duration-100">
+                        <RecurrenceEditor
+                          recurrence={node.recurrence}
+                          onSave={(newRecurrence) => { onUpdate(node.id, { recurrence: newRecurrence }); setIsMoreActionsOpen(false); }}
+                          onClose={() => setIsRecurrenceEditorOpen(false)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRequestDelete(node.id);
+                      setIsMoreActionsOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-content-secondary hover:text-danger hover:bg-danger/10 rounded-md transition-colors"
+                  >
+                    <Trash2 size={13} />
+                    <span>Delete</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
