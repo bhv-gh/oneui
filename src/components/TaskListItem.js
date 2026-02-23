@@ -90,7 +90,7 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
     if (cleanText !== task.text || project || tags.length > 0) {
       const updates = { text: cleanText };
       if (project) updates.project = project;
-      if (tags.length > 0) updates.tags = tags;
+      if (tags.length > 0) updates.tags = [...new Set([...(task.tags || []), ...tags])];
       onUpdate(task.id, updates);
     }
   };

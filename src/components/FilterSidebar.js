@@ -620,7 +620,7 @@ const FilterSidebar = ({ treeData, activeFilter, onFilterChange, savedFilters, o
   if (isCollapsed) {
     return (
       <div
-        className="fixed z-40 animate-in fade-in duration-200"
+        className="fixed z-40 animate-in duration-200"
         style={dragPos ? { left: dragPos.x, top: dragPos.y } : { left: 12, top: '6.5rem' }}
       >
         <button

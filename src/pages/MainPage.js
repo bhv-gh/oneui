@@ -775,7 +775,7 @@ export default function MainPage({
 
             {activeTab === 'today' && <SuggestionBar suggestions={suggestedTasks} onSuggestionClick={handleSuggestionClick} />}
 
-            {activeTab === 'today' && (
+            {activeTab === 'today' && (viewMode === 'tree' || viewMode === 'list') && (
                 <FilterSidebar
                     treeData={treeData}
                     activeFilter={activeFilter}
