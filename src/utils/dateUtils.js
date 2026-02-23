@@ -55,3 +55,12 @@ export const calculateNextOccurrence = (task, completionDateStr) => {
   
   return null; // Return null if no occurrence is found within 5 years
 };
+
+export const getDeadlineStatus = (deadline, todayStr, isCompleted) => {
+  if (!deadline) return null;
+  const daysRemaining = differenceInDays(parseISO(deadline), parseISO(todayStr));
+  if (isCompleted) return { daysRemaining, urgency: 'completed' };
+  if (daysRemaining < 0) return { daysRemaining, urgency: 'overdue' };
+  if (daysRemaining <= 3) return { daysRemaining, urgency: 'due-soon' };
+  return { daysRemaining, urgency: 'normal' };
+};

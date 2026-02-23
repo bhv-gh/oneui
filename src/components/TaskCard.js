@@ -20,6 +20,7 @@ import {
   GripVertical,
   AtSign,
   Hash,
+  Flag,
 } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import CustomDatalistInput from './CustomDatalistInput';
@@ -28,7 +29,7 @@ import RecurrenceEditor from './RecurrenceEditor';
 import { getTimerDurations } from '../utils/timerSettings';
 import { generateId } from '../utils/idGenerator';
 import { startOfToday, parseISO } from 'date-fns';
-import { getTodayDateString } from '../utils/dateUtils';
+import { getTodayDateString, getDeadlineStatus } from '../utils/dateUtils';
 import { isUrl, fetchPageTitle, getLinkedSegments } from '../utils/linkUtils';
 import { parseTaskInput } from '../utils/taskParser';
 
@@ -44,8 +45,10 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
   nodeRef.current = node;
   const [incompleteWarning, setIncompleteWarning] = useState(null);
   const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false);
+  const [isDeadlinePickerOpen, setIsDeadlinePickerOpen] = useState(false);
   const [isRecurrenceEditorOpen, setIsRecurrenceEditorOpen] = useState(false);
   const schedulePickerRef = useRef(null);
+  const deadlinePickerRef = useRef(null);
   const recurrenceEditorRef = useRef(null);
 
   // DnD hooks
@@ -86,6 +89,9 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
     const handleClickOutside = (event) => {
       if (schedulePickerRef.current && !schedulePickerRef.current.contains(event.target)) {
         setIsSchedulePickerOpen(false);
+      }
+      if (deadlinePickerRef.current && !deadlinePickerRef.current.contains(event.target)) {
+        setIsDeadlinePickerOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -476,6 +482,32 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
           <div className="mt-2 text-xs flex items-center gap-1.5 text-content-muted"><CalendarDays size={12} /><span>{node.scheduledDate}</span></div>
         )}
 
+        {/* Deadline Display */}
+        {node.deadline && (() => {
+          const todayStr = getTodayDateString();
+          const status = getDeadlineStatus(node.deadline, todayStr, isCompleted);
+          const urgencyClasses = {
+            overdue: 'text-danger',
+            'due-soon': 'text-warning',
+            completed: 'text-content-muted',
+            normal: 'text-content-muted',
+          };
+          const badgeClasses = {
+            overdue: 'bg-danger/10 text-danger',
+            'due-soon': 'bg-warning/10 text-warning',
+            completed: 'bg-surface-tertiary text-content-muted',
+            normal: 'bg-surface-tertiary text-content-muted',
+          };
+          const badgeText = status.daysRemaining === 0 ? 'Today' : status.daysRemaining < 0 ? `${Math.abs(status.daysRemaining)}d overdue` : `${status.daysRemaining}d left`;
+          return (
+            <div className={`mt-1 text-xs flex items-center gap-1.5 ${urgencyClasses[status.urgency]}`}>
+              <Flag size={12} />
+              <span>{node.deadline}</span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${badgeClasses[status.urgency]}`}>{badgeText}</span>
+            </div>
+          );
+        })()}
+
         {/* Recurrence Info Display */}
         {node.recurrence && (
           <div className="mt-1 text-xs flex items-center gap-1.5 text-accent-secondary-bold"><Repeat size={12} /><span>Recurring</span></div>
@@ -563,6 +595,27 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                       const newScheduledDate = date ? date.toISOString().split('T')[0] : null;
                       onUpdate(node.id, { scheduledDate: newScheduledDate });
                       setIsSchedulePickerOpen(false);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="relative" ref={deadlinePickerRef}>
+              <button
+                onClick={(e) => { e.stopPropagation(); setIsDeadlinePickerOpen(!isDeadlinePickerOpen); }}
+                className="p-1 text-content-tertiary hover:text-warning hover:bg-warning/10 rounded-md transition-colors"
+                title="Set Deadline"
+              >
+                <Flag size={14} />
+              </button>
+              {isDeadlinePickerOpen && (
+                <div className="absolute bottom-full right-0 mb-2 z-30 animate-in fade-in duration-100">
+                  <CustomDatePicker
+                    selected={node.deadline ? new Date(node.deadline) : undefined}
+                    onSelect={(date) => {
+                      const newDeadline = date ? date.toISOString().split('T')[0] : null;
+                      onUpdate(node.id, { deadline: newDeadline });
+                      setIsDeadlinePickerOpen(false);
                     }}
                   />
                 </div>

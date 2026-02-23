@@ -10,12 +10,14 @@ import {
   ExternalLink,
   StickyNote,
   GripVertical,
+  Flag,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import CustomDatePicker from './CustomDatePicker';
 import RecurrenceEditor from './RecurrenceEditor';
 import { getLinkedSegments } from '../utils/linkUtils';
+import { getTodayDateString, getDeadlineStatus } from '../utils/dateUtils';
 
 const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, onDeleteEmpty, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId, isPastDate, onPrepareKeyboard }) => {
   const isCompleted = task.recurrence
@@ -25,9 +27,11 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
   const [isEditing, setIsEditing] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false);
+  const [isDeadlinePickerOpen, setIsDeadlinePickerOpen] = useState(false);
   const [isRecurrenceEditorOpen, setIsRecurrenceEditorOpen] = useState(false);
   const inputRef = useRef(null);
   const schedulePickerRef = useRef(null);
+  const deadlinePickerRef = useRef(null);
   const recurrenceEditorRef = useRef(null);
 
   // Swipe-to-add-subtask state
@@ -102,6 +106,9 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
       if (schedulePickerRef.current && !schedulePickerRef.current.contains(event.target)) {
         setIsSchedulePickerOpen(false);
       }
+      if (deadlinePickerRef.current && !deadlinePickerRef.current.contains(event.target)) {
+        setIsDeadlinePickerOpen(false);
+      }
       if (recurrenceEditorRef.current && !recurrenceEditorRef.current.contains(event.target)) {
         setIsRecurrenceEditorOpen(false);
       }
@@ -135,6 +142,12 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
   const handleRecurrenceSave = (newRecurrence) => {
     onUpdate(task.id, { recurrence: newRecurrence });
     setIsRecurrenceEditorOpen(false);
+  };
+
+  const handleDeadlineSelect = (date) => {
+    const newDeadline = date ? format(date, 'yyyy-MM-dd') : null;
+    onUpdate(task.id, { deadline: newDeadline });
+    setIsDeadlinePickerOpen(false);
   };
 
   return (
@@ -237,6 +250,17 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
           {task.scheduledDate && (
             <span className="text-[10px] text-content-muted">{task.scheduledDate.slice(5)}</span>
           )}
+          {task.deadline && (() => {
+            const todayStr = getTodayDateString();
+            const status = getDeadlineStatus(task.deadline, todayStr, isCompleted);
+            const colorClass = status.urgency === 'overdue' ? 'text-danger' : status.urgency === 'due-soon' ? 'text-warning' : 'text-content-muted';
+            const label = status.daysRemaining === 0 ? '0d' : status.daysRemaining < 0 ? `${Math.abs(status.daysRemaining)}d!` : `${status.daysRemaining}d`;
+            return (
+              <span className={`inline-flex items-center gap-0.5 text-[10px] ${colorClass}`}>
+                <Flag size={10} />{label}
+              </span>
+            );
+          })()}
         </div>
 
         {/* More button — 44px tap target */}
@@ -258,6 +282,13 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
             title="Schedule"
           >
             <CalendarPlus size={18} />
+          </button>
+          <button
+            onClick={() => { setIsDeadlinePickerOpen(o => !o); }}
+            className="p-2.5 rounded-lg text-content-tertiary active:bg-surface-secondary"
+            title="Deadline"
+          >
+            <Flag size={18} />
           </button>
           <button
             onClick={() => { setIsRecurrenceEditorOpen(o => !o); }}
@@ -306,6 +337,18 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
             <CustomDatePicker
               selected={task.scheduledDate ? parseISO(task.scheduledDate) : undefined}
               onSelect={handleScheduleSelect}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Deadline picker overlay */}
+      {isDeadlinePickerOpen && (
+        <div ref={deadlinePickerRef} className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={(e) => { if (e.target === e.currentTarget) setIsDeadlinePickerOpen(false); }}>
+          <div className="mb-4 animate-in slide-in-from-bottom duration-200">
+            <CustomDatePicker
+              selected={task.deadline ? parseISO(task.deadline) : undefined}
+              onSelect={handleDeadlineSelect}
             />
           </div>
         </div>

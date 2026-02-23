@@ -14,12 +14,13 @@ import {
   GripVertical,
   AtSign,
   Hash,
+  Flag,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import CustomDatePicker from './CustomDatePicker';
 import RecurrenceEditor from './RecurrenceEditor';
-import { getTodayDateString } from '../utils/dateUtils';
+import { getTodayDateString, getDeadlineStatus } from '../utils/dateUtils';
 import { isUrl, fetchPageTitle, getLinkedSegments } from '../utils/linkUtils';
 import { parseTaskInput } from '../utils/taskParser';
 
@@ -31,11 +32,13 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false);
+  const [isDeadlinePickerOpen, setIsDeadlinePickerOpen] = useState(false);
   const [isRecurrenceEditorOpen, setIsRecurrenceEditorOpen] = useState(false);
   const inputRef = useRef(null);
   const taskRef = useRef(task);
   taskRef.current = task;
   const schedulePickerRef = useRef(null);
+  const deadlinePickerRef = useRef(null);
   const recurrenceEditorRef = useRef(null);
 
   // DnD hooks
@@ -68,6 +71,9 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
     const handleClickOutside = (event) => {
       if (schedulePickerRef.current && !schedulePickerRef.current.contains(event.target)) {
         setIsSchedulePickerOpen(false);
+      }
+      if (deadlinePickerRef.current && !deadlinePickerRef.current.contains(event.target)) {
+        setIsDeadlinePickerOpen(false);
       }
       if (recurrenceEditorRef.current && !recurrenceEditorRef.current.contains(event.target)) {
         setIsRecurrenceEditorOpen(false);
@@ -118,6 +124,12 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
     setIsSchedulePickerOpen(false);
   };
 
+  const handleDeadlineSelect = (date) => {
+    const newDeadline = date ? format(date, 'yyyy-MM-dd') : null;
+    onUpdate(task.id, { deadline: newDeadline });
+    setIsDeadlinePickerOpen(false);
+  };
+
   const handleRecurrenceSave = (newRecurrence) => {
     onUpdate(task.id, { recurrence: newRecurrence });
     setIsRecurrenceEditorOpen(false);
@@ -146,6 +158,15 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
           <CustomDatePicker
             selected={task.scheduledDate ? parseISO(task.scheduledDate) : undefined}
             onSelect={handleScheduleSelect}
+          />
+        </div>
+      )}
+      {/* Deadline Picker Popover */}
+      {isDeadlinePickerOpen && (
+        <div ref={deadlinePickerRef} className="absolute top-full right-4 mt-2 z-30 animate-in fade-in duration-100">
+          <CustomDatePicker
+            selected={task.deadline ? parseISO(task.deadline) : undefined}
+            onSelect={handleDeadlineSelect}
           />
         </div>
       )}
@@ -301,6 +322,23 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
             <span>{task.scheduledDate}</span>
           </div>
         )}
+        {task.deadline && (() => {
+          const todayStr = getTodayDateString();
+          const status = getDeadlineStatus(task.deadline, todayStr, isCompleted);
+          const badgeClasses = {
+            overdue: 'bg-danger/10 text-danger',
+            'due-soon': 'bg-warning/10 text-warning',
+            completed: 'bg-surface-secondary text-content-muted',
+            normal: 'bg-surface-secondary text-content-muted',
+          };
+          const badgeText = status.daysRemaining === 0 ? 'Today' : status.daysRemaining < 0 ? `${Math.abs(status.daysRemaining)}d overdue` : `${status.daysRemaining}d left`;
+          return (
+            <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-md ${badgeClasses[status.urgency]}`}>
+              <Flag size={14} />
+              <span>{badgeText}</span>
+            </div>
+          );
+        })()}
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
           <button
             onClick={(e) => { e.stopPropagation(); setIsSchedulePickerOpen(o => !o); }}
@@ -308,6 +346,13 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
             title="Schedule Task"
           >
             <CalendarPlus size={16} />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setIsDeadlinePickerOpen(o => !o); }}
+            className="p-2 rounded-md text-content-muted hover:text-warning hover:bg-warning/10 transition-colors"
+            title="Set Deadline"
+          >
+            <Flag size={16} />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); setIsRecurrenceEditorOpen(o => !o); }}

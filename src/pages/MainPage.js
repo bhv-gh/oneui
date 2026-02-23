@@ -7,6 +7,7 @@ import {
     Settings2,
     GitMerge,
     LayoutGrid,
+    GanttChart,
     Mic,
     RefreshCw,
 } from 'lucide-react';
@@ -23,6 +24,7 @@ import SearchOverlay from '../components/SearchOverlay';
 import SuggestionBar from '../components/SuggestionBar';
 import TreeNode from '../components/TreeNode';
 import ListView from '../components/ListView';
+import TimelineView from '../components/TimelineView';
 import MemoryView from '../components/MemoryView';
 import LogsView from '../components/LogsView';
 import SettingsModal from '../components/SettingsModal';
@@ -248,6 +250,14 @@ export default function MainPage({
         }
         return filtered;
       }, [treeData, selectedDate, simulatedToday, activeFilter]);
+
+      // Timeline data: full tree with only expression filter applied (no date filtering)
+      const timelineTreeData = useMemo(() => {
+        if (activeFilter.children && activeFilter.children.length > 0) {
+          return filterTreeByExpression(treeData, activeFilter);
+        }
+        return treeData;
+      }, [treeData, activeFilter]);
 
       // IDs of nodes that directly match the active filter (vs ancestors shown for context)
       const filterMatchIds = useMemo(() => {
@@ -722,6 +732,9 @@ export default function MainPage({
                         <button onClick={() => setViewMode('list')} className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-surface-secondary text-content-inverse' : 'text-content-tertiary hover:text-content-inverse'}`} title="List View">
                         <LayoutGrid size={18} />
                         </button>
+                        <button onClick={() => setViewMode('timeline')} className={`p-2 rounded-md transition-colors ${viewMode === 'timeline' ? 'bg-surface-secondary text-content-inverse' : 'text-content-tertiary hover:text-content-inverse'}`} title="Timeline View">
+                        <GanttChart size={18} />
+                        </button>
                     </div>
                 )}
 
@@ -858,6 +871,18 @@ export default function MainPage({
                     />
                     );
                 })()
+                )}
+                {activeTab === 'today' && viewMode === 'timeline' && (
+                  <TimelineView
+                    tasks={timelineTreeData}
+                    onUpdate={(id, updates) => handleUpdate(id, updates, selectedDate)}
+                    onStartFocus={handleStartFocus}
+                    onAdd={(parentId) => handleAddTaskAndFocus(() => handleAddSubtask(parentId, selectedDate))}
+                    onRequestDelete={setDeleteTargetId}
+                    onAddRoot={() => handleAddTaskAndFocus(() => handleAddRoot(selectedDate))}
+                    selectedDate={selectedDate}
+                    onOpenNotes={handleOpenNotes}
+                  />
                 )}
                 {activeTab === 'memory' && (() => {
                 const isSearching = searchQuery.length > 0;
