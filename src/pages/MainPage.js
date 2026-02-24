@@ -293,7 +293,7 @@ export default function MainPage({
         }
 
         let tasksForSelectedDate = [];
-        let overdueTasks = [];
+        let deadlineTasks = [];
         let otherPendingTasks = [];
 
         const findTasksRecursive = (nodes) => {
@@ -302,9 +302,9 @@ export default function MainPage({
               // Skip
             } else if (node.scheduledDate === selectedDate || isDateAnOccurrence(node, selectedDate)) {
               tasksForSelectedDate.push(node);
-            } else if (selectedDate === todayStr && node.scheduledDate && node.scheduledDate < todayStr) {
-              overdueTasks.push(node);
-            } else if (selectedDate === todayStr && !node.scheduledDate) {
+            } else if (!node.recurrence && node.deadline && selectedDate <= node.deadline) {
+              deadlineTasks.push(node);
+            } else if (selectedDate === todayStr && !node.scheduledDate && !node.recurrence && !node.deadline) {
               otherPendingTasks.push(node);
             }
 
@@ -317,11 +317,10 @@ export default function MainPage({
         findTasksRecursive(treeData);
 
         if (selectedDate > todayStr) {
-          return tasksForSelectedDate.slice(0, 3);
+          return [...tasksForSelectedDate, ...deadlineTasks].slice(0, 3);
         }
 
         if (selectedDate === todayStr) {
-          overdueTasks.sort((a, b) => parseISO(a.scheduledDate) - parseISO(b.scheduledDate));
           // Stable shuffle seeded by date so suggestions don't reshuffle on every treeData change
           const dateSeed = selectedDate.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
           const shuffledPending = otherPendingTasks.sort((a, b) => {
@@ -330,7 +329,7 @@ export default function MainPage({
             return hashA - hashB;
           });
 
-          const suggestions = [...overdueTasks, ...tasksForSelectedDate, ...shuffledPending];
+          const suggestions = [...tasksForSelectedDate, ...deadlineTasks, ...shuffledPending];
           return suggestions.slice(0, 3);
         }
 

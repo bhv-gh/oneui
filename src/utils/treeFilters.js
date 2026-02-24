@@ -44,6 +44,9 @@ export const filterTreeByDate = (nodes, date, today) => {
     // Task is a recurring occurrence on this date
     const isOccurrenceOnDate = isDateAnOccurrence(node, date);
 
+    // Task has an active deadline covering this date (non-recurrent only)
+    const hasActiveDeadline = !node.recurrence && node.deadline && !node.isCompleted && date <= node.deadline;
+
     // Task was completed on this date (only relevant for past/present)
     const wasCompletedOnDate = isPastOrPresent && (
       node.recurrence
@@ -51,7 +54,7 @@ export const filterTreeByDate = (nodes, date, today) => {
         : (node.isCompleted && node.completionDate === date)
     );
 
-    if (isScheduledForDate || isOccurrenceOnDate || wasCompletedOnDate || hasMatchingChildren) {
+    if (isScheduledForDate || isOccurrenceOnDate || wasCompletedOnDate || hasActiveDeadline || hasMatchingChildren) {
       return { ...node, children, originalChildrenCount };
     }
     return null;
@@ -164,7 +167,15 @@ export const filterForTodayView = (nodes, today) => {
       ? node.completedOccurrences?.includes(today)
       : (node.isCompleted && node.completionDate === today);
 
-    const isRelevantToday = (node.scheduledDate && node.scheduledDate <= today) || isDateAnOccurrence(node, today) || !node.scheduledDate;
+    // Recurrent: show on occurrence dates
+    const isOccurrenceToday = isDateAnOccurrence(node, today);
+    // Scheduled (non-recurrent): show only on the exact scheduled date
+    const isScheduledForToday = node.scheduledDate === today;
+    // Deadline (non-recurrent): show every day until deadline, unless completed
+    const hasActiveDeadline = !node.recurrence && node.deadline && !node.isCompleted && today <= node.deadline;
+    // Unscheduled: tasks with no date info still show in today view
+    const isUnscheduled = !node.scheduledDate && !node.recurrence && !node.deadline;
+    const isRelevantToday = isScheduledForToday || isOccurrenceToday || hasActiveDeadline || isUnscheduled;
 
     const isTaskActionable = isRelevantToday && !isCompletedForToday;
     const wasCompletedToday = node.recurrence
