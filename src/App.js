@@ -263,6 +263,22 @@ function AppContent({ onLogout }) {
       setIsTimerActive(false);
       playNotificationSound(getNotificationSound());
       if (timerMode === 'pomodoro') {
+        // Log the completed focus session
+        if (activeSession) {
+          const endTime = new Date();
+          const newLog = {
+            id: generateId(),
+            taskId: activeSession.taskId,
+            taskText: findNodeRecursive(treeData, activeSession.taskId)?.text || 'Untitled Task',
+            startTime: activeSession.startTime,
+            endTime: endTime,
+          };
+          if (endTime.getTime() - activeSession.startTime.getTime() > 5 * 60 * 1000) {
+            logsHook.addLog(newLog);
+          }
+          setActiveSession(null);
+        }
+
         const newCount = pomodoroCount + 1;
         setPomodoroCount(newCount);
         const pomodorosField = focusedTask.fields?.find(f => f.label === 'Pomodoros');
