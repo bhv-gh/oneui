@@ -22,6 +22,12 @@ export const initSettingsFromSupabase = async () => {
     if (settings && settings.viewMode) {
       localStorage.setItem('flowAppViewMode', settings.viewMode);
     }
+    if (settings && settings.bgMusicUrl !== undefined) {
+      localStorage.setItem('flow-bg-music-url', settings.bgMusicUrl);
+    }
+    if (settings && settings.bgMusicVolume !== undefined) {
+      localStorage.setItem('flow-bg-music-volume', String(settings.bgMusicVolume));
+    }
   } catch (e) {
     // Supabase unavailable, use whatever is in localStorage
   }

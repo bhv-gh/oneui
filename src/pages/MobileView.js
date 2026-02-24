@@ -7,6 +7,7 @@ import { useDroppable } from '@dnd-kit/core';
 import TreeDataContext from '../contexts/TreeDataContext';
 import LogsContext from '../contexts/LogsContext';
 import MemoryContext from '../contexts/MemoryContext';
+import OnlineContext from '../contexts/OnlineContext';
 import CustomDatePicker from '../components/CustomDatePicker';
 import MobileTaskItem from '../components/MobileTaskItem';
 import SettingsModal from '../components/SettingsModal';
@@ -51,6 +52,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
   } = useContext(TreeDataContext);
   const { forceSync: forceSyncLogs } = useContext(LogsContext);
   const { forceSync: forceSyncMemory } = useContext(MemoryContext);
+  const { isOnline } = useContext(OnlineContext);
 
   const [simulatedToday, setSimulatedToday] = useState(getTodayDateString);
   const [selectedDate, setSelectedDate] = useState(simulatedToday);
@@ -188,6 +190,12 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
 
         <div className="flex items-center gap-1">
           {/* Sync status + button */}
+          {!isOnline && (
+            <div className="flex items-center gap-1 text-xs px-2 py-1 rounded-md text-amber-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              Offline
+            </div>
+          )}
           {syncStatus !== 'idle' && !isSyncing && (
             <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md ${
               syncStatus === 'saving' ? 'text-content-tertiary' :

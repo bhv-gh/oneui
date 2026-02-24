@@ -5,9 +5,11 @@ import {
   DownloadCloud,
   Volume2,
   LogOut,
+  Music,
 } from 'lucide-react';
 import { SOUND_OPTIONS, playNotificationSound, getNotificationSound, setNotificationSound } from '../utils/notificationSounds';
 import { getTimerDurations, setTimerDurations, getNudgeMinutes, setNudgeMinutes } from '../utils/timerSettings';
+import { getBgMusicUrl, setBgMusicUrl, getBgMusicVolume, setBgMusicVolume } from '../utils/backgroundMusic';
 import ThemeContext from '../contexts/ThemeContext';
 
 // --- Component: Settings Modal ---
@@ -19,6 +21,8 @@ const SettingsModal = ({ isOpen, onClose, onExport, onImport, simulatedToday, se
     return { pomodoro: d.pomodoro / 60, shortBreak: d.shortBreak / 60, longBreak: d.longBreak / 60 };
   });
   const [nudge, setNudge] = useState(() => getNudgeMinutes());
+  const [bgMusicUrl, setBgMusicUrlState] = useState(() => getBgMusicUrl());
+  const [bgMusicVol, setBgMusicVol] = useState(() => getBgMusicVolume());
   const { theme, setTheme } = useContext(ThemeContext);
 
   if (!isOpen) return null;
@@ -168,6 +172,40 @@ const SettingsModal = ({ isOpen, onClose, onExport, onImport, simulatedToday, se
               </button>
             </div>
             <p className="text-xs text-content-muted mt-1">Plays when a pomodoro or break ends.</p>
+          </div>
+
+          <div className="pt-4 border-t border-edge-secondary">
+            <label className="block text-sm font-medium text-content-tertiary mb-2 flex items-center gap-2">
+              <Music size={14} />
+              Background Music
+            </label>
+            <input
+              type="text"
+              placeholder="Paste audio URL (e.g. Supabase storage link)"
+              value={bgMusicUrl}
+              onChange={(e) => {
+                setBgMusicUrlState(e.target.value);
+                setBgMusicUrl(e.target.value);
+              }}
+              className="w-full bg-surface-secondary text-content-primary text-sm rounded-lg p-2.5 border-none focus:outline-none focus:ring-1 focus:ring-edge-focus placeholder:text-content-muted"
+            />
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-xs text-content-muted">Volume</span>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={Math.round(bgMusicVol * 100)}
+                onChange={(e) => {
+                  const vol = parseInt(e.target.value, 10) / 100;
+                  setBgMusicVol(vol);
+                  setBgMusicVolume(vol);
+                }}
+                className="flex-1 h-1 accent-accent-bold cursor-pointer"
+              />
+              <span className="text-xs text-content-muted w-8 text-right">{Math.round(bgMusicVol * 100)}%</span>
+            </div>
+            <p className="text-xs text-content-muted mt-1">Auto-plays during focus pomodoros, pauses on break.</p>
           </div>
 
           <div className="pt-4 border-t border-edge-secondary">

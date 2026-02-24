@@ -2,25 +2,59 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { generateId } from '../utils/idGenerator';
 import { getTodayDateString } from '../utils/dateUtils';
 import { findNodeRecursive, findNodePath, findParentNode, isDescendantOf } from '../utils/treeUtils';
+import { saveCache, loadCache, markDirty, clearDirty, isDirty, setLastSyncedAt } from '../utils/offlineStorage';
 import * as api from '../api/client';
 
+const CACHE_KEY = 'tree';
+
 export function useTreeData() {
-  const [treeData, setTreeData] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [treeData, setTreeData] = useState(() => {
+    const cached = loadCache(CACHE_KEY);
+    return Array.isArray(cached) ? cached : [];
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    // If we have cached data, skip loading state
+    const cached = loadCache(CACHE_KEY);
+    return !Array.isArray(cached) || cached.length === 0;
+  });
   const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   const saveTimerRef = useRef(null);
   const savedTimerRef = useRef(null);
   const isInitialLoad = useRef(true);
 
+  // Persist to localStorage on every treeData change (except initial)
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    saveCache(CACHE_KEY, treeData);
+  }, [treeData]);
+
   useEffect(() => {
     const init = async () => {
       try {
-        const row = await api.getTree();
-        if (row && Array.isArray(row.data)) {
-          setTreeData(row.data);
+        if (isDirty(CACHE_KEY)) {
+          // Local has unsynced changes — push to Supabase
+          const cached = loadCache(CACHE_KEY);
+          if (cached && Array.isArray(cached)) {
+            await api.putTree(cached);
+            clearDirty(CACHE_KEY);
+            setLastSyncedAt(new Date().toISOString());
+          }
+        } else {
+          // Local is clean — prefer Supabase data
+          const row = await api.getTree();
+          if (row && Array.isArray(row.data)) {
+            setTreeData(row.data);
+            saveCache(CACHE_KEY, row.data);
+            setLastSyncedAt(new Date().toISOString());
+          }
         }
       } catch (err) {
         console.error('Failed to init tree:', err);
+        // Supabase unreachable — keep cached data (already loaded via useState initializer)
       } finally {
         setIsLoading(false);
         isInitialLoad.current = false;
@@ -29,7 +63,7 @@ export function useTreeData() {
     init();
   }, []);
 
-  // Debounced save to Supabase only (no localStorage)
+  // Debounced save to Supabase
   useEffect(() => {
     if (isInitialLoad.current) return;
 
@@ -40,11 +74,14 @@ export function useTreeData() {
     saveTimerRef.current = setTimeout(() => {
       api.putTree(treeData)
         .then(() => {
+          clearDirty(CACHE_KEY);
+          setLastSyncedAt(new Date().toISOString());
           setSyncStatus('saved');
           savedTimerRef.current = setTimeout(() => setSyncStatus('idle'), 2000);
         })
         .catch(err => {
           console.error('Failed to save tree to Supabase:', err);
+          markDirty(CACHE_KEY);
           setSyncStatus('error');
           savedTimerRef.current = setTimeout(() => setSyncStatus('idle'), 3000);
         });
@@ -283,6 +320,9 @@ export function useTreeData() {
       if (row && Array.isArray(row.data)) {
         isInitialLoad.current = true;
         setTreeData(row.data);
+        saveCache(CACHE_KEY, row.data);
+        clearDirty(CACHE_KEY);
+        setLastSyncedAt(new Date().toISOString());
         // Allow the state to settle before re-enabling saves
         setTimeout(() => { isInitialLoad.current = false; }, 50);
       }
@@ -290,15 +330,23 @@ export function useTreeData() {
       savedTimerRef.current = setTimeout(() => setSyncStatus('idle'), 2000);
     } catch (err) {
       console.error('Force sync failed:', err);
+      markDirty(CACHE_KEY);
       setSyncStatus('error');
       savedTimerRef.current = setTimeout(() => setSyncStatus('idle'), 3000);
     }
+  }, []);
+
+  // Allow escaping the loading state when Supabase is unreachable but cache exists
+  const skipLoading = useCallback(() => {
+    setIsLoading(false);
+    isInitialLoad.current = false;
   }, []);
 
   return {
     treeData,
     setTreeData,
     isLoading,
+    skipLoading,
     syncStatus,
     forceSync,
     handleUpdate,

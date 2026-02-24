@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { XCircle, PictureInPicture } from 'lucide-react';
+import { XCircle, PictureInPicture, Volume2, VolumeX, Music } from 'lucide-react';
 import PomodoroTimer from './PomodoroTimer';
 import PipTimerView from './PipTimerView';
 import QuickCapture from './QuickCapture';
+import { getBgMusicUrl, getBgMusicVolume, setBgMusicVolume, isBgMusicPlaying, playBgMusic, pauseBgMusic } from '../utils/backgroundMusic';
 
 // --- Component: Full Screen Focus View ---
 const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onCaptureTask }) => {
   const [pipWindow, setPipWindow] = useState(null);
   const [pipPortalRoot, setPipPortalRoot] = useState(null);
   const [isPipActive, setIsPipActive] = useState(false);
+  const [musicVolume, setMusicVolume] = useState(() => getBgMusicVolume());
+  const [musicMuted, setMusicMuted] = useState(false);
+  const hasMusicUrl = !!getBgMusicUrl();
   const pipWindowRef = useRef(null);
   const canvasRef = useRef(null);
   const videoRef = useRef(null);
@@ -267,6 +271,40 @@ const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onC
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
         <QuickCapture onCapture={onCaptureTask} capturedCount={capturedTasks.length} />
       </div>
+
+      {hasMusicUrl && (
+        <div className="absolute bottom-8 left-8 flex items-center gap-2 bg-surface-primary/60 backdrop-blur-sm rounded-full px-3 py-2">
+          <Music size={14} className="text-content-muted" />
+          <button
+            onClick={() => {
+              if (musicMuted) {
+                setBgMusicVolume(musicVolume || 0.3);
+                setMusicMuted(false);
+              } else {
+                setBgMusicVolume(0);
+                setMusicMuted(true);
+              }
+            }}
+            className="p-1 text-content-tertiary hover:text-content-primary transition-colors"
+            title={musicMuted ? 'Unmute' : 'Mute'}
+          >
+            {musicMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+          </button>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={musicMuted ? 0 : Math.round(musicVolume * 100)}
+            onChange={(e) => {
+              const vol = parseInt(e.target.value, 10) / 100;
+              setMusicVolume(vol);
+              setBgMusicVolume(vol);
+              if (vol > 0) setMusicMuted(false);
+            }}
+            className="w-20 h-1 accent-accent-bold cursor-pointer"
+          />
+        </div>
+      )}
     </div>
   );
 };

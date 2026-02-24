@@ -7,13 +7,17 @@ import { useTreeData } from './hooks/useTreeData';
 import { useLogs } from './hooks/useLogs';
 import { useMemoryData } from './hooks/useMemoryData';
 import { useTheme } from './hooks/useTheme';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
 import TreeDataContext from './contexts/TreeDataContext';
 import LogsContext from './contexts/LogsContext';
 import MemoryContext from './contexts/MemoryContext';
 import ThemeContext from './contexts/ThemeContext';
+import OnlineContext from './contexts/OnlineContext';
+import { getPendingOps, clearPendingOps, loadCache } from './utils/offlineStorage';
 import { findNodeRecursive } from './utils/treeUtils';
 import { generateId } from './utils/idGenerator';
 import { playNotificationSound, getNotificationSound } from './utils/notificationSounds';
+import { playBgMusic, pauseBgMusic } from './utils/backgroundMusic';
 import { getTimerDurations, getNudgeMinutes, initSettingsFromSupabase } from './utils/timerSettings';
 import { getUserHash, clearUserHash } from './utils/userHash';
 import * as api from './api/client';
@@ -151,6 +155,8 @@ export default function TaskTreeApp() {
 
 function AppContent({ onLogout }) {
   const isMobile = useIsMobile();
+  const onlineStatus = useOnlineStatus();
+  const { isOnline } = onlineStatus;
   const treeDataHook = useTreeData();
   const logsHook = useLogs();
   const memoryDataHook = useMemoryData();
@@ -162,6 +168,77 @@ function AppContent({ onLogout }) {
   useEffect(() => {
     initSettingsFromSupabase();
   }, []);
+
+  // Replay pending ops and force-sync when coming back online
+  const wasOnlineRef = useRef(isOnline);
+  useEffect(() => {
+    if (isOnline && !wasOnlineRef.current) {
+      // Transitioned from offline → online
+      const replay = async () => {
+        const ops = getPendingOps();
+        if (ops.length > 0) {
+          for (const op of ops) {
+            try {
+              switch (op.type) {
+                case 'createLog': await api.createLog(op.payload); break;
+                case 'updateLog': await api.updateLog(op.payload.id, op.payload.updates); break;
+                case 'deleteLog': await api.deleteLog(op.payload.id); break;
+                case 'createNote': await api.createNote(op.payload); break;
+                case 'updateNote': await api.updateNote(op.payload.id, op.payload.text); break;
+                case 'deleteNote': await api.deleteNote(op.payload.id); break;
+                case 'createQA': await api.createQA(op.payload); break;
+                case 'updateQA': await api.updateQA(op.payload.id, op.payload.updates); break;
+                case 'deleteQA': await api.deleteQA(op.payload.id); break;
+                default: break;
+              }
+            } catch (err) {
+              console.error('Replay failed for op:', op, err);
+              break;
+            }
+          }
+          clearPendingOps();
+        }
+        // Force-sync all hooks
+        try { await treeDataHook.forceSync(); } catch (e) { console.error('Tree sync failed:', e); }
+        try { await logsHook.forceSync(); } catch (e) { console.error('Logs sync failed:', e); }
+        try { await memoryDataHook.forceSync(); } catch (e) { console.error('Memory sync failed:', e); }
+      };
+      replay();
+    }
+    wasOnlineRef.current = isOnline;
+  }, [isOnline]);
+
+  // Periodic background sync — every 5 minutes when online, replay pending ops + sync
+  useEffect(() => {
+    if (!isOnline) return;
+    const interval = setInterval(async () => {
+      const ops = getPendingOps();
+      if (ops.length > 0) {
+        for (const op of ops) {
+          try {
+            switch (op.type) {
+              case 'createLog': await api.createLog(op.payload); break;
+              case 'updateLog': await api.updateLog(op.payload.id, op.payload.updates); break;
+              case 'deleteLog': await api.deleteLog(op.payload.id); break;
+              case 'createNote': await api.createNote(op.payload); break;
+              case 'updateNote': await api.updateNote(op.payload.id, op.payload.text); break;
+              case 'deleteNote': await api.deleteNote(op.payload.id); break;
+              case 'createQA': await api.createQA(op.payload); break;
+              case 'updateQA': await api.updateQA(op.payload.id, op.payload.updates); break;
+              case 'deleteQA': await api.deleteQA(op.payload.id); break;
+              default: break;
+            }
+          } catch (err) {
+            console.error('Background replay failed:', err);
+            onlineStatus.markUnreachable();
+            return; // Stop — will retry on next interval or reconnection
+          }
+        }
+        clearPendingOps();
+      }
+    }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [isOnline, onlineStatus]);
 
   const [focusedTaskId, setFocusedTaskId] = useState(null);
   const [timerMode, setTimerMode] = useState('pomodoro');
@@ -446,6 +523,15 @@ function AppContent({ onLogout }) {
     return () => clearTimeout(nudgeTimeoutRef.current);
   }, [focusedTaskId, isTimerActive]);
 
+  // Background music: auto-play during focus pomodoros, pause otherwise
+  useEffect(() => {
+    if (focusedTaskId && isTimerActive && timerMode === 'pomodoro') {
+      playBgMusic();
+    } else {
+      pauseBgMusic();
+    }
+  }, [focusedTaskId, isTimerActive, timerMode]);
+
   const timerProps = {
     timeRemaining,
     isTimerActive,
@@ -580,6 +666,7 @@ function AppContent({ onLogout }) {
 
   return (
     <ThemeContext.Provider value={themeValue}>
+    <OnlineContext.Provider value={onlineStatus}>
     <TreeDataContext.Provider value={treeDataHook}>
       <LogsContext.Provider value={logsHook}>
         <MemoryContext.Provider value={memoryDataHook}>
@@ -590,6 +677,14 @@ function AppContent({ onLogout }) {
               <div className="h-14 border-b border-edge-secondary flex items-center px-6 gap-4">
                 <div className="shimmer h-5 w-24 rounded-md" />
                 <div className="flex-1" />
+                {loadCache('tree') && (
+                  <button
+                    onClick={() => treeDataHook.skipLoading()}
+                    className="text-xs px-3 py-1.5 rounded-md bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors"
+                  >
+                    Go Offline
+                  </button>
+                )}
                 <div className="shimmer h-5 w-16 rounded-md" />
                 <div className="shimmer h-5 w-16 rounded-md" />
                 <div className="shimmer h-5 w-16 rounded-md" />
@@ -644,6 +739,7 @@ function AppContent({ onLogout }) {
         </MemoryContext.Provider>
       </LogsContext.Provider>
     </TreeDataContext.Provider>
+    </OnlineContext.Provider>
     </ThemeContext.Provider>
   );
 }
