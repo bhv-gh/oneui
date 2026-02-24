@@ -30,10 +30,15 @@ export function useLogs() {
   }, [logs]);
 
   useEffect(() => {
+    let aborted = false;
+    const timeout = setTimeout(() => {
+      if (!aborted) { aborted = true; isInitialLoad.current = false; }
+    }, 5000);
+
     const init = async () => {
       try {
         const data = await api.getLogs();
-        if (data) {
+        if (!aborted && data) {
           const parsed = data.map(log => ({
             ...log,
             startTime: new Date(log.startTime),
@@ -46,10 +51,13 @@ export function useLogs() {
         console.error('Failed to init logs:', err);
         // Supabase unreachable — keep cached data (already loaded)
       } finally {
-        isInitialLoad.current = false;
+        clearTimeout(timeout);
+        if (!aborted) { isInitialLoad.current = false; }
       }
     };
     init();
+
+    return () => { clearTimeout(timeout); };
   }, []);
 
   const handleSaveLog = (logData) => {
@@ -103,13 +111,23 @@ export function useLogs() {
     try {
       const data = await api.getLogs();
       if (data) {
-        const parsed = data.map(log => ({
+        const remoteParsed = data.map(log => ({
           ...log,
           startTime: new Date(log.startTime),
           endTime: new Date(log.endTime),
         }));
-        setLogs(parsed);
-        saveCache(CACHE_KEY, parsed);
+        // Merge by ID — keep local-only logs, prefer remote for shared
+        setLogs(prev => {
+          const remoteById = new Map(remoteParsed.map(l => [l.id, l]));
+          const localIds = new Set(prev.map(l => l.id));
+          const merged = prev.map(local =>
+            remoteById.has(local.id) ? remoteById.get(local.id) : local
+          );
+          for (const remote of remoteParsed) {
+            if (!localIds.has(remote.id)) merged.push(remote);
+          }
+          return merged.sort((a, b) => a.startTime - b.startTime);
+        });
       }
     } catch (err) {
       console.error('Logs force sync failed:', err);

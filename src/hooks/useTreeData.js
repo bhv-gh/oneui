@@ -3,6 +3,7 @@ import { generateId } from '../utils/idGenerator';
 import { getTodayDateString } from '../utils/dateUtils';
 import { findNodeRecursive, findNodePath, findParentNode, isDescendantOf } from '../utils/treeUtils';
 import { saveCache, loadCache, markDirty, clearDirty, isDirty, setLastSyncedAt } from '../utils/offlineStorage';
+import { mergeTrees } from '../utils/treeMerge';
 import * as api from '../api/client';
 
 const CACHE_KEY = 'tree';
@@ -33,20 +34,37 @@ export function useTreeData() {
   }, [treeData]);
 
   useEffect(() => {
+    let aborted = false;
+
+    // Safety timeout — if Supabase doesn't respond in 5s, stop loading
+    const timeout = setTimeout(() => {
+      if (!aborted) {
+        aborted = true;
+        setIsLoading(false);
+        isInitialLoad.current = false;
+      }
+    }, 5000);
+
     const init = async () => {
       try {
         if (isDirty(CACHE_KEY)) {
-          // Local has unsynced changes — push to Supabase
+          // Local has unsynced changes — fetch remote, merge, push merged
           const cached = loadCache(CACHE_KEY);
-          if (cached && Array.isArray(cached)) {
-            await api.putTree(cached);
-            clearDirty(CACHE_KEY);
-            setLastSyncedAt(new Date().toISOString());
+          const localData = (cached && Array.isArray(cached)) ? cached : [];
+          const row = await api.getTree();
+          const remoteData = (row && Array.isArray(row.data)) ? row.data : [];
+          const merged = mergeTrees(localData, remoteData);
+          if (!aborted) {
+            setTreeData(merged);
+            saveCache(CACHE_KEY, merged);
           }
+          await api.putTree(merged);
+          clearDirty(CACHE_KEY);
+          setLastSyncedAt(new Date().toISOString());
         } else {
           // Local is clean — prefer Supabase data
           const row = await api.getTree();
-          if (row && Array.isArray(row.data)) {
+          if (!aborted && row && Array.isArray(row.data)) {
             setTreeData(row.data);
             saveCache(CACHE_KEY, row.data);
             setLastSyncedAt(new Date().toISOString());
@@ -56,11 +74,16 @@ export function useTreeData() {
         console.error('Failed to init tree:', err);
         // Supabase unreachable — keep cached data (already loaded via useState initializer)
       } finally {
-        setIsLoading(false);
-        isInitialLoad.current = false;
+        clearTimeout(timeout);
+        if (!aborted) {
+          setIsLoading(false);
+          isInitialLoad.current = false;
+        }
       }
     };
     init();
+
+    return () => { clearTimeout(timeout); };
   }, []);
 
   // Debounced save to Supabase
@@ -313,19 +336,22 @@ export function useTreeData() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     try {
-      // Push local state to remote
-      await api.putTree(treeDataRef.current);
-      // Pull fresh data from remote
+      // Fetch remote and merge with local
       const row = await api.getTree();
-      if (row && Array.isArray(row.data)) {
-        isInitialLoad.current = true;
-        setTreeData(row.data);
-        saveCache(CACHE_KEY, row.data);
-        clearDirty(CACHE_KEY);
-        setLastSyncedAt(new Date().toISOString());
-        // Allow the state to settle before re-enabling saves
-        setTimeout(() => { isInitialLoad.current = false; }, 50);
-      }
+      const remoteData = (row && Array.isArray(row.data)) ? row.data : [];
+      const merged = mergeTrees(treeDataRef.current, remoteData);
+
+      // Push merged result
+      await api.putTree(merged);
+
+      isInitialLoad.current = true;
+      setTreeData(merged);
+      saveCache(CACHE_KEY, merged);
+      clearDirty(CACHE_KEY);
+      setLastSyncedAt(new Date().toISOString());
+      // Allow the state to settle before re-enabling saves
+      setTimeout(() => { isInitialLoad.current = false; }, 50);
+
       setSyncStatus('saved');
       savedTimerRef.current = setTimeout(() => setSyncStatus('idle'), 2000);
     } catch (err) {

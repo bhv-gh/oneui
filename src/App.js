@@ -13,7 +13,7 @@ import LogsContext from './contexts/LogsContext';
 import MemoryContext from './contexts/MemoryContext';
 import ThemeContext from './contexts/ThemeContext';
 import OnlineContext from './contexts/OnlineContext';
-import { getPendingOps, clearPendingOps, loadCache } from './utils/offlineStorage';
+import { getPendingOps, clearPendingOps, savePendingOps } from './utils/offlineStorage';
 import { findNodeRecursive } from './utils/treeUtils';
 import { generateId } from './utils/idGenerator';
 import { playNotificationSound, getNotificationSound } from './utils/notificationSounds';
@@ -169,36 +169,46 @@ function AppContent({ onLogout }) {
     initSettingsFromSupabase();
   }, []);
 
+  // Replay queued offline operations one by one.
+  // On failure, saves remaining ops back and returns false.
+  const replayPendingOps = async () => {
+    const ops = getPendingOps();
+    if (ops.length === 0) return true;
+
+    for (let i = 0; i < ops.length; i++) {
+      const op = ops[i];
+      try {
+        switch (op.type) {
+          case 'createLog': await api.createLog(op.payload); break;
+          case 'updateLog': await api.updateLog(op.payload.id, op.payload.updates); break;
+          case 'deleteLog': await api.deleteLog(op.payload.id); break;
+          case 'createNote': await api.createNote(op.payload); break;
+          case 'updateNote': await api.updateNote(op.payload.id, op.payload.text); break;
+          case 'deleteNote': await api.deleteNote(op.payload.id); break;
+          case 'createQA': await api.createQA(op.payload); break;
+          case 'updateQA': await api.updateQA(op.payload.id, op.payload.updates); break;
+          case 'deleteQA': await api.deleteQA(op.payload.id); break;
+          default: break;
+        }
+      } catch (err) {
+        console.error('Replay failed for op:', op, err);
+        // Save remaining (unplayed) ops back and stop
+        savePendingOps(ops.slice(i));
+        return false;
+      }
+    }
+    clearPendingOps();
+    return true;
+  };
+
   // Replay pending ops and force-sync when coming back online
   const wasOnlineRef = useRef(isOnline);
   useEffect(() => {
     if (isOnline && !wasOnlineRef.current) {
       // Transitioned from offline → online
       const replay = async () => {
-        const ops = getPendingOps();
-        if (ops.length > 0) {
-          for (const op of ops) {
-            try {
-              switch (op.type) {
-                case 'createLog': await api.createLog(op.payload); break;
-                case 'updateLog': await api.updateLog(op.payload.id, op.payload.updates); break;
-                case 'deleteLog': await api.deleteLog(op.payload.id); break;
-                case 'createNote': await api.createNote(op.payload); break;
-                case 'updateNote': await api.updateNote(op.payload.id, op.payload.text); break;
-                case 'deleteNote': await api.deleteNote(op.payload.id); break;
-                case 'createQA': await api.createQA(op.payload); break;
-                case 'updateQA': await api.updateQA(op.payload.id, op.payload.updates); break;
-                case 'deleteQA': await api.deleteQA(op.payload.id); break;
-                default: break;
-              }
-            } catch (err) {
-              console.error('Replay failed for op:', op, err);
-              break;
-            }
-          }
-          clearPendingOps();
-        }
-        // Force-sync all hooks
+        await replayPendingOps();
+        // Force-sync all hooks (merge-based, both sides' edits survive)
         try { await treeDataHook.forceSync(); } catch (e) { console.error('Tree sync failed:', e); }
         try { await logsHook.forceSync(); } catch (e) { console.error('Logs sync failed:', e); }
         try { await memoryDataHook.forceSync(); } catch (e) { console.error('Memory sync failed:', e); }
@@ -208,34 +218,12 @@ function AppContent({ onLogout }) {
     wasOnlineRef.current = isOnline;
   }, [isOnline]);
 
-  // Periodic background sync — every 5 minutes when online, replay pending ops + sync
+  // Periodic background sync — every 5 minutes when online, replay pending ops
   useEffect(() => {
     if (!isOnline) return;
     const interval = setInterval(async () => {
-      const ops = getPendingOps();
-      if (ops.length > 0) {
-        for (const op of ops) {
-          try {
-            switch (op.type) {
-              case 'createLog': await api.createLog(op.payload); break;
-              case 'updateLog': await api.updateLog(op.payload.id, op.payload.updates); break;
-              case 'deleteLog': await api.deleteLog(op.payload.id); break;
-              case 'createNote': await api.createNote(op.payload); break;
-              case 'updateNote': await api.updateNote(op.payload.id, op.payload.text); break;
-              case 'deleteNote': await api.deleteNote(op.payload.id); break;
-              case 'createQA': await api.createQA(op.payload); break;
-              case 'updateQA': await api.updateQA(op.payload.id, op.payload.updates); break;
-              case 'deleteQA': await api.deleteQA(op.payload.id); break;
-              default: break;
-            }
-          } catch (err) {
-            console.error('Background replay failed:', err);
-            onlineStatus.markUnreachable();
-            return; // Stop — will retry on next interval or reconnection
-          }
-        }
-        clearPendingOps();
-      }
+      const success = await replayPendingOps();
+      if (!success) onlineStatus.markUnreachable();
     }, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [isOnline, onlineStatus]);
@@ -677,14 +665,12 @@ function AppContent({ onLogout }) {
               <div className="h-14 border-b border-edge-secondary flex items-center px-6 gap-4">
                 <div className="shimmer h-5 w-24 rounded-md" />
                 <div className="flex-1" />
-                {loadCache('tree') && (
-                  <button
-                    onClick={() => treeDataHook.skipLoading()}
-                    className="text-xs px-3 py-1.5 rounded-md bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors"
-                  >
-                    Go Offline
-                  </button>
-                )}
+                <button
+                  onClick={() => treeDataHook.skipLoading()}
+                  className="text-xs px-3 py-1.5 rounded-md bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors animate-fade-in-delayed opacity-0"
+                >
+                  Go Offline
+                </button>
                 <div className="shimmer h-5 w-16 rounded-md" />
                 <div className="shimmer h-5 w-16 rounded-md" />
                 <div className="shimmer h-5 w-16 rounded-md" />

@@ -65,9 +65,14 @@ module.exports = {
           '0%, 100%': { borderColor: 'var(--color-timer-border-pulse-from)' },
           '50%': { borderColor: 'var(--color-timer-border-pulse-to)' },
         },
+        'fadeIn': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
       },
       animation: {
         'border-pulse': 'border-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'fade-in-delayed': 'fadeIn 0.5s ease-in 2s forwards',
       },
     },
   },

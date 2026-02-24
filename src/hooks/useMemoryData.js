@@ -28,23 +28,33 @@ export function useMemoryData() {
   }, [memoryData]);
 
   useEffect(() => {
+    let aborted = false;
+    const timeout = setTimeout(() => {
+      if (!aborted) { aborted = true; isInitialLoad.current = false; }
+    }, 5000);
+
     const init = async () => {
       try {
         const [notes, qas] = await Promise.all([api.getNotes(), api.getQAs()]);
-        const fresh = {
-          notes: notes || [],
-          qas: qas || [],
-        };
-        setMemoryData(fresh);
-        saveCache(CACHE_KEY, fresh);
+        if (!aborted) {
+          const fresh = {
+            notes: notes || [],
+            qas: qas || [],
+          };
+          setMemoryData(fresh);
+          saveCache(CACHE_KEY, fresh);
+        }
       } catch (err) {
         console.error('Failed to init memory:', err);
         // Supabase unreachable — keep cached data (already loaded)
       } finally {
-        isInitialLoad.current = false;
+        clearTimeout(timeout);
+        if (!aborted) { isInitialLoad.current = false; }
       }
     };
     init();
+
+    return () => { clearTimeout(timeout); };
   }, []);
 
   // Wrapped setMemoryData that syncs changes to Supabase
@@ -126,13 +136,30 @@ export function useMemoryData() {
   const forceSync = async () => {
     try {
       const [notes, qas] = await Promise.all([api.getNotes(), api.getQAs()]);
-      const fresh = {
-        notes: notes || [],
-        qas: qas || [],
-      };
-      // Use raw setter to avoid triggering diff-based sync
-      setMemoryData(fresh);
-      saveCache(CACHE_KEY, fresh);
+      const remoteNotes = notes || [];
+      const remoteQAs = qas || [];
+      // Merge by ID — keep local-only items, prefer remote for shared
+      setMemoryData(prev => {
+        const remoteNoteById = new Map(remoteNotes.map(n => [n.id, n]));
+        const localNoteIds = new Set(prev.notes.map(n => n.id));
+        const mergedNotes = prev.notes.map(local =>
+          remoteNoteById.has(local.id) ? remoteNoteById.get(local.id) : local
+        );
+        for (const remote of remoteNotes) {
+          if (!localNoteIds.has(remote.id)) mergedNotes.push(remote);
+        }
+
+        const remoteQAById = new Map(remoteQAs.map(q => [q.id, q]));
+        const localQAIds = new Set(prev.qas.map(q => q.id));
+        const mergedQAs = prev.qas.map(local =>
+          remoteQAById.has(local.id) ? remoteQAById.get(local.id) : local
+        );
+        for (const remote of remoteQAs) {
+          if (!localQAIds.has(remote.id)) mergedQAs.push(remote);
+        }
+
+        return { notes: mergedNotes, qas: mergedQAs };
+      });
     } catch (err) {
       console.error('Memory force sync failed:', err);
     }

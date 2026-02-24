@@ -62,6 +62,18 @@ export function clearPendingOps() {
   localStorage.removeItem(PENDING_OPS_KEY);
 }
 
+export function savePendingOps(ops) {
+  try {
+    if (ops.length === 0) {
+      localStorage.removeItem(PENDING_OPS_KEY);
+    } else {
+      localStorage.setItem(PENDING_OPS_KEY, JSON.stringify(ops));
+    }
+  } catch (err) {
+    console.error('savePendingOps failed:', err);
+  }
+}
+
 // ── Last sync timestamp ────────────────────────────────────
 
 export function setLastSyncedAt(timestamp) {
