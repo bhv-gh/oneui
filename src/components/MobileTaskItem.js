@@ -35,10 +35,11 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
   const deadlinePickerRef = useRef(null);
   const recurrenceEditorRef = useRef(null);
 
-  // Swipe-to-add-subtask state
+  // Swipe state (right = add subtask, left = focus)
   const [swipeOffset, setSwipeOffset] = useState(0);
   const touchStartRef = useRef(null);
   const swipeActiveRef = useRef(false);
+  const swipeDirectionRef = useRef(null); // 'left' or 'right'
   const isNewlyCreatedRef = useRef(false);
 
   const handleTouchStart = useCallback((e) => {
@@ -46,6 +47,7 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
     if (e.target.closest('[data-drag-handle]')) return;
     touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     swipeActiveRef.current = false;
+    swipeDirectionRef.current = null;
   }, [isPastDate]);
 
   const handleTouchMove = useCallback((e) => {
@@ -56,27 +58,36 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
     if (!swipeActiveRef.current) {
       if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) {
         swipeActiveRef.current = true;
+        swipeDirectionRef.current = dx > 0 ? 'right' : 'left';
       } else if (Math.abs(dy) > 10) {
         touchStartRef.current = null;
         return;
       }
     }
 
-    if (swipeActiveRef.current && dx > 0) {
-      e.preventDefault();
-      setSwipeOffset(Math.min(dx, 120));
+    if (swipeActiveRef.current) {
+      if (swipeDirectionRef.current === 'right' && dx > 0) {
+        e.preventDefault();
+        setSwipeOffset(Math.min(dx, 120));
+      } else if (swipeDirectionRef.current === 'left' && dx < 0) {
+        e.preventDefault();
+        setSwipeOffset(Math.max(dx, -120));
+      }
     }
   }, []);
 
   const handleTouchEnd = useCallback(() => {
-    if (swipeOffset >= 80) {
+    if (swipeDirectionRef.current === 'right' && swipeOffset >= 80) {
       if (onPrepareKeyboard) onPrepareKeyboard();
       onAdd(task.id);
+    } else if (swipeDirectionRef.current === 'left' && swipeOffset <= -80) {
+      onStartFocus(task.id, true);
     }
     setSwipeOffset(0);
     touchStartRef.current = null;
     swipeActiveRef.current = false;
-  }, [swipeOffset, onAdd, task.id, onPrepareKeyboard]);
+    swipeDirectionRef.current = null;
+  }, [swipeOffset, onAdd, onStartFocus, task.id, onPrepareKeyboard]);
 
   // DnD hooks
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: task.id });
@@ -161,13 +172,23 @@ const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDe
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Swipe reveal zone */}
+      {/* Swipe reveal zone — right swipe (add subtask) */}
       {swipeOffset > 0 && (
         <div
           className="absolute inset-y-0 left-0 flex items-center pl-4 bg-accent-bold rounded-r-lg"
           style={{ width: swipeOffset }}
         >
           <Plus size={20} className="text-content-inverse" />
+        </div>
+      )}
+
+      {/* Swipe reveal zone — left swipe (focus) */}
+      {swipeOffset < 0 && (
+        <div
+          className="absolute inset-y-0 right-0 flex items-center justify-end pr-4 bg-emerald-600 rounded-l-lg"
+          style={{ width: Math.abs(swipeOffset) }}
+        >
+          <Play size={20} className="text-content-inverse" />
         </div>
       )}
 

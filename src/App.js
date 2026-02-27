@@ -429,17 +429,18 @@ function AppContent({ onLogout }) {
   };
 
 
-  const handleStartFocus = (taskId) => {
+  const handleStartFocus = (taskId, autoStart = false) => {
     setFocusedTaskId(taskId);
     const task = findNodeRecursive(treeData, taskId);
     const defaultPomodoro = getTimerDurations().pomodoro;
-    if (task) {
-      setTimerMode(task.timerMode || 'pomodoro');
-      setTimeRemaining(task.timeRemaining !== undefined ? task.timeRemaining : defaultPomodoro);
-      setIsTimerActive(false);
+    const mode = task?.timerMode || 'pomodoro';
+    const remaining = task?.timeRemaining !== undefined ? task.timeRemaining : defaultPomodoro;
+    setTimerMode(mode);
+    setTimeRemaining(remaining);
+    if (autoStart) {
+      setIsTimerActive(true);
+      setActiveSession({ taskId, startTime: new Date() });
     } else {
-      setTimerMode('pomodoro');
-      setTimeRemaining(defaultPomodoro);
       setIsTimerActive(false);
     }
   };
