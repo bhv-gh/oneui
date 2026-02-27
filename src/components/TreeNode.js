@@ -3,7 +3,8 @@ import TaskCard from './TaskCard';
 
 // --- Component: Recursive Tree Node ---
 const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, highlightedTaskId, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId, filterMatchIds }) => {
-  const visibleChildren = node.hideCompleted
+  const hideCompleted = node.hideCompleted !== false;
+  const visibleChildren = hideCompleted
     ? node.children.filter(child => {
         if (child.recurrence) {
           return !child.completedOccurrences?.includes(selectedDate);

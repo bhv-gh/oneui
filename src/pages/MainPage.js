@@ -88,7 +88,7 @@ export default function MainPage({
     } = useContext(TreeDataContext);
     const { logs, handleSaveLog, handleDeleteLog, handleUpdateLogTime, forceSync: forceSyncLogs } = useContext(LogsContext);
     const { memoryData, setMemoryData, forceSync: forceSyncMemory } = useContext(MemoryContext);
-    const { isOnline } = useContext(OnlineContext);
+    const { isOnline, checkReachability } = useContext(OnlineContext);
     const [scale, setScale] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
@@ -674,10 +674,13 @@ export default function MainPage({
                         <button onClick={() => setActiveTab('insights')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'insights' ? 'bg-surface-secondary text-content-inverse' : 'text-content-tertiary hover:text-content-inverse'}`}>Insights</button>
                     </div>
                     {!isOnline && (
-                        <div className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-md text-amber-400">
+                        <button
+                            onClick={() => checkReachability()}
+                            className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-md text-amber-400 hover:bg-amber-400/10 transition-colors"
+                        >
                             <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400" />
-                            Offline
-                        </div>
+                            Offline — Go Online
+                        </button>
                     )}
                     {syncStatus !== 'idle' && (
                         <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-md transition-all duration-300 ${

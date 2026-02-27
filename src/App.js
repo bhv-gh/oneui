@@ -201,11 +201,11 @@ function AppContent({ onLogout }) {
     return true;
   };
 
-  // Replay pending ops and force-sync when coming back online
-  const wasOnlineRef = useRef(isOnline);
+  // Replay pending ops and force-sync when coming back online or on initial load
+  const wasOnlineRef = useRef(false);
   useEffect(() => {
     if (isOnline && !wasOnlineRef.current) {
-      // Transitioned from offline → online
+      // Transitioned from offline → online, or initial load while online
       const replay = async () => {
         await replayPendingOps();
         // Force-sync all hooks (merge-based, both sides' edits survive)

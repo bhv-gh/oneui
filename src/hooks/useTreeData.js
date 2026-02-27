@@ -13,11 +13,7 @@ export function useTreeData() {
     const cached = loadCache(CACHE_KEY);
     return Array.isArray(cached) ? cached : [];
   });
-  const [isLoading, setIsLoading] = useState(() => {
-    // If we have cached data, skip loading state
-    const cached = loadCache(CACHE_KEY);
-    return !Array.isArray(cached) || cached.length === 0;
-  });
+  const [isLoading, setIsLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   const saveTimerRef = useRef(null);
   const savedTimerRef = useRef(null);

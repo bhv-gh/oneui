@@ -74,5 +74,5 @@ export function useOnlineStatus() {
   // Effective connectivity = browser online AND Supabase reachable
   const effectivelyOnline = isOnline && isReachable;
 
-  return { isOnline: effectivelyOnline, markUnreachable: () => setIsReachable(false), markReachable: () => setIsReachable(true) };
+  return { isOnline: effectivelyOnline, markUnreachable: () => setIsReachable(false), markReachable: () => setIsReachable(true), checkReachability };
 }

@@ -52,7 +52,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
   } = useContext(TreeDataContext);
   const { forceSync: forceSyncLogs } = useContext(LogsContext);
   const { forceSync: forceSyncMemory } = useContext(MemoryContext);
-  const { isOnline } = useContext(OnlineContext);
+  const { isOnline, checkReachability } = useContext(OnlineContext);
 
   const [simulatedToday, setSimulatedToday] = useState(getTodayDateString);
   const [selectedDate, setSelectedDate] = useState(simulatedToday);
@@ -132,7 +132,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
 
   // Flatten tree for rendering
   const flattenedTasks = useMemo(() => {
-    const flatten = (nodes, path = [], parentHideCompleted = false) => {
+    const flatten = (nodes, path = [], parentHideCompleted = true) => {
       let list = [];
       for (const node of nodes) {
         const nodeIsCompleted = node.recurrence
@@ -141,7 +141,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
         if (parentHideCompleted && nodeIsCompleted) continue;
         list.push({ task: node, path });
         if (node.children) {
-          list = list.concat(flatten(node.children, [...path, node.text || 'Untitled'], node.hideCompleted));
+          list = list.concat(flatten(node.children, [...path, node.text || 'Untitled'], node.hideCompleted !== false));
         }
       }
       return list;
@@ -191,10 +191,13 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
         <div className="flex items-center gap-1">
           {/* Sync status + button */}
           {!isOnline && (
-            <div className="flex items-center gap-1 text-xs px-2 py-1 rounded-md text-amber-400">
+            <button
+              onClick={() => checkReachability()}
+              className="flex items-center gap-1 text-xs px-2 py-1 rounded-md text-amber-400 hover:bg-amber-400/10 transition-colors"
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-              Offline
-            </div>
+              Offline — Go Online
+            </button>
           )}
           {syncStatus !== 'idle' && !isSyncing && (
             <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md ${

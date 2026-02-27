@@ -37,7 +37,7 @@ const TimelineView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, o
   // Flatten tree into rows
   const flattenedRows = useMemo(() => {
     const rows = [];
-    const flatten = (nodes, path = [], depth = 0, parentHideCompleted = false) => {
+    const flatten = (nodes, path = [], depth = 0, parentHideCompleted = true) => {
       for (const node of nodes) {
         const nodeIsCompleted = node.recurrence
           ? node.completedOccurrences?.includes(selectedDate)
@@ -46,7 +46,7 @@ const TimelineView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, o
 
         rows.push({ task: node, path, depth, isCompleted: nodeIsCompleted });
         if (node.children) {
-          flatten(node.children, [...path, node.text || 'Untitled'], depth + 1, node.hideCompleted);
+          flatten(node.children, [...path, node.text || 'Untitled'], depth + 1, node.hideCompleted !== false);
         }
       }
     };

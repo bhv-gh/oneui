@@ -11,7 +11,7 @@ const getTodayDateString = () => {
 // --- Component: List View ---
 const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAddRoot, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId }) => {
   const flattenedTasks = useMemo(() => {
-    const flatten = (nodes, path = [], parentHideCompleted = false) => {
+    const flatten = (nodes, path = [], parentHideCompleted = true) => {
       let list = [];
       for (const node of nodes) {
         const nodeIsCompleted = node.recurrence
@@ -22,7 +22,7 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAdd
 
         list.push({ task: node, path });
         if (node.children) {
-          list = list.concat(flatten(node.children, [...path, node.text || "Untitled"], node.hideCompleted));
+          list = list.concat(flatten(node.children, [...path, node.text || "Untitled"], node.hideCompleted !== false));
         }
       }
       return list;

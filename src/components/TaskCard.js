@@ -538,16 +538,17 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onUpdate(node.id, { hideCompleted: !node.hideCompleted });
+                    const isCurrentlyHiding = node.hideCompleted !== false;
+                    onUpdate(node.id, { hideCompleted: !isCurrentlyHiding });
                   }}
                   className={`text-xs flex items-center gap-1 px-2 py-1 rounded-md transition-colors ${
-                    node.hideCompleted
+                    node.hideCompleted !== false
                       ? 'text-amber-400 bg-amber-400/10 hover:bg-amber-400/20'
                       : 'text-content-tertiary bg-surface-tertiary hover:bg-surface-secondary hover:text-content-inverse'
                   }`}
-                  title={node.hideCompleted ? 'Show completed subtasks' : 'Hide completed subtasks'}
+                  title={node.hideCompleted !== false ? 'Show completed subtasks' : 'Hide completed subtasks'}
                 >
-                  {node.hideCompleted ? <EyeOff size={12} /> : <Eye size={12} />}
+                  {node.hideCompleted !== false ? <EyeOff size={12} /> : <Eye size={12} />}
                 </button>
               )}
             </div>
