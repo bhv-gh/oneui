@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { Hash, AtSign, Bookmark, X, Filter, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react';
+import { Hash, AtSign, Bookmark, X, Filter } from 'lucide-react';
 import { generateId } from '../utils/idGenerator';
 
 // ============================================================
@@ -463,50 +463,11 @@ const ExpressionPills = ({ expression }) => {
 const FilterSidebar = ({ treeData, activeFilter, onFilterChange, savedFilters, onSaveFilter, onDeleteFilter }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [newFilterName, setNewFilterName] = useState('');
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [filterText, setFilterText] = useState(() => serializeExpression(activeFilter));
-  const [dragPos, setDragPos] = useState(null); // { x, y } when dragged
-  const dragRef = useRef(null);
-  const dragStartRef = useRef(null);
 
-  // Track whether the last filter change came from typing (internal) vs external (saved filter applied)
   const isInternalChangeRef = useRef(false);
 
-  // Drag-to-reposition handlers
-  const handleDragStart = useCallback((e) => {
-    if (e.target.closest('input, button, [data-no-drag]')) return;
-    e.preventDefault();
-    const el = dragRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    dragStartRef.current = {
-      mouseX: e.clientX,
-      mouseY: e.clientY,
-      startX: rect.left,
-      startY: rect.top,
-    };
-
-    const handleDragMove = (moveEvt) => {
-      if (!dragStartRef.current) return;
-      const dx = moveEvt.clientX - dragStartRef.current.mouseX;
-      const dy = moveEvt.clientY - dragStartRef.current.mouseY;
-      setDragPos({
-        x: dragStartRef.current.startX + dx,
-        y: dragStartRef.current.startY + dy,
-      });
-    };
-
-    const handleDragEnd = () => {
-      dragStartRef.current = null;
-      document.removeEventListener('mousemove', handleDragMove);
-      document.removeEventListener('mouseup', handleDragEnd);
-    };
-
-    document.addEventListener('mousemove', handleDragMove);
-    document.addEventListener('mouseup', handleDragEnd);
-  }, []);
-
-  // Only sync filterText from activeFilter when it changed externally (e.g. saved filter click)
   useEffect(() => {
     if (isInternalChangeRef.current) {
       isInternalChangeRef.current = false;
@@ -611,217 +572,223 @@ const FilterSidebar = ({ treeData, activeFilter, onFilterChange, savedFilters, o
     return JSON.stringify(activeFilter) === JSON.stringify(filter.expression || migrateLegacyFilter(filter));
   };
 
-  // Don't render if there are no projects or tags
   if (allProjects.length === 0 && allTags.length === 0 && savedFilters.length === 0) {
     return null;
   }
 
-  // Collapsed state
-  if (isCollapsed) {
-    return (
-      <div
-        className="fixed z-40 animate-in duration-200"
-        style={dragPos ? { left: dragPos.x, top: dragPos.y } : { left: 12, top: '6.5rem' }}
-      >
+  return (
+    <div className="flex-shrink-0 px-8 transition-all duration-300">
+      {/* Compact bar — always visible */}
+      <div className="flex items-center gap-2 py-2">
         <button
-          onClick={() => setIsCollapsed(false)}
-          className={`p-2 rounded-xl border shadow-lg backdrop-blur-md transition-all ${
+          onClick={() => setIsExpanded(!isExpanded)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
             hasActiveFilter
-              ? 'bg-accent-subtle border-accent-bold text-accent'
-              : 'bg-surface-primary/80 border-edge-secondary text-content-tertiary hover:text-content-primary'
+              ? 'bg-accent-subtle text-accent border border-accent/30'
+              : 'bg-surface-secondary/60 text-content-tertiary hover:text-content-primary border border-transparent'
           }`}
-          title="Show filters"
         >
-          <div className="flex items-center gap-1">
-            <Filter size={14} />
-            <ChevronRight size={12} />
-          </div>
+          <Filter size={13} />
+          <span className="font-medium">Filter</span>
           {hasActiveFilter && (
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-accent-bold rounded-full" />
+            <span className="w-1.5 h-1.5 rounded-full bg-accent" />
           )}
         </button>
-      </div>
-    );
-  }
 
-  return (
-    <div
-      ref={dragRef}
-      className="fixed z-40 flex flex-col animate-in slide-in-from-left-2 duration-300 pointer-events-none"
-      style={dragPos ? { left: dragPos.x, top: dragPos.y, bottom: 'auto' } : { left: 12, top: '6.5rem', bottom: 16 }}
-    >
-      <div className="bg-surface-primary/90 backdrop-blur-md border border-edge-secondary rounded-xl shadow-lg overflow-hidden pointer-events-auto w-64">
-        <div className="p-3 max-h-[calc(100vh-8rem)] overflow-y-auto no-scrollbar">
-          {/* Header — draggable */}
-          <div
-            className="flex items-center justify-between mb-2 cursor-grab active:cursor-grabbing select-none"
-            onMouseDown={handleDragStart}
-          >
-            <div className="flex items-center gap-1.5">
-              <GripVertical size={10} className="text-content-disabled" />
-              <Filter size={12} className="text-content-tertiary" />
-              <span className="text-[10px] font-semibold text-content-secondary uppercase tracking-widest">Filters</span>
-            </div>
-            <div className="flex items-center gap-1">
-              {hasActiveFilter && (
-                <button
-                  onClick={handleClearFilter}
-                  className="p-1 rounded-md text-content-disabled hover:text-danger hover:bg-danger/10 transition-colors"
-                  title="Clear all filters"
-                >
-                  <X size={10} />
-                </button>
-              )}
-              <button
-                onClick={() => setIsCollapsed(true)}
-                className="p-1 rounded-md text-content-disabled hover:text-content-secondary hover:bg-surface-secondary transition-colors"
-                title="Collapse sidebar"
-              >
-                <ChevronLeft size={12} />
-              </button>
-            </div>
+        {/* Inline pills when compact */}
+        {!isExpanded && hasActiveFilter && (
+          <div className="flex items-center gap-1 animate-in fade-in duration-150">
+            <ExpressionPills expression={activeFilter} />
+            <button
+              onClick={handleClearFilter}
+              className="p-1 rounded-md text-content-disabled hover:text-danger hover:bg-danger/10 transition-colors"
+              title="Clear filters"
+            >
+              <X size={12} />
+            </button>
           </div>
+        )}
 
-          {/* Text-based filter input */}
-          <FilterInput
-            value={filterText}
-            onChange={setFilterText}
-            onApply={handleApplyText}
-            allProjects={allProjects}
-            allTags={allTags}
-            placeholder="#tag AND @project"
-          />
+        {/* Quick toggle pills for projects/tags when compact */}
+        {!isExpanded && !hasActiveFilter && (allProjects.length > 0 || allTags.length > 0) && (
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar animate-in fade-in duration-150">
+            {allProjects.map(project => (
+              <button
+                key={project}
+                onClick={() => handlePaletteProjectClick(project)}
+                className={`px-2 py-0.5 text-[10px] rounded-full transition-all border flex-shrink-0 flex items-center gap-1 ${
+                  isProjectActive(project)
+                    ? 'bg-accent-secondary-subtle text-accent-secondary border-accent-secondary/50 font-semibold'
+                    : 'text-content-muted border-edge-secondary hover:border-accent-secondary/50 hover:text-accent-secondary'
+                }`}
+              >
+                <AtSign size={8} className="opacity-60" />
+                {project}
+              </button>
+            ))}
+            {allTags.map(tag => (
+              <button
+                key={tag}
+                onClick={() => handlePaletteTagClick(tag)}
+                className={`px-2 py-0.5 text-[10px] rounded-full transition-all border flex-shrink-0 ${
+                  isTagActive(tag)
+                    ? 'bg-accent-subtle text-accent border-accent-bold/50 font-semibold'
+                    : 'text-content-muted border-edge-secondary hover:border-accent-bold/50 hover:text-accent'
+                }`}
+              >
+                #{tag}
+              </button>
+            ))}
+          </div>
+        )}
 
-          {/* Active expression pills (read-only visual) */}
-          {hasActiveFilter && (
-            <div className="mt-2 mb-1">
-              <ExpressionPills expression={activeFilter} />
-            </div>
-          )}
+        {/* Saved filter quick picks */}
+        {!isExpanded && savedFilters.length > 0 && (
+          <div className="flex items-center gap-1 ml-1">
+            {savedFilters.slice(0, 3).map(filter => (
+              <button
+                key={filter.id}
+                onClick={() => handleApplySavedFilter(filter)}
+                className={`px-2 py-0.5 text-[10px] rounded-full transition-all border flex-shrink-0 flex items-center gap-1 ${
+                  isFilterActive(filter)
+                    ? 'bg-accent-subtle text-accent border-accent-bold/50 font-semibold'
+                    : 'text-content-muted border-edge-secondary hover:text-content-primary'
+                }`}
+              >
+                <Bookmark size={8} className="opacity-50" />
+                {filter.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
-          {/* Palette */}
-          {allProjects.length > 0 && (
-            <>
-              <div className="text-[8px] font-bold text-content-disabled uppercase tracking-widest mt-3 mb-1 px-1">Projects</div>
-              <div className="flex flex-wrap gap-1 px-0.5 mb-1">
-                {allProjects.map(project => (
-                  <button
-                    key={project}
-                    onClick={() => handlePaletteProjectClick(project)}
-                    className={`px-2 py-0.5 text-[10px] rounded-full transition-all border flex items-center gap-1 ${
-                      isProjectActive(project)
-                        ? 'bg-accent-secondary-subtle text-accent-secondary border-accent-secondary/50 font-semibold'
-                        : 'text-content-tertiary border-edge-primary hover:border-accent-secondary/50 hover:text-accent-secondary'
-                    }`}
-                  >
-                    <AtSign size={8} className="opacity-60" />
-                    <span className="truncate">{project}</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-
-          {allTags.length > 0 && (
-            <>
-              <div className="text-[8px] font-bold text-content-disabled uppercase tracking-widest mt-2 mb-1 px-1">Tags</div>
-              <div className="flex flex-wrap gap-1 px-0.5">
-                {allTags.map(tag => (
-                  <button
-                    key={tag}
-                    onClick={() => handlePaletteTagClick(tag)}
-                    className={`px-2 py-0.5 text-[10px] rounded-full transition-all border ${
-                      isTagActive(tag)
-                        ? 'bg-accent-subtle text-accent border-accent-bold/50 font-semibold'
-                        : 'text-content-tertiary border-edge-primary hover:border-accent-bold/50 hover:text-accent'
-                    }`}
-                  >
-                    #{tag}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* Saved Filters */}
-          {(savedFilters.length > 0 || hasActiveFilter) && (
-            <>
-              <div className="text-[9px] font-bold text-content-disabled uppercase tracking-widest mt-3 mb-1 px-1">Saved</div>
-              {savedFilters.map(filter => (
-                <div key={filter.id} className="flex items-center gap-0.5 mb-0.5 group/filter">
-                  <button
-                    onClick={() => handleApplySavedFilter(filter)}
-                    className={`flex-1 text-left px-2.5 py-1.5 rounded-lg transition-all flex flex-col min-w-0 ${
-                      isFilterActive(filter)
-                        ? 'bg-accent-subtle text-accent font-semibold'
-                        : 'text-content-secondary hover:bg-surface-secondary hover:text-content-primary'
-                    }`}
-                  >
-                    <span className="flex items-center gap-1.5 text-xs truncate w-full">
-                      <Bookmark size={10} className="flex-shrink-0 opacity-50" />
-                      {filter.name}
-                    </span>
-                    {filter.text && (
-                      <span className="text-[9px] font-mono text-content-disabled truncate w-full pl-[22px] mt-0.5">
-                        {filter.text}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => onDeleteFilter(filter.id)}
-                    className="p-1 rounded text-content-disabled hover:text-danger transition-all opacity-0 group-hover/filter:opacity-100"
-                    title="Remove saved filter"
-                  >
-                    <X size={10} />
-                  </button>
-                </div>
-              ))}
-
-              {/* Save current filter */}
-              {hasActiveFilter && (
-                isCreating ? (
-                  <div className="flex items-center gap-1 mt-1.5">
-                    <input
-                      type="text"
-                      value={newFilterName}
-                      onChange={(e) => setNewFilterName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSaveFilter();
-                        if (e.key === 'Escape') { setIsCreating(false); setNewFilterName(''); }
-                      }}
-                      placeholder="Filter name..."
-                      className="flex-1 min-w-0 bg-surface-secondary text-[10px] text-content-primary border border-edge-secondary rounded-md px-2 py-1 focus:outline-none focus:border-edge-focus"
-                      autoFocus
-                    />
+      {/* Expanded panel */}
+      {isExpanded && (
+        <div className="pb-3 animate-in slide-in-from-top-1 duration-200">
+          <div className="bg-surface-primary/80 backdrop-blur-md border border-edge-secondary rounded-xl p-4">
+            <div className="flex gap-4">
+              {/* Left: filter input + expression */}
+              <div className="flex-1 min-w-0">
+                <FilterInput
+                  value={filterText}
+                  onChange={setFilterText}
+                  onApply={handleApplyText}
+                  allProjects={allProjects}
+                  allTags={allTags}
+                  placeholder="#tag AND @project OR (#urgent AND @work)"
+                />
+                {hasActiveFilter && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <ExpressionPills expression={activeFilter} />
                     <button
-                      onClick={handleSaveFilter}
-                      className="p-1 text-accent hover:bg-accent-subtle rounded transition-colors"
-                      title="Save"
+                      onClick={handleClearFilter}
+                      className="p-1 rounded-md text-content-disabled hover:text-danger hover:bg-danger/10 transition-colors flex-shrink-0"
+                      title="Clear"
                     >
-                      <Bookmark size={10} />
+                      <X size={12} />
                     </button>
                   </div>
-                ) : (
-                  <button
-                    onClick={() => setIsCreating(true)}
-                    className="w-full mt-1.5 px-2.5 py-1.5 text-[10px] text-content-muted hover:text-accent border border-dashed border-edge-secondary hover:border-accent-bold rounded-lg flex items-center justify-center gap-1 transition-colors"
-                  >
-                    <Bookmark size={9} />
-                    <span>Save Filter</span>
-                  </button>
-                )
-              )}
-            </>
-          )}
+                )}
+              </div>
 
-          {/* Syntax help */}
-          <div className="mt-3 px-1 text-[9px] text-content-disabled leading-relaxed font-mono">
-            <div className="font-sans font-bold uppercase tracking-widest mb-0.5 text-[8px]">Syntax</div>
-            <div>#tag @project AND OR ( )</div>
-            <div className="mt-0.5 font-sans text-[8px]">AND binds tighter than OR</div>
+              {/* Right: palettes */}
+              <div className="flex-shrink-0 flex flex-col gap-2 max-w-[280px]">
+                {allProjects.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {allProjects.map(project => (
+                      <button
+                        key={project}
+                        onClick={() => handlePaletteProjectClick(project)}
+                        className={`px-2 py-0.5 text-[10px] rounded-full transition-all border flex items-center gap-1 ${
+                          isProjectActive(project)
+                            ? 'bg-accent-secondary-subtle text-accent-secondary border-accent-secondary/50 font-semibold'
+                            : 'text-content-tertiary border-edge-primary hover:border-accent-secondary/50 hover:text-accent-secondary'
+                        }`}
+                      >
+                        <AtSign size={8} className="opacity-60" />
+                        {project}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {allTags.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {allTags.map(tag => (
+                      <button
+                        key={tag}
+                        onClick={() => handlePaletteTagClick(tag)}
+                        className={`px-2 py-0.5 text-[10px] rounded-full transition-all border ${
+                          isTagActive(tag)
+                            ? 'bg-accent-subtle text-accent border-accent-bold/50 font-semibold'
+                            : 'text-content-tertiary border-edge-primary hover:border-accent-bold/50 hover:text-accent'
+                        }`}
+                      >
+                        #{tag}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Saved filters row */}
+            {(savedFilters.length > 0 || hasActiveFilter) && (
+              <div className="mt-3 pt-3 border-t border-edge-secondary flex items-center gap-2 flex-wrap">
+                <span className="text-[9px] font-bold text-content-disabled uppercase tracking-widest">Saved</span>
+                {savedFilters.map(filter => (
+                  <div key={filter.id} className="flex items-center group/filter">
+                    <button
+                      onClick={() => handleApplySavedFilter(filter)}
+                      className={`px-2.5 py-1 text-[11px] rounded-lg transition-all flex items-center gap-1.5 ${
+                        isFilterActive(filter)
+                          ? 'bg-accent-subtle text-accent font-semibold'
+                          : 'text-content-secondary hover:bg-surface-secondary hover:text-content-primary'
+                      }`}
+                    >
+                      <Bookmark size={10} className="opacity-50" />
+                      {filter.name}
+                    </button>
+                    <button
+                      onClick={() => onDeleteFilter(filter.id)}
+                      className="p-0.5 rounded text-content-disabled hover:text-danger transition-all opacity-0 group-hover/filter:opacity-100"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                ))}
+                {hasActiveFilter && (
+                  isCreating ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={newFilterName}
+                        onChange={(e) => setNewFilterName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveFilter();
+                          if (e.key === 'Escape') { setIsCreating(false); setNewFilterName(''); }
+                        }}
+                        placeholder="Name..."
+                        className="w-24 bg-surface-secondary text-[10px] text-content-primary border border-edge-secondary rounded-md px-2 py-1 focus:outline-none focus:border-accent-bold"
+                        autoFocus
+                      />
+                      <button onClick={handleSaveFilter} className="p-1 text-accent hover:bg-accent-subtle rounded transition-colors"><Bookmark size={10} /></button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setIsCreating(true)}
+                      className="px-2 py-0.5 text-[10px] text-content-muted hover:text-accent border border-dashed border-edge-secondary hover:border-accent-bold rounded-full flex items-center gap-1 transition-colors"
+                    >
+                      <Bookmark size={9} />
+                      Save
+                    </button>
+                  )
+                )}
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

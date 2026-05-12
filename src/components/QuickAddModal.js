@@ -205,7 +205,7 @@ const QuickAddModal = ({ isOpen, onClose, treeData, onAddSubtask, onAddRoot, onU
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-start justify-center pt-[20vh] bg-page-base backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-[200] flex items-start justify-center pt-[20vh] bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="w-full max-w-lg mx-4 bg-surface-primary border border-edge-primary rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-top-2 duration-200">

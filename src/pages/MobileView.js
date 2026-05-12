@@ -257,13 +257,20 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
         {flattenedTasks.length === 0 ? (
           <div className="flex-1 flex items-center justify-center h-full">
             {isPastDate ? (
-              <p className="text-content-disabled text-sm">No tasks were completed on this day.</p>
+              <div className="flex flex-col items-center gap-3 text-center p-8">
+                <div className="w-12 h-12 rounded-2xl bg-surface-secondary flex items-center justify-center">
+                  <CalendarDays size={24} className="text-content-disabled" />
+                </div>
+                <p className="text-content-disabled text-sm">No tasks were scheduled for this day.</p>
+              </div>
             ) : (
               <button
                 onClick={() => setIsQuickAddOpen(true)}
-                className="flex flex-col items-center gap-2 text-content-muted active:text-accent p-8"
+                className="flex flex-col items-center gap-3 text-content-muted active:text-accent p-8"
               >
-                <Plus size={28} />
+                <div className="w-14 h-14 rounded-2xl bg-surface-secondary flex items-center justify-center">
+                  <Plus size={28} />
+                </div>
                 <span className="text-sm font-medium">Add a Task</span>
               </button>
             )}
@@ -309,7 +316,7 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
       {!isPastDate && (
         <button
           onClick={() => setIsQuickAddOpen(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-accent-bolder active:bg-accent-boldest text-content-inverse shadow-lg flex items-center justify-center z-30"
+          className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-accent-bold active:bg-accent-boldest text-content-inverse shadow-lg shadow-accent-bold/30 flex items-center justify-center z-30 transition-transform active:scale-95"
         >
           <Plus size={24} />
         </button>

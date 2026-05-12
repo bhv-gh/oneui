@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import gsap from 'gsap';
 import { format, parseISO, startOfWeek, addDays } from 'date-fns';
 import { Pencil, Trash, Clock, Flame, Trophy, TrendingUp } from 'lucide-react';
 import { findNodePath } from '../utils/treeUtils';
+import { getColorForString } from '../utils/colorUtils';
 
 const getTodayDateString = () => {
     const today = new Date();
@@ -11,7 +13,17 @@ const getTodayDateString = () => {
 
 // --- Component: Logs View ---
 const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onDeleteLog, onUpdateLogTime, onInteractionChange }) => {
-  const hours = Array.from({ length: 24 }, (_, i) => i); // 0 to 23
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const statsGridRef = useRef(null);
+
+  useEffect(() => {
+    if (!statsGridRef.current) return;
+    const cards = statsGridRef.current.children;
+    gsap.fromTo(cards,
+      { opacity: 0, y: 12, scale: 0.95 },
+      { opacity: 1, y: 0, scale: 1, duration: 0.3, stagger: 0.05, ease: 'back.out(1.4)', clearProps: 'all' }
+    );
+  }, [selectedDate]);
 
   const snapTo15Minutes = (time) => {
     const msIn15Minutes = 15 * 60 * 1000;
@@ -440,16 +452,16 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
         <div className="w-64 flex-shrink-0 space-y-4 sticky top-0 self-start">
 
           {/* --- 1. Stats Summary --- */}
-          <div className="grid grid-cols-2 gap-2">
+          <div ref={statsGridRef} className="grid grid-cols-2 gap-2">
             {[
-              { icon: Clock, label: 'Total Focus', value: stats.totalFocus > 0 ? formatDuration(stats.totalFocus) : '0m' },
-              { icon: Flame, label: 'Sessions', value: stats.sessions },
-              { icon: Trophy, label: 'Longest', value: stats.longestSession > 0 ? formatDuration(stats.longestSession) : '--' },
-              { icon: TrendingUp, label: 'Peak Hour', value: formatHour(stats.peakHour) },
-            ].map(({ icon: Icon, label, value }) => (
+              { icon: Clock, label: 'Total Focus', value: stats.totalFocus > 0 ? formatDuration(stats.totalFocus) : '0m', color: '#38bdf8' },
+              { icon: Flame, label: 'Sessions', value: stats.sessions, color: '#fb923c' },
+              { icon: Trophy, label: 'Longest', value: stats.longestSession > 0 ? formatDuration(stats.longestSession) : '--', color: '#eab308' },
+              { icon: TrendingUp, label: 'Peak Hour', value: formatHour(stats.peakHour), color: '#a78bfa' },
+            ].map(({ icon: Icon, label, value, color }) => (
               <div key={label} className="bg-surface-tertiary border border-edge-primary rounded-lg px-3 py-2.5 flex items-center gap-2">
-                <div className="p-1.5 rounded-md bg-surface-secondary">
-                  <Icon size={14} className="text-accent" />
+                <div className="p-1.5 rounded-md" style={{ backgroundColor: `${color}15` }}>
+                  <Icon size={14} style={{ color }} />
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] text-content-tertiary leading-tight">{label}</p>
@@ -503,10 +515,12 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
             <div>
               <p className="text-[10px] text-content-tertiary font-medium mb-2">Task Breakdown</p>
               <div className="space-y-2.5">
-                {taskBreakdown.map(category => (
+                {taskBreakdown.map(category => {
+                  const catColor = getColorForString(category.categoryName);
+                  return (
                   <div key={category.categoryName}>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${category.hasTaskId ? 'bg-accent' : 'bg-info'}`} />
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: catColor.dot }} />
                       <span className="text-xs text-content-primary font-medium flex-1 truncate" title={category.categoryName}>{category.categoryName}</span>
                       <span className="text-[10px] text-content-tertiary flex-shrink-0">{formatDuration(category.totalMs)}</span>
                     </div>
@@ -523,7 +537,8 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -567,9 +582,11 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
             {processedLogs.length === 0 && !isDragging && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="text-center px-6 py-8">
-                  <div className="text-content-disabled text-4xl mb-3">○</div>
-                  <p className="text-content-muted text-sm">No sessions logged.</p>
-                  <p className="text-content-disabled text-xs mt-1">Drag to create one, or start a Pomodoro.</p>
+                  <div className="w-12 h-12 rounded-2xl bg-surface-secondary flex items-center justify-center mx-auto mb-3">
+                    <Clock size={24} className="text-content-disabled" />
+                  </div>
+                  <p className="text-content-muted text-sm font-medium">No sessions logged</p>
+                  <p className="text-content-disabled text-xs mt-1">Drag on the timeline to log manually, or start a Pomodoro.</p>
                 </div>
               </div>
             )}
@@ -580,6 +597,7 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
               const { top, height } = getPositionAndHeight(currentLog.startTime, currentLog.endTime);
               const { width, left } = log.display;
               const durationMs = currentLog.endTime.getTime() - currentLog.startTime.getTime();
+              const logColor = getColorForString(log.taskText || 'Manual');
               return (
                 <div
                   key={log.id}
@@ -588,19 +606,23 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
                 >
                   <div
                     onMouseDown={(e) => startInteraction(e, log, 'move')}
-                    className={`group relative h-full border-l-2 rounded-lg p-2 flex flex-col justify-center cursor-move ${log.taskId ? 'bg-accent-subtle border-accent' : 'bg-info-subtle border-info'}`}
+                    className="group relative h-full border-l-[3px] rounded-lg p-2 flex flex-col justify-center cursor-move"
+                    style={{ backgroundColor: logColor.bg, borderLeftColor: logColor.dot }}
                   >
                     {/* Resize Handles */}
                     <div onMouseDown={(e) => startInteraction(e, log, 'resize-top')} className="absolute -top-1 left-0 w-full h-2 cursor-row-resize" />
                     <div onMouseDown={(e) => startInteraction(e, log, 'resize-bottom')} className="absolute -bottom-1 left-0 w-full h-2 cursor-row-resize" />
 
-                    <p className={`text-sm font-medium truncate ${log.taskId ? 'text-accent' : 'text-info'}`}>{log.taskText}</p>
-                    <p className={`text-xs ${log.taskId ? 'text-accent-bold' : 'text-info'}`}>
+                    <p className="text-sm font-medium truncate" style={{ color: logColor.text }}>{log.taskText}</p>
+                    <p className="text-xs" style={{ color: logColor.text, opacity: 0.7 }}>
                       {format(currentLog.startTime, 'h:mm a')} - {format(currentLog.endTime, 'h:mm a')}
                     </p>
 
                     {/* Duration Badge */}
-                    <span className={`absolute bottom-1 right-2 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${log.taskId ? 'bg-accent-subtle text-accent' : 'bg-info-subtle text-info'}`}>
+                    <span
+                      className="absolute bottom-1 right-2 text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+                      style={{ backgroundColor: logColor.bg, color: logColor.text }}
+                    >
                       {formatDuration(durationMs)}
                     </span>
 
@@ -608,14 +630,14 @@ const LogsView = ({ logs, treeData, selectedDate, onAddManualLog, onEditLog, onD
                     <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => onEditLog(log)}
-                        className="p-1 rounded bg-surface-secondary text-content-tertiary hover:bg-surface-secondary hover:text-content-inverse"
+                        className="p-1 rounded bg-surface-secondary text-content-tertiary hover:bg-accent-subtle hover:text-accent"
                         title="Edit Log"
                       >
                         <Pencil size={12} />
                       </button>
                       <button
                         onClick={() => onDeleteLog(log.id)}
-                        className="p-1 rounded bg-surface-secondary text-danger hover:bg-danger-subtle hover:text-content-inverse"
+                        className="p-1 rounded bg-surface-secondary text-content-tertiary hover:bg-danger-subtle hover:text-danger"
                         title="Delete Log"
                       >
                         <Trash size={12} />

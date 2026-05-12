@@ -74,7 +74,7 @@ const TriageModal = ({ capturedTasks, treeData, onAddAsRoot, onAddUnderParent, o
   }
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-page-base animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-page-base/95 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="w-full max-w-lg mx-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

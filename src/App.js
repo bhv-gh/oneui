@@ -18,7 +18,7 @@ import { findNodeRecursive } from './utils/treeUtils';
 import { generateId } from './utils/idGenerator';
 import { playNotificationSound, getNotificationSound } from './utils/notificationSounds';
 import { playBgMusic, pauseBgMusic } from './utils/backgroundMusic';
-import { getTimerDurations, getNudgeMinutes, initSettingsFromSupabase } from './utils/timerSettings';
+import { getTimerDurations, getNudgeMinutes, getReminderMinutes, initSettingsFromSupabase } from './utils/timerSettings';
 import { getUserHash, clearUserHash } from './utils/userHash';
 import * as api from './api/client';
 import { resetClient } from './api/supabaseClient';
@@ -28,7 +28,10 @@ import TriageModal from './components/TriageModal';
 import SecretScreen from './components/SecretScreen';
 import MainPage from './pages/MainPage';
 import MobileView from './pages/MobileView';
+import FlowPet from './components/FlowPet';
+import FloatingEmojis from './components/FloatingEmojis';
 import useIsMobile from './hooks/useIsMobile';
+import { useProductivityStats } from './hooks/useProductivityStats';
 import { getTodayDateString } from './utils/dateUtils';
 
 const NUDGE_TITLES = [
@@ -163,6 +166,7 @@ function AppContent({ onLogout }) {
   const themeValue = useTheme();
 
   const { treeData, handleUpdate, handleUpdateField, handleAddField } = treeDataHook;
+  const productivityStats = useProductivityStats(treeData, logsHook.logs);
 
   // Load settings from Supabase on mount
   useEffect(() => {
@@ -227,6 +231,24 @@ function AppContent({ onLogout }) {
     }, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [isOnline, onlineStatus]);
+
+  const [petEnabled, setPetEnabled] = useState(() => localStorage.getItem('flow-pet-enabled') !== 'false');
+  const [petSkin, setPetSkin] = useState(() => localStorage.getItem('flow-pet-skin') || 'default');
+  const [bgEmojis, setBgEmojis] = useState(() => {
+    const raw = localStorage.getItem('flow-bg-emojis') || '';
+    return raw.trim() ? raw.trim().split(/\s+/) : null;
+  });
+
+  useEffect(() => {
+    const sync = () => {
+      setPetEnabled(localStorage.getItem('flow-pet-enabled') !== 'false');
+      setPetSkin(localStorage.getItem('flow-pet-skin') || 'default');
+      const raw = localStorage.getItem('flow-bg-emojis') || '';
+      setBgEmojis(raw.trim() ? raw.trim().split(/\s+/) : null);
+    };
+    window.addEventListener('flow-vibes-changed', sync);
+    return () => window.removeEventListener('flow-vibes-changed', sync);
+  }, []);
 
   const [focusedTaskId, setFocusedTaskId] = useState(null);
   const [timerMode, setTimerMode] = useState('pomodoro');
@@ -432,6 +454,10 @@ function AppContent({ onLogout }) {
   const handleStartFocus = (taskId, autoStart = false) => {
     setFocusedTaskId(taskId);
     const task = findNodeRecursive(treeData, taskId);
+    if (task) {
+      const log = [...(task.activityLog || []), { type: 'focus_started', at: new Date().toISOString() }].slice(-30);
+      handleUpdate(taskId, { activityLog: log, lastFocusedAt: new Date().toISOString(), focusCount: (task.focusCount || 0) + 1 });
+    }
     const defaultPomodoro = getTimerDurations().pomodoro;
     const mode = task?.timerMode || 'pomodoro';
     const remaining = task?.timeRemaining !== undefined ? task.timeRemaining : defaultPomodoro;
@@ -511,6 +537,47 @@ function AppContent({ onLogout }) {
 
     return () => clearTimeout(nudgeTimeoutRef.current);
   }, [focusedTaskId, isTimerActive]);
+
+  // Schedule reminders: notify before tasks with scheduled times
+  const notifiedTasksRef = useRef(new Set());
+  useEffect(() => {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const reminderMin = getReminderMinutes();
+    if (reminderMin <= 0) return;
+
+    const checkSchedules = () => {
+      const now = new Date();
+      const todayStr = getTodayDateString();
+      const scan = (nodes) => {
+        for (const node of nodes) {
+          if (node.scheduledDate === todayStr && node.scheduledTime && !node.isCompleted) {
+            const [h, m] = node.scheduledTime.split(':').map(Number);
+            const scheduledAt = new Date(now);
+            scheduledAt.setHours(h, m, 0, 0);
+            const diffMs = scheduledAt.getTime() - now.getTime();
+            const diffMin = diffMs / 60000;
+            if (diffMin > 0 && diffMin <= reminderMin && !notifiedTasksRef.current.has(node.id + todayStr)) {
+              notifiedTasksRef.current.add(node.id + todayStr);
+              showNotification(
+                `Coming up in ${Math.ceil(diffMin)} min`,
+                node.text || 'Untitled Task',
+                [{ action: 'newPomodoro', title: 'Start Focus' }],
+                node.id,
+                `schedule-${node.id}`
+              );
+              playNotificationSound(getNotificationSound());
+            }
+          }
+          if (node.children) scan(node.children);
+        }
+      };
+      scan(treeData);
+    };
+
+    checkSchedules();
+    const interval = setInterval(checkSchedules, 30000);
+    return () => clearInterval(interval);
+  }, [treeData]);
 
   // Background music: auto-play during focus pomodoros, pause otherwise
   useEffect(() => {
@@ -661,6 +728,22 @@ function AppContent({ onLogout }) {
         <MemoryContext.Provider value={memoryDataHook}>
           <style>{scrollbarHideStyle}</style>
           <style>{quillStyle}</style>
+          {!treeDataHook.isLoading && !focusedTask && !isMobile && (
+            <>
+              <FloatingEmojis intensity="normal" customEmojis={bgEmojis} />
+              {petEnabled && (
+                <FlowPet
+                  key={petSkin}
+                  appState={appState}
+                  completionCount={productivityStats.completionsToday}
+                  focusSessionsToday={productivityStats.focusSessionsToday}
+                  streakDays={productivityStats.streakDays}
+                  treeData={treeData}
+                  logs={logsHook.logs}
+                />
+              )}
+            </>
+          )}
           {treeDataHook.isLoading ? (
             <div className="min-h-screen bg-page-base flex flex-col">
               <div className="h-14 border-b border-edge-secondary flex items-center px-6 gap-4">

@@ -1,11 +1,49 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import TaskCard from './TaskCard';
+import { getPriorityColor } from '../utils/priorityUtils';
 
-// --- Component: Recursive Tree Node ---
-const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, highlightedTaskId, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId, filterMatchIds }) => {
+const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, highlightedTaskId, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId, filterMatchIds, depth = 0 }) => {
   const hideCompleted = node.hideCompleted !== false;
+  const graceIdsRef = useRef(new Set());
+  const prevStatesRef = useRef(null);
+  const timersRef = useRef({});
+  const [, forceUpdate] = useState(0);
+
+  // Build current completion states
+  const curStates = {};
+  node.children.forEach(child => {
+    curStates[child.id] = child.recurrence
+      ? !!child.completedOccurrences?.includes(selectedDate)
+      : !!child.isCompleted;
+  });
+
+  // Detect newly completed children and add to grace set (synchronous, during render)
+  if (hideCompleted && prevStatesRef.current !== null) {
+    node.children.forEach(child => {
+      if (curStates[child.id] && !prevStatesRef.current[child.id]) {
+        graceIdsRef.current.add(child.id);
+        clearTimeout(timersRef.current[child.id]);
+        timersRef.current[child.id] = setTimeout(() => {
+          graceIdsRef.current.delete(child.id);
+          forceUpdate(n => n + 1);
+        }, 1500);
+      }
+    });
+  }
+  if (!hideCompleted) {
+    graceIdsRef.current.clear();
+    Object.values(timersRef.current).forEach(clearTimeout);
+    timersRef.current = {};
+  }
+  prevStatesRef.current = curStates;
+
+  useEffect(() => {
+    return () => Object.values(timersRef.current).forEach(clearTimeout);
+  }, []);
+
   const visibleChildren = hideCompleted
     ? node.children.filter(child => {
+        if (graceIdsRef.current.has(child.id)) return true;
         if (child.recurrence) {
           return !child.completedOccurrences?.includes(selectedDate);
         }
@@ -16,7 +54,7 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
   const isFilterMatch = filterMatchIds ? filterMatchIds.has(node.id) : null;
 
   return (
-    <div className="flex flex-col items-center">
+    <div className={depth === 0 ? 'w-80 flex-shrink-0' : 'w-full'}>
       <TaskCard
         node={node}
         onUpdate={onUpdate}
@@ -38,57 +76,49 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
         isFilterMatch={isFilterMatch}
       />
 
-      {/* Children Container */}
-      {node.isExpanded && hasChildren && (
-        <div className="flex items-start pt-0 relative">
-          {/* Horizontal Connector Line */}
-          {visibleChildren.length > 1 && (
-            <div className="absolute top-0 left-0 right-0 h-px bg-surface-secondary translate-y-0"></div>
-          )}
+      {node.isExpanded && hasChildren && (() => {
+        const isLightTheme = document.documentElement.getAttribute('data-theme') === 'personal';
+        const connectorColor = getPriorityColor(node.priority || 'none', isLightTheme);
+        return (
+        <div className="relative ml-4 mt-2">
+          {/* Vertical connector line spanning all children */}
+          <div className="absolute left-0 top-0 bottom-2 w-px" style={{ backgroundColor: connectorColor.border }} />
 
-          {visibleChildren.map((child, index) => (
-            <div key={child.id} className="flex flex-col items-center relative px-[2vw]">
-              {/* 1. Vertical line going UP from child to the horizontal bar */}
-              <div className="w-px h-8 bg-surface-secondary mb-0"></div>
+          <div className="space-y-2">
+            {visibleChildren.map((child) => (
+              <div key={child.id} className="relative pl-5">
+                {/* Horizontal branch connector */}
+                <div className="absolute left-0 top-[22px] w-5 h-px" style={{ backgroundColor: connectorColor.border }} />
+                {/* Dot at the junction */}
+                <div className="absolute left-[-2px] top-[20px] w-[5px] h-[5px] rounded-full" style={{ backgroundColor: connectorColor.dot }} />
 
-              {/* 2. Horizontal Connectors (The "Arms") */}
-              {visibleChildren.length > 1 && (
-                <>
-                  {/* Right arm (for all except last child) */}
-                  {index !== visibleChildren.length - 1 && (
-                    <div className="absolute top-0 right-0 w-1/2 h-px bg-surface-secondary"></div>
-                  )}
-                  {/* Left arm (for all except first child) */}
-                  {index !== 0 && (
-                    <div className="absolute top-0 left-0 w-1/2 h-px bg-surface-secondary"></div>
-                  )}
-                </>
-              )}
-
-              <TreeNode
-                node={child}
-                onUpdate={onUpdate}
-                onAdd={onAdd}
-                onRequestDelete={onRequestDelete}
-                allFieldKeys={allFieldKeys}
-                onStartFocus={onStartFocus}
-                focusedTaskId={focusedTaskId}
-                isTimerActive={isTimerActive}
-                isSearching={isSearching}
-                highlightedTaskId={highlightedTaskId}
-                highlightedRef={highlightedRef}
-                treeData={treeData}
-                selectedDate={selectedDate}
-                newlyAddedTaskId={newlyAddedTaskId}
-                onFocusHandled={onFocusHandled}
-                onOpenNotes={onOpenNotes}
-                activeDragId={activeDragId}
-                filterMatchIds={filterMatchIds}
-              />
-            </div>
-          ))}
+                <TreeNode
+                  node={child}
+                  onUpdate={onUpdate}
+                  onAdd={onAdd}
+                  onRequestDelete={onRequestDelete}
+                  allFieldKeys={allFieldKeys}
+                  onStartFocus={onStartFocus}
+                  focusedTaskId={focusedTaskId}
+                  isTimerActive={isTimerActive}
+                  isSearching={isSearching}
+                  highlightedTaskId={highlightedTaskId}
+                  highlightedRef={highlightedRef}
+                  treeData={treeData}
+                  selectedDate={selectedDate}
+                  newlyAddedTaskId={newlyAddedTaskId}
+                  onFocusHandled={onFocusHandled}
+                  onOpenNotes={onOpenNotes}
+                  activeDragId={activeDragId}
+                  filterMatchIds={filterMatchIds}
+                  depth={depth + 1}
+                />
+              </div>
+            ))}
+          </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

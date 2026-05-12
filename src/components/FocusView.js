@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
+import gsap from 'gsap';
 import { XCircle, PictureInPicture, Volume2, VolumeX, Music } from 'lucide-react';
 import PomodoroTimer from './PomodoroTimer';
 import PipTimerView from './PipTimerView';
@@ -179,6 +180,21 @@ const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onC
   // Cleanup on unmount
   useEffect(() => () => closePip(), []);
 
+  const focusContainerRef = useRef(null);
+  const hasAnimatedRef = useRef(false);
+
+  useEffect(() => {
+    if (!focusContainerRef.current || !task || hasAnimatedRef.current) return;
+    hasAnimatedRef.current = true;
+    const el = focusContainerRef.current;
+    const title = el.querySelector('[data-focus-title]');
+    const timer = el.querySelector('[data-focus-timer]');
+
+    gsap.fromTo(el, { opacity: 0, scale: 1.03 }, { opacity: 1, scale: 1, duration: 0.5, ease: 'power3.out' });
+    if (title) gsap.fromTo(title, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, delay: 0.15, ease: 'power2.out' });
+    if (timer) gsap.fromTo(timer, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, delay: 0.3, ease: 'back.out(1.5)' });
+  });
+
   if (!task) return null;
 
   const { timeRemaining, isTimerActive, timerMode, onStartPause, onReset, onSetMode } = timerProps;
@@ -190,7 +206,6 @@ const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onC
     paused: 'bg-page-focus', idle: 'bg-page-focus',
   };
 
-  // Resolve CSS variable values for PiP window (which lacks access to the main document's CSS vars)
   const resolvedPipColors = (() => {
     const style = getComputedStyle(document.documentElement);
     const g = (v) => style.getPropertyValue(v).trim() || undefined;
@@ -215,7 +230,7 @@ const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onC
   })();
 
   return (
-    <div className={`fixed inset-0 z-[200] flex flex-col items-center justify-center p-8 animate-in fade-in duration-300 transition-colors duration-1000 ${backgroundClasses[appState]}`}>
+    <div ref={focusContainerRef} className={`fixed inset-0 z-[200] flex flex-col items-center justify-center p-8 transition-colors duration-1000 ${backgroundClasses[appState]}`}>
       <canvas ref={canvasRef} width="400" height="200" style={{ display: 'none' }} />
       <video ref={videoRef} muted playsInline autoPlay style={{ display: 'none' }} />
 
@@ -236,20 +251,23 @@ const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onC
         pipPortalRoot
       )}
 
-      <button onClick={handleExitClick} className="absolute top-6 right-6 text-content-disabled hover:text-content-secondary transition-colors">
-        <XCircle size={32} />
+      <button onClick={handleExitClick} className="absolute top-6 right-6 p-2 rounded-xl text-content-disabled hover:text-content-primary hover:bg-surface-secondary/50 transition-all" title="Exit focus mode">
+        <XCircle size={28} />
       </button>
 
       <div className="text-center">
-        <p className="text-content-muted text-lg mb-2">Focusing on:</p>
-        <h1 className="text-4xl font-bold text-content-primary mb-12 truncate max-w-2xl">{task.text || "Untitled Task"}</h1>
+        <div data-focus-title>
+          <p className="text-content-muted text-lg mb-2">Focusing on:</p>
+          <h1 className="text-4xl font-bold text-content-primary mb-12 truncate max-w-2xl">{task.text || "Untitled Task"}</h1>
+        </div>
 
+        <div data-focus-timer>
         {isPipActive ? (
           <div className="flex flex-col items-center gap-4 animate-in fade-in duration-300">
             <p className="text-content-tertiary">Timer is in Picture-in-Picture mode.</p>
             <button
               onClick={closePip}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-secondary text-content-secondary hover:bg-surface-secondary transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-secondary text-content-secondary hover:bg-accent-subtle hover:text-accent transition-all"
             >
               <PictureInPicture size={18} />
               <span>Bring Timer Back</span>
@@ -266,6 +284,7 @@ const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onC
             onTogglePip={togglePip}
           />
         )}
+        </div>
       </div>
 
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2">

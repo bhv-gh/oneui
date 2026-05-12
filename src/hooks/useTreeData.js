@@ -131,7 +131,9 @@ export function useTreeData() {
           isExpanded: true,
           fields: [],
           children: [],
-          scheduledDate: node.scheduledDate || null
+          scheduledDate: node.scheduledDate || null,
+          createdAt: new Date().toISOString(),
+          interactionCount: 0,
         };
         if (selectedDate > getTodayDateString() && !newNode.scheduledDate) {
           newNode.scheduledDate = selectedDate;
@@ -160,6 +162,35 @@ export function useTreeData() {
     let newUpdates = { ...updates };
 
     const task = findNodeRecursive(treeData, id);
+
+    // Smart interaction tracking — only count meaningful actions, not keystrokes
+    if (task) {
+      const isTextOnly = Object.keys(updates).length === 1 && updates.text !== undefined;
+      const isTimerState = updates.timeRemaining !== undefined || updates.timerMode !== undefined || updates.isTimerActive !== undefined;
+
+      if (!isTextOnly && !isTimerState) {
+        // Meaningful interaction: completion, scheduling, priority, fields, etc.
+        newUpdates.interactionCount = (task.interactionCount || 0) + 1;
+        newUpdates.lastInteractedAt = new Date().toISOString();
+
+        // Track specific events in a compact history
+        const history = [...(task.activityLog || [])];
+        const now = new Date().toISOString();
+
+        if (updates.isCompleted === true) history.push({ type: 'completed', at: now });
+        else if (updates.isCompleted === false) history.push({ type: 'reopened', at: now });
+        if (updates.priority && updates.priority !== task.priority) history.push({ type: 'priority', value: updates.priority, at: now });
+        if (updates.scheduledDate && updates.scheduledDate !== task.scheduledDate) history.push({ type: 'scheduled', value: updates.scheduledDate, at: now });
+        if (updates.deadline && updates.deadline !== task.deadline) history.push({ type: 'deadline', value: updates.deadline, at: now });
+        if (updates.isExpanded !== undefined) history.push({ type: updates.isExpanded ? 'expanded' : 'collapsed', at: now });
+
+        // Keep last 30 events
+        newUpdates.activityLog = history.slice(-30);
+      } else if (isTextOnly && !task.firstEditAt) {
+        // Track when text was first written (task was given a name)
+        newUpdates.firstEditAt = new Date().toISOString();
+      }
+    }
 
     // Recurrence/completion logic requires the task snapshot —
     // only run when the task is found in the current render's state.
@@ -218,7 +249,9 @@ export function useTreeData() {
       isCompleted: false,
       isExpanded: true,
       fields: [],
-      children: []
+      children: [],
+      createdAt: new Date().toISOString(),
+      interactionCount: 0,
     };
     if (selectedDate > getTodayDateString()) {
       newRootTask.scheduledDate = selectedDate;
@@ -232,6 +265,7 @@ export function useTreeData() {
     const today = getTodayDateString();
     const isFuture = selectedDate > today;
 
+    const now = new Date().toISOString();
     const buildNodes = (items) => items.map(task => ({
       id: generateId(),
       text: task.text || '',
@@ -239,6 +273,8 @@ export function useTreeData() {
       isExpanded: true,
       fields: [],
       children: task.children?.length > 0 ? buildNodes(task.children) : [],
+      createdAt: now,
+      interactionCount: 0,
       ...(isFuture ? { scheduledDate: selectedDate } : {}),
       ...(task.project ? { project: task.project } : {}),
       ...(task.tags?.length > 0 ? { tags: task.tags } : {}),

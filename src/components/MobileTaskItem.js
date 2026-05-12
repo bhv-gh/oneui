@@ -19,6 +19,7 @@ import HighlightedInput from './HighlightedInput';
 import RecurrenceEditor from './RecurrenceEditor';
 import { getLinkedSegments } from '../utils/linkUtils';
 import { getTodayDateString, getDeadlineStatus } from '../utils/dateUtils';
+import { getPriorityColor } from '../utils/priorityUtils';
 
 const MobileTaskItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, onDeleteEmpty, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId, isPastDate, onPrepareKeyboard }) => {
   const isCompleted = task.recurrence

@@ -34,7 +34,7 @@ const RecurrenceEditor = ({ recurrence, onSave, onClose }) => {
         <label className="text-xs text-content-tertiary">Frequency</label>
         <div className="flex bg-surface-secondary rounded-md p-1 mt-1">
           {['daily', 'weekly', 'monthly'].map(f => (
-            <button key={f} onClick={() => setFreq(f)} className={`flex-1 text-xs capitalize py-1 rounded ${freq === f ? 'bg-surface-secondary text-content-inverse' : 'text-content-secondary'}`}>
+            <button key={f} onClick={() => setFreq(f)} className={`flex-1 text-xs capitalize py-1.5 rounded transition-all font-medium ${freq === f ? 'bg-accent-bold text-content-inverse shadow-sm' : 'text-content-tertiary hover:text-content-primary'}`}>
               {f}
             </button>
           ))}
@@ -63,7 +63,7 @@ const RecurrenceEditor = ({ recurrence, onSave, onClose }) => {
               <button
                 key={index}
                 onClick={() => handleDayToggle(index)}
-                className={`w-7 h-7 text-xs rounded-full transition-colors ${daysOfWeek.includes(index) ? 'bg-accent-bold text-content-inverse' : 'bg-surface-secondary hover:bg-surface-secondary'}`}
+                className={`w-7 h-7 text-xs rounded-full transition-all ${daysOfWeek.includes(index) ? 'bg-accent-bold text-content-inverse' : 'bg-surface-secondary hover:bg-accent-subtle hover:text-accent text-content-tertiary'}`}
               >
                 {day}
               </button>

@@ -437,7 +437,7 @@ export default function RambleModal({ isOpen, onClose, onAddTasks, treeData, onU
     const parts = [];
     if (stats.completes > 0) parts.push(`${stats.completes} completed`);
     if (stats.logs > 0) parts.push(`${stats.logs} logged`);
-    if (stats.newTasks > 0) parts.push(`${stats.newTasks} new task${stats.newTasks > 1 ? 's' : ''}`);
+    if (stats.newTasks > 0) parts.push(`${stats.newTasks} to place`);
     setConfirmation(parts.join(', ') || 'Done');
     setTimeout(handleClose, 1200);
   };

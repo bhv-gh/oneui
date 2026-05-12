@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useContext } from 'react';
 import {
   Plus,
   Trash2,
@@ -24,12 +24,29 @@ import RecurrenceEditor from './RecurrenceEditor';
 import { getTodayDateString, getDeadlineStatus } from '../utils/dateUtils';
 import { isUrl, fetchPageTitle, getLinkedSegments } from '../utils/linkUtils';
 import { parseTaskInput } from '../utils/taskParser';
+import { getPriorityColor, getNextPriority, getPriorityLabel } from '../utils/priorityUtils';
+import TreeDataContext from '../contexts/TreeDataContext';
 
 // --- Component: Task List Item (for List View) ---
 const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDelete, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId }) => {
   const isCompleted = task.recurrence
     ? task.completedOccurrences?.includes(selectedDate)
     : task.isCompleted;
+
+  const { treeData } = useContext(TreeDataContext);
+  const { allProjects, allTags } = useMemo(() => {
+    const projects = new Set();
+    const tags = new Set();
+    const collect = (nodes) => {
+      for (const n of nodes) {
+        if (n.project) projects.add(n.project);
+        if (n.tags) n.tags.forEach(t => tags.add(t));
+        if (n.children) collect(n.children);
+      }
+    };
+    collect(treeData || []);
+    return { allProjects: [...projects], allTags: [...tags] };
+  }, [treeData]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false);
@@ -86,11 +103,12 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
 
   const handleFinishEditing = () => {
     setIsEditing(false);
-    const { text: cleanText, project, tags } = parseTaskInput(task.text);
-    if (cleanText !== task.text || project || tags.length > 0) {
+    const { text: cleanText, project, tags, priority: parsedPriority } = parseTaskInput(task.text);
+    if (cleanText !== task.text || project || tags.length > 0 || parsedPriority) {
       const updates = { text: cleanText };
       if (project) updates.project = project;
       if (tags.length > 0) updates.tags = [...new Set([...(task.tags || []), ...tags])];
+      if (parsedPriority) updates.priority = parsedPriority;
       onUpdate(task.id, updates);
     }
   };
@@ -136,12 +154,16 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
     setIsRecurrenceEditorOpen(false);
   };
 
+  const isLightTheme = document.documentElement.getAttribute('data-theme') === 'personal';
+  const priority = task.priority || 'none';
+  const priorityColor = getPriorityColor(priority, isLightTheme);
+
   return (
     <div
       ref={setDropRef}
       data-task-id={task.id}
       className={`relative flex items-center gap-4 px-4 py-3 rounded-lg transition-colors group ${isCompleted ? 'opacity-50' : ''} ${isDragging ? '!opacity-40' : ''} ${isDropTarget ? 'border-l-2 border-accent-secondary bg-accent-secondary-subtle' : ''} hover:bg-surface-secondary`}
-      style={indentationStyle}
+      style={{ ...indentationStyle, borderLeft: isDropTarget ? undefined : (priority !== 'none' ? `3px solid ${priorityColor.dot}` : undefined) }}
     >
       {/* Drag Handle */}
       <div
@@ -215,6 +237,8 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
               onPaste={handlePaste}
               className="bg-transparent text-content-primary font-medium w-full outline-none border-b border-edge-focus"
               onClick={(e) => e.stopPropagation()}
+              projects={allProjects}
+              tags={allTags}
             />
             {task.links && task.links.length > 0 && (
               <div className="flex flex-col gap-0.5 mt-1">
@@ -259,7 +283,7 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="text-accent-secondary hover:text-accent-secondary hover:underline"
+                      className="text-accent-secondary hover:text-accent-secondary-bold hover:underline"
                     >
                       {seg.content}
                       <ExternalLink size={10} className="inline ml-0.5 mb-0.5" />
@@ -277,7 +301,7 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
         {(task.project || (task.tags && task.tags.length > 0)) && (
           <div className="flex flex-wrap gap-1 mt-0.5">
             {task.project && (
-              <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 bg-accent-secondary-subtle text-accent-secondary-bold rounded-full group/badge">
+              <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 bg-accent-secondary-subtle text-accent-secondary-bold rounded-full group/badge font-medium border border-accent-secondary/20">
                 <AtSign size={8} />
                 {task.project}
                 <button
@@ -286,6 +310,14 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
                 >
                   <X size={8} />
                 </button>
+              </span>
+            )}
+            {priority !== 'none' && (
+              <span
+                className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                style={{ backgroundColor: priorityColor.bg, color: priorityColor.text, border: `1px solid ${priorityColor.border}` }}
+              >
+                {getPriorityLabel(priority)}
               </span>
             )}
             {(task.tags || []).map(tag => (
@@ -320,6 +352,7 @@ const TaskListItem = ({ task, path, onUpdate, onStartFocus, onAdd, onRequestDele
           <div className="flex items-center gap-1.5 text-xs text-content-muted bg-surface-secondary px-2 py-1 rounded-md">
             <CalendarDays size={14} />
             <span>{task.scheduledDate}</span>
+            {task.scheduledTime && <span className="text-accent-secondary-bold font-medium">@ {task.scheduledTime}</span>}
           </div>
         )}
         {task.deadline && (() => {

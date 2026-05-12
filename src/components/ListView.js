@@ -36,7 +36,12 @@ const ListView = ({ tasks, onUpdate, onStartFocus, onAdd, onRequestDelete, onAdd
     return (
       <div className="flex-1 flex items-center justify-center">
         {selectedDate < getTodayDateString() ? (
-          <div className="text-content-disabled">No tasks were completed on this day.</div>
+          <div className="flex flex-col items-center gap-3 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-surface-secondary flex items-center justify-center">
+              <Plus size={24} className="text-content-disabled" />
+            </div>
+            <p className="text-content-disabled text-sm">No tasks were scheduled for this day.</p>
+          </div>
         ) : (
           <button
             onClick={onAddRoot}

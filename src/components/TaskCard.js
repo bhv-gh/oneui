@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import gsap from 'gsap';
 import {
   Plus,
   Trash2,
@@ -34,6 +35,7 @@ import { startOfToday, parseISO } from 'date-fns';
 import { getTodayDateString, getDeadlineStatus } from '../utils/dateUtils';
 import { isUrl, fetchPageTitle, getLinkedSegments } from '../utils/linkUtils';
 import { parseTaskInput } from '../utils/taskParser';
+import { getPriorityColor, getNextPriority, getPriorityLabel } from '../utils/priorityUtils';
 
 // --- Component: Task Card (The actual node content) ---
 const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStartFocus, focusedTaskId, isTimerActive, isSearching, isHighlighted, highlightedRef, treeData, selectedDate, newlyAddedTaskId, onFocusHandled, onOpenNotes, activeDragId, isFilterMatch }) => {
@@ -43,13 +45,113 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
   const [isEditing, setIsEditing] = useState(false);
   const [showFields, setShowFields] = useState(false);
   const inputRef = useRef(null);
+  const cardBoxRef = useRef(null);
   const nodeRef = useRef(node);
   nodeRef.current = node;
+  const prevCompletedRef = useRef(isCompleted);
+
+  // GSAP: celebration on completion
+  useEffect(() => {
+    if (isCompleted && !prevCompletedRef.current && cardBoxRef.current) {
+      const card = cardBoxRef.current;
+
+      // Card glow pulse
+      gsap.to(card, {
+        boxShadow: '0 0 30px rgba(16,185,129,0.4)',
+        duration: 0.3,
+        yoyo: true,
+        repeat: 1,
+        ease: 'power2.out',
+      });
+
+      // Card bounce
+      gsap.fromTo(card, { scale: 1 }, { scale: 1.05, duration: 0.2, yoyo: true, repeat: 1, ease: 'back.out(3)' });
+
+      // Checkbox spin
+      const checkbox = card.querySelector('[data-checkbox]');
+      if (checkbox) {
+        gsap.fromTo(checkbox, { rotation: 0, scale: 0.5 }, { rotation: 360, scale: 1, duration: 0.5, ease: 'back.out(2)' });
+      }
+
+      // Confetti burst from the checkbox
+      const rect = (checkbox || card).getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const emojis = ['🎉', '✨', '⭐', '🌟', '💫', '🎊', '✅', '🥳'];
+
+      for (let i = 0; i < 8; i++) {
+        const particle = document.createElement('div');
+        particle.textContent = emojis[i % emojis.length];
+        particle.style.cssText = `position:fixed;left:${cx}px;top:${cy}px;font-size:16px;pointer-events:none;z-index:9999;`;
+        document.body.appendChild(particle);
+
+        const angle = (Math.PI * 2 * i) / 8 + (Math.random() - 0.5) * 0.5;
+        const dist = 40 + Math.random() * 60;
+
+        gsap.to(particle, {
+          x: Math.cos(angle) * dist,
+          y: Math.sin(angle) * dist - 20,
+          opacity: 0,
+          scale: 1.5,
+          duration: 0.6 + Math.random() * 0.3,
+          ease: 'power2.out',
+          onComplete: () => particle.remove(),
+        });
+      }
+
+      // Fade out after celebration — if the card stays in DOM (not hidden),
+      // we restore it; if it gets unmounted by the grace period, it's seamless.
+      const wrapper = card.closest('[data-task-id]');
+      if (wrapper) {
+        gsap.to(wrapper, {
+          opacity: 0.4,
+          y: -8,
+          scale: 0.97,
+          duration: 0.4,
+          delay: 0.7,
+          ease: 'power2.in',
+          onComplete: () => {
+            // If still in DOM after fade, gently settle into completed state
+            if (wrapper.isConnected) {
+              gsap.to(wrapper, { opacity: 0.7, y: 0, scale: 1, duration: 0.3, ease: 'power2.out' });
+            }
+          },
+        });
+      }
+    }
+    prevCompletedRef.current = isCompleted;
+  }, [isCompleted]);
+
+  // GSAP: smooth expand when entering edit mode
+  useEffect(() => {
+    if (isEditing && cardBoxRef.current) {
+      gsap.from(cardBoxRef.current, {
+        scaleY: 0.92, opacity: 0.8,
+        duration: 0.3, ease: 'back.out(1.5)',
+        clearProps: 'transform,opacity',
+      });
+    }
+  }, [isEditing]);
   const [incompleteWarning, setIncompleteWarning] = useState(null);
   const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false);
   const [isDeadlinePickerOpen, setIsDeadlinePickerOpen] = useState(false);
   const [isRecurrenceEditorOpen, setIsRecurrenceEditorOpen] = useState(false);
   const [isMoreActionsOpen, setIsMoreActionsOpen] = useState(false);
+
+  const { allProjects, allTags } = useMemo(() => {
+    const projects = new Set();
+    const tags = new Set();
+    const collect = (nodes) => {
+      for (const n of nodes) {
+        if (n.project) projects.add(n.project);
+        if (n.tags) n.tags.forEach(t => tags.add(t));
+        if (n.children) collect(n.children);
+      }
+    };
+    collect(treeData || []);
+    return { allProjects: [...projects], allTags: [...tags] };
+  }, [treeData]);
+
   const schedulePickerRef = useRef(null);
   const deadlinePickerRef = useRef(null);
   const recurrenceEditorRef = useRef(null);
@@ -117,11 +219,12 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
 
   const handleFinishEditing = () => {
     setIsEditing(false);
-    const { text: cleanText, project, tags } = parseTaskInput(node.text);
-    if (cleanText !== node.text || project || tags.length > 0) {
+    const { text: cleanText, project, tags, priority: parsedPriority } = parseTaskInput(node.text);
+    if (cleanText !== node.text || project || tags.length > 0 || parsedPriority) {
       const updates = { text: cleanText };
       if (project) updates.project = project;
       if (tags.length > 0) updates.tags = [...new Set([...(node.tags || []), ...tags])];
+      if (parsedPriority) updates.priority = parsedPriority;
       onUpdate(node.id, updates);
     }
   };
@@ -190,6 +293,10 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
     return node.timeRemaining < full;
   })();
 
+  const isLightTheme = document.documentElement.getAttribute('data-theme') === 'personal';
+  const priority = node.priority || 'none';
+  const priorityColor = getPriorityColor(priority, isLightTheme);
+
   return (
     <div
       ref={(el) => {
@@ -198,7 +305,8 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
       }}
       data-task-id={node.id}
       className={`
-        relative flex flex-col items-center w-[15vw] min-w-[250px] max-w-[350px] transition-all duration-300 group z-10
+        relative flex flex-col w-full transition-all duration-300 group
+        ${isEditing || isMoreActionsOpen || isSchedulePickerOpen || isDeadlinePickerOpen || isRecurrenceEditorOpen ? 'z-50' : 'z-10'}
         ${isSearching && !isHighlighted ? 'opacity-20 scale-95' : 'opacity-100 scale-100'}
         ${isHighlighted ? 'opacity-100' : ''}
         ${isCompleted && !isHighlighted ? 'opacity-70' : ''}
@@ -207,9 +315,200 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
       `}
     >
       {/* The Card Box */}
+      {isEditing ? (
+      /* ═══════════ EDITING STATE ═══════════ */
+      <div ref={cardBoxRef} className="relative w-full bg-surface-primary/95 backdrop-blur-md border border-accent/40 rounded-2xl p-6 shadow-[0_0_40px_rgba(16,185,129,0.12)] transition-all duration-300"
+        style={priority !== 'none' ? { backgroundImage: `linear-gradient(135deg, ${priorityColor.dot}25 0%, transparent 50%)`, boxShadow: `inset 0 0 30px ${priorityColor.dot}15, 0 0 12px ${priorityColor.dot}10` } : undefined}
+      >
+
+        {/* Main input — blends with card */}
+        <HighlightedInput
+          ref={inputRef}
+          value={node.text}
+          onChange={(e) => onUpdate(node.id, { text: e.target.value })}
+          onBlur={handleFinishEditing}
+          onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
+          className="bg-transparent text-content-primary text-lg font-medium w-full outline-none border-b-2 border-accent/30 focus:border-accent pb-2 transition-all"
+          placeholder="What needs to be done?"
+          projects={allProjects}
+          tags={allTags}
+          autoFocus
+          onClick={(e) => e.stopPropagation()}
+        />
+
+        {/* Inline quick actions */}
+        <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const input = inputRef.current;
+              if (input) {
+                const pos = input.selectionStart || input.value.length;
+                const before = input.value.slice(0, pos);
+                const after = input.value.slice(pos);
+                const newVal = before + (before.endsWith(' ') || before === '' ? '@' : ' @') + after;
+                onUpdate(node.id, { text: newVal });
+                setTimeout(() => { input.focus(); input.setSelectionRange(newVal.length - after.length, newVal.length - after.length); }, 0);
+              }
+            }}
+            className="px-2.5 py-1.5 text-[11px] rounded-lg bg-accent-secondary-subtle text-accent-secondary-bold hover:bg-accent-secondary/20 transition-colors flex items-center gap-1"
+          >
+            <AtSign size={11} /> Project
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const input = inputRef.current;
+              if (input) {
+                const pos = input.selectionStart || input.value.length;
+                const before = input.value.slice(0, pos);
+                const after = input.value.slice(pos);
+                const newVal = before + (before.endsWith(' ') || before === '' ? '#' : ' #') + after;
+                onUpdate(node.id, { text: newVal });
+                setTimeout(() => { input.focus(); input.setSelectionRange(newVal.length - after.length, newVal.length - after.length); }, 0);
+              }
+            }}
+            className="px-2.5 py-1.5 text-[11px] rounded-lg bg-accent-subtle text-accent hover:bg-accent/20 transition-colors flex items-center gap-1"
+          >
+            <Hash size={11} /> Tag
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onUpdate(node.id, { priority: getNextPriority(priority) });
+            }}
+            className="px-2.5 py-1.5 text-[11px] rounded-lg transition-colors flex items-center gap-1 border"
+            style={{ backgroundColor: priorityColor.bg, color: priorityColor.text, borderColor: priorityColor.border }}
+          >
+            <Flag size={11} /> {getPriorityLabel(priority)}
+          </button>
+        </div>
+
+        {/* Inline schedule / deadline row */}
+        <div className="mt-3 pt-3 border-t border-edge-secondary grid grid-cols-2 gap-2">
+          <div className="relative" ref={schedulePickerRef}>
+            <button
+              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setIsSchedulePickerOpen(!isSchedulePickerOpen); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-lg bg-surface-secondary text-content-secondary hover:text-accent-secondary hover:bg-accent-secondary-subtle transition-colors"
+            >
+              <CalendarPlus size={13} />
+              <span>{node.scheduledDate ? `${node.scheduledDate}${node.scheduledTime ? ' @ ' + node.scheduledTime : ''}` : 'Schedule'}</span>
+            </button>
+            {isSchedulePickerOpen && (
+              <div className="absolute top-full left-0 mt-1 z-[110] animate-in fade-in duration-100">
+                <div className="bg-surface-primary border border-edge-secondary rounded-xl shadow-2xl overflow-hidden">
+                  <CustomDatePicker
+                    selected={node.scheduledDate ? new Date(node.scheduledDate) : undefined}
+                    onSelect={(date) => {
+                      const newScheduledDate = date ? date.toISOString().split('T')[0] : null;
+                      onUpdate(node.id, { scheduledDate: newScheduledDate });
+                      if (!node.scheduledTime) setIsSchedulePickerOpen(false);
+                    }}
+                  />
+                  <div className="px-3 pb-3 flex items-center gap-2 border-t border-edge-secondary pt-2">
+                    <label className="text-[10px] text-content-muted uppercase tracking-wider">Time</label>
+                    <input
+                      type="time"
+                      value={node.scheduledTime || ''}
+                      onChange={(e) => onUpdate(node.id, { scheduledTime: e.target.value || null })}
+                      className="flex-1 bg-surface-secondary text-content-primary text-xs rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-accent-bold/50"
+                    />
+                    {node.scheduledTime && (
+                      <button onClick={(e) => { e.stopPropagation(); onUpdate(node.id, { scheduledTime: null }); }} className="p-1 text-content-muted hover:text-danger transition-colors">
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="relative" ref={deadlinePickerRef}>
+            <button
+              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setIsDeadlinePickerOpen(!isDeadlinePickerOpen); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-lg bg-surface-secondary text-content-secondary hover:text-warning hover:bg-warning-subtle transition-colors"
+            >
+              <Flag size={13} />
+              <span>{node.deadline || 'Deadline'}</span>
+            </button>
+            {isDeadlinePickerOpen && (
+              <div className="absolute top-full right-0 mt-1 z-[110] animate-in fade-in duration-100">
+                <CustomDatePicker
+                  selected={node.deadline ? new Date(node.deadline) : undefined}
+                  onSelect={(date) => {
+                    const newDeadline = date ? date.toISOString().split('T')[0] : null;
+                    onUpdate(node.id, { deadline: newDeadline });
+                    setIsDeadlinePickerOpen(false);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Inline recurrence + delete row */}
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <div className="relative" ref={recurrenceEditorRef}>
+            <button
+              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setIsRecurrenceEditorOpen(!isRecurrenceEditorOpen); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-lg bg-surface-secondary text-content-secondary hover:text-accent-secondary hover:bg-accent-secondary-subtle transition-colors"
+            >
+              <Repeat size={13} />
+              <span>{node.recurrence ? 'Edit Recurrence' : 'Recurrence'}</span>
+            </button>
+            {isRecurrenceEditorOpen && (
+              <div className="absolute top-full left-0 mt-1 z-[110] animate-in fade-in duration-100">
+                <RecurrenceEditor
+                  recurrence={node.recurrence}
+                  onSave={(newRecurrence) => { onUpdate(node.id, { recurrence: newRecurrence }); setIsRecurrenceEditorOpen(false); }}
+                  onClose={() => setIsRecurrenceEditorOpen(false)}
+                />
+              </div>
+            )}
+          </div>
+          <button
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onRequestDelete(node.id); }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-lg bg-surface-secondary text-content-secondary hover:text-danger hover:bg-danger-subtle transition-colors"
+          >
+            <Trash2 size={13} />
+            <span>Delete</span>
+          </button>
+        </div>
+
+        {/* Links */}
+        {node.links && node.links.length > 0 && (
+          <div className="flex flex-col gap-0.5 mt-3">
+            {node.links.map((l, i) => (
+              <div key={i} className="flex items-center gap-1">
+                <ExternalLink size={10} className="text-accent-secondary-bold flex-shrink-0" />
+                <span className="text-[10px] text-accent-secondary/70 truncate flex-1">{l.title !== l.url ? `${l.title} — ${l.url}` : l.url}</span>
+                <button
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); const updated = node.links.filter((_, j) => j !== i); onUpdate(node.id, { links: updated.length ? updated : null }); }}
+                  className="text-content-disabled hover:text-danger transition-colors flex-shrink-0"
+                ><X size={10} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Footer hint */}
+        <div className="mt-3 pt-2 border-t border-edge-secondary flex items-center justify-between">
+          <span className="text-[10px] text-content-disabled">
+            <kbd className="px-1 py-0.5 rounded bg-surface-secondary border border-edge-secondary">Enter</kbd> save
+            {' · '}
+            <kbd className="px-1 py-0.5 rounded bg-surface-secondary border border-edge-secondary">@</kbd> project
+            {' · '}
+            <kbd className="px-1 py-0.5 rounded bg-surface-secondary border border-edge-secondary">#</kbd> tag
+          </span>
+        </div>
+      </div>
+      ) : (
+      /* ═══════════ VIEW STATE ═══════════ */
       <div
+        ref={cardBoxRef}
         className={`
-          relative w-full bg-surface-primary/90 backdrop-blur-md border rounded-2xl p-3 shadow-xl transition-all duration-300
+          relative w-full bg-surface-primary/90 backdrop-blur-md border rounded-2xl p-4 shadow-xl transition-all duration-300
           ${isDropTarget
             ? 'border-accent-secondary shadow-[0_0_15px_rgba(34,211,238,0.3)]'
             : isHighlighted
@@ -220,6 +519,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
               ? 'border-edge-focus shadow-[0_0_15px_rgba(16,185,129,0.15)] animate-border-pulse'
               : (isCompleted ? 'border-edge-focus shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'border-edge-primary hover:border-content-muted hover:shadow-2xl hover:shadow-accent-bold/5')}
         `}
+        style={priority !== 'none' ? { backgroundImage: `linear-gradient(135deg, ${priorityColor.dot}25 0%, transparent 50%)`, boxShadow: `inset 0 0 30px ${priorityColor.dot}15, 0 0 12px ${priorityColor.dot}10` } : undefined}
       >
         <div className="flex items-start gap-3">
           {/* Drag Handle */}
@@ -233,43 +533,34 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
             <GripVertical size={14} />
           </div>
 
-          {/* Checkbox with Tooltip Wrapper */}
+          {/* Checkbox */}
           <div className="relative flex-shrink-0">
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                // If trying to complete a parent task
-                // Use originalChildrenCount to check for ALL children, not just visible ones.
                 if (!isCompleted && node.originalChildrenCount > 0) {
-                  // We need to find the node in the full tree to check its real children's status.
                   const fullNode = findNodeRecursive(treeData, node.id);
                   const allChildrenDone = fullNode.children.every(child => child.isCompleted);
                   if (!allChildrenDone) {
                     const incompleteChildren = fullNode.children.filter(child => !child.isCompleted);
                     const today = startOfToday();
-
-                    // Check if there are any incomplete tasks that are due today or are overdue/unscheduled.
                     const hasActionableTasks = incompleteChildren.some(
                       child => !child.scheduledDate || parseISO(child.scheduledDate) <= today
                     );
-
                     let warningMessage = 'Complete all subtasks first.';
-                    // Only show the "Next up" message if ALL incomplete tasks are in the future.
                     if (!hasActionableTasks) {
                       const futureTasks = incompleteChildren.filter(child => child.scheduledDate).sort((a, b) => parseISO(a.scheduledDate) - parseISO(b.scheduledDate));
                       const nextTask = futureTasks[0];
                       warningMessage = `Next up: "${nextTask.text}" on ${nextTask.scheduledDate}.`;
                     }
-
                     setIncompleteWarning(warningMessage);
-                    setTimeout(() => setIncompleteWarning(null), 3000); // Hide after 3 seconds
-                    return; // Prevent completion
+                    setTimeout(() => setIncompleteWarning(null), 3000);
+                    return;
                   }
                 }
-
-                // Proceed with update if it's being un-completed, has no children, or all children are done.
                 onUpdate(node.id, { isCompleted: !isCompleted, isExpanded: false });
               }}
+              data-checkbox
               className={`
                 mt-1 flex items-center justify-center w-5 h-5 rounded-full border transition-all duration-300
                 ${isCompleted
@@ -286,88 +577,48 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
             )}
           </div>
 
-          {/* Indicator for currently running timer */}
           {isCurrentlyRunningInFocus && (
             <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></div>
           )}
 
           {/* Text Content */}
           <div className="flex-1 min-w-0">
-            {isEditing ? (
-              <>
-                <HighlightedInput
-                  ref={inputRef}
-                  value={node.text}
-                  onChange={(e) => onUpdate(node.id, { text: e.target.value })}
-                  onBlur={handleFinishEditing}
-                  onKeyDown={handleKeyDown}
-                  onPaste={handlePaste}
-                  className="bg-transparent text-content-primary text-sm w-full outline-none border-b border-edge-focus pb-1"
-                  placeholder="Task name..."
-                  autoFocus
-                  onClick={(e) => e.stopPropagation()}
-                />
-                {node.links && node.links.length > 0 && (
-                  <div className="flex flex-col gap-0.5 mt-1">
-                    {node.links.map((l, i) => (
-                      <div key={i} className="flex items-center gap-1">
-                        <ExternalLink size={10} className="text-accent-secondary-bold flex-shrink-0" />
-                        <span className="text-[10px] text-accent-secondary/70 truncate flex-1">{l.title !== l.url ? `${l.title} — ${l.url}` : l.url}</span>
-                        <button
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const updated = node.links.filter((_, j) => j !== i);
-                            onUpdate(node.id, { links: updated.length ? updated : null });
-                          }}
-                          className="text-content-disabled hover:text-danger transition-colors flex-shrink-0"
-                          title="Remove link"
-                        >
-                          <X size={10} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div
-                onClick={(e) => {
-                  if (e.target.tagName === 'A') return;
-                  e.stopPropagation();
-                  setIsEditing(true);
-                }}
-                className={`
-                  cursor-text text-sm font-medium break-words pb-1 min-h-[1.5rem]
-                  ${node.text ? 'text-content-primary' : 'text-content-muted italic'}
-                  ${isCompleted ? 'line-through text-content-muted' : ''}
-                `}
-              >
-                {(() => {
-                  const segments = getLinkedSegments(node.text, node.links);
-                  if (segments) {
-                    return segments.map((seg, i) =>
-                      seg.type === 'link' ? (
-                        <a
-                          key={i}
-                          href={seg.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-accent-secondary hover:text-accent-secondary hover:underline"
-                        >
-                          {seg.content}
-                          <ExternalLink size={10} className="inline ml-0.5 mb-0.5" />
-                        </a>
-                      ) : (
-                        <span key={i}>{seg.content}</span>
-                      )
-                    );
-                  }
-                  return node.text || "New Task";
-                })()}
-              </div>
-            )}
+            <div
+              onClick={(e) => {
+                if (e.target.tagName === 'A') return;
+                e.stopPropagation();
+                setIsEditing(true);
+              }}
+              className={`
+                cursor-text text-sm font-medium break-words pb-1 min-h-[1.5rem]
+                ${node.text ? 'text-content-primary' : 'text-content-muted italic'}
+                ${isCompleted ? 'line-through text-content-muted' : ''}
+              `}
+            >
+              {(() => {
+                const segments = getLinkedSegments(node.text, node.links);
+                if (segments) {
+                  return segments.map((seg, i) =>
+                    seg.type === 'link' ? (
+                      <a
+                        key={i}
+                        href={seg.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-accent-secondary hover:text-accent-secondary-bold hover:underline"
+                      >
+                        {seg.content}
+                        <ExternalLink size={10} className="inline ml-0.5 mb-0.5" />
+                      </a>
+                    ) : (
+                      <span key={i}>{seg.content}</span>
+                    )
+                  );
+                }
+                return node.text || "New Task";
+              })()}
+            </div>
           </div>
 
           {/* Fields Toggle */}
@@ -457,7 +708,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
         {(node.project || (node.tags && node.tags.length > 0)) && (
           <div className="mt-1.5 flex flex-wrap gap-1">
             {node.project && (
-              <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 bg-accent-secondary-subtle text-accent-secondary-bold rounded-full group/badge">
+              <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 bg-accent-secondary-subtle text-accent-secondary-bold rounded-full group/badge font-medium border border-accent-secondary/20">
                 <AtSign size={8} />
                 {node.project}
                 <button
@@ -466,6 +717,14 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 >
                   <X size={8} />
                 </button>
+              </span>
+            )}
+            {priority !== 'none' && (
+              <span
+                className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                style={{ backgroundColor: priorityColor.bg, color: priorityColor.text, border: `1px solid ${priorityColor.border}` }}
+              >
+                {getPriorityLabel(priority)}
               </span>
             )}
             {(node.tags || []).map(tag => (
@@ -483,9 +742,13 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
           </div>
         )}
 
-        {/* Scheduled Date Display */}
+        {/* Scheduled Date + Time Display */}
         {node.scheduledDate && (
-          <div className="mt-2 text-xs flex items-center gap-1.5 text-content-muted"><CalendarDays size={12} /><span>{node.scheduledDate}</span></div>
+          <div className="mt-2 text-xs flex items-center gap-1.5 text-content-muted">
+            <CalendarDays size={12} />
+            <span>{node.scheduledDate}</span>
+            {node.scheduledTime && <span className="text-accent-secondary-bold font-medium">@ {node.scheduledTime}</span>}
+          </div>
         )}
 
         {/* Deadline Display */}
@@ -532,7 +795,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 className="text-xs flex items-center gap-1 text-content-tertiary hover:text-content-inverse bg-surface-tertiary hover:bg-surface-secondary px-2 py-1 rounded-md transition-colors"
               >
                 {node.isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                <span>{node.children.length}</span>
+                <span>{completedChildren}/{totalChildren}</span>
               </button>
               {hasCompletedChildren && (
                 <button
@@ -566,6 +829,17 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
 
           {/* Action Buttons */}
           <div className="flex items-center gap-0.5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdate(node.id, { priority: getNextPriority(priority) });
+              }}
+              className="p-1 rounded-md transition-all"
+              style={{ color: priorityColor.dot }}
+              title={`Priority: ${getPriorityLabel(priority)} — click to cycle`}
+            >
+              <Flag size={14} />
+            </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -608,7 +882,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                 <Ellipsis size={14} />
               </button>
               {isMoreActionsOpen && (
-                <div className="absolute bottom-full right-0 mb-2 z-30 animate-in fade-in duration-100 bg-surface-primary border border-edge-primary rounded-lg shadow-xl p-1 flex flex-col gap-0.5 min-w-[150px]">
+                <div className="absolute top-full right-0 mt-1 z-[100] animate-in fade-in duration-100 bg-surface-primary border border-edge-primary rounded-lg shadow-2xl p-1 flex flex-col gap-0.5 min-w-[160px]">
                   <div className="relative" ref={schedulePickerRef}>
                     <button
                       onClick={(e) => { e.stopPropagation(); setIsSchedulePickerOpen(!isSchedulePickerOpen); }}
@@ -618,16 +892,37 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                       <span>Schedule</span>
                     </button>
                     {isSchedulePickerOpen && (
-                      <div className="absolute bottom-full right-0 mb-1 z-40 animate-in fade-in duration-100">
-                        <CustomDatePicker
-                          selected={node.scheduledDate ? new Date(node.scheduledDate) : undefined}
-                          onSelect={(date) => {
-                            const newScheduledDate = date ? date.toISOString().split('T')[0] : null;
-                            onUpdate(node.id, { scheduledDate: newScheduledDate });
-                            setIsSchedulePickerOpen(false);
-                            setIsMoreActionsOpen(false);
-                          }}
-                        />
+                      <div className="absolute top-0 right-full mr-1 z-[110] animate-in fade-in duration-100">
+                        <div className="bg-surface-primary border border-edge-secondary rounded-xl shadow-2xl overflow-hidden">
+                          <CustomDatePicker
+                            selected={node.scheduledDate ? new Date(node.scheduledDate) : undefined}
+                            onSelect={(date) => {
+                              const newScheduledDate = date ? date.toISOString().split('T')[0] : null;
+                              onUpdate(node.id, { scheduledDate: newScheduledDate });
+                              if (!node.scheduledTime) {
+                                setIsSchedulePickerOpen(false);
+                                setIsMoreActionsOpen(false);
+                              }
+                            }}
+                          />
+                          <div className="px-3 pb-3 flex items-center gap-2 border-t border-edge-secondary pt-2">
+                            <label className="text-[10px] text-content-muted uppercase tracking-wider">Time</label>
+                            <input
+                              type="time"
+                              value={node.scheduledTime || ''}
+                              onChange={(e) => onUpdate(node.id, { scheduledTime: e.target.value || null })}
+                              className="flex-1 bg-surface-secondary text-content-primary text-xs rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-accent-bold/50"
+                            />
+                            {node.scheduledTime && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); onUpdate(node.id, { scheduledTime: null }); }}
+                                className="p-1 text-content-muted hover:text-danger transition-colors"
+                              >
+                                <X size={12} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -640,7 +935,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                       <span>Deadline</span>
                     </button>
                     {isDeadlinePickerOpen && (
-                      <div className="absolute bottom-full right-0 mb-1 z-40 animate-in fade-in duration-100">
+                      <div className="absolute top-0 right-full mr-1 z-[110] animate-in fade-in duration-100">
                         <CustomDatePicker
                           selected={node.deadline ? new Date(node.deadline) : undefined}
                           onSelect={(date) => {
@@ -662,7 +957,7 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
                       <span>Recurrence</span>
                     </button>
                     {isRecurrenceEditorOpen && (
-                      <div className="absolute bottom-full right-0 mb-1 z-40 animate-in fade-in duration-100">
+                      <div className="absolute top-0 right-full mr-1 z-[110] animate-in fade-in duration-100">
                         <RecurrenceEditor
                           recurrence={node.recurrence}
                           onSave={(newRecurrence) => { onUpdate(node.id, { recurrence: newRecurrence }); setIsMoreActionsOpen(false); }}
@@ -688,11 +983,8 @@ const TaskCard = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
           </div>
         </div>
       </div>
-
-      {/* Vertical Connector from Card to Children Line */}
-      {node.isExpanded && node.children.length > 0 && (
-        <div className="w-px h-8 bg-surface-secondary"></div>
       )}
+
     </div>
   );
 };

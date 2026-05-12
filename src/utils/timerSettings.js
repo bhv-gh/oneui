@@ -73,3 +73,17 @@ export const setNudgeMinutes = (minutes) => {
   localStorage.setItem('flow-nudge-minutes', String(minutes));
   api.updateSettings({ nudgeMinutes: minutes }).catch(console.error);
 };
+
+export const getReminderMinutes = () => {
+  const stored = localStorage.getItem('flow-reminder-minutes');
+  if (stored !== null) {
+    const val = parseInt(stored, 10);
+    return isNaN(val) ? 5 : val;
+  }
+  return 5;
+};
+
+export const setReminderMinutes = (minutes) => {
+  localStorage.setItem('flow-reminder-minutes', String(minutes));
+  api.updateSettings({ reminderMinutes: minutes }).catch(console.error);
+};

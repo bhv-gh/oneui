@@ -35,7 +35,7 @@ const QuickCapture = ({ onCapture, capturedCount }) => {
     return (
       <button
         onClick={() => setIsExpanded(true)}
-        className="flex items-center gap-2 px-3 py-2 rounded-full bg-surface-secondary border border-edge-primary hover:border-edge-focus hover:bg-surface-secondary text-content-tertiary hover:text-accent transition-all"
+        className="flex items-center gap-2 px-3 py-2 rounded-full bg-surface-secondary border border-edge-primary hover:border-accent hover:bg-accent-subtle text-content-tertiary hover:text-accent transition-all"
         title="Jot down a task"
       >
         <Plus size={16} />
@@ -64,7 +64,7 @@ const QuickCapture = ({ onCapture, capturedCount }) => {
       <button
         onClick={handleSubmit}
         disabled={!text.trim()}
-        className="p-1.5 rounded-lg bg-accent-subtle text-accent hover:bg-accent-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        className="p-1.5 rounded-lg bg-accent-subtle text-accent hover:bg-accent-bold hover:text-content-inverse disabled:opacity-30 disabled:cursor-not-allowed transition-all"
       >
         <Plus size={14} />
       </button>

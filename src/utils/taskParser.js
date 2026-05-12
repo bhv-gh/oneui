@@ -1,29 +1,36 @@
+const VALID_PRIORITIES = ['urgent', 'high', 'medium', 'low'];
+
 /**
- * Parses task input text to extract @project and #tag tokens.
- * Returns the cleaned text, extracted project, and extracted tags.
+ * Parses task input text to extract @project, #tag, and !priority tokens.
+ * Returns the cleaned text, extracted project, tags, and priority.
  *
- * Example: "Buy groceries @personal #errands #urgent"
- *  → { text: "Buy groceries", project: "personal", tags: ["errands", "urgent"] }
+ * Example: "Buy groceries @personal #errands !high"
+ *  → { text: "Buy groceries", project: "personal", tags: ["errands"], priority: "high" }
  */
 export function parseTaskInput(text) {
-  if (!text) return { text: '', project: null, tags: [] };
+  if (!text) return { text: '', project: null, tags: [], priority: null };
 
   let project = null;
   const tags = [];
+  let priority = null;
 
-  // Extract @project references (last one wins)
   const projectMatches = text.match(/@([\w][\w-]*)/g);
   if (projectMatches) {
     project = projectMatches[projectMatches.length - 1].slice(1);
   }
 
-  // Extract #tag references
   const tagMatches = text.match(/#([\w][\w-]*)/g);
   if (tagMatches) {
-    tagMatches.forEach(t => tags.push(t.slice(1)));
+    tagMatches.forEach(t => {
+      const val = t.slice(1);
+      if (VALID_PRIORITIES.includes(val.toLowerCase())) {
+        priority = val.toLowerCase();
+      } else {
+        tags.push(val);
+      }
+    });
   }
 
-  // Clean text: remove @project and #tag tokens, collapse whitespace
   const cleanText = text
     .replace(/@[\w][\w-]*/g, '')
     .replace(/#[\w][\w-]*/g, '')
@@ -34,5 +41,6 @@ export function parseTaskInput(text) {
     text: cleanText,
     project,
     tags: [...new Set(tags)],
+    priority,
   };
 }

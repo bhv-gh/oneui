@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useContext, useCallback } from 'react';
+import gsap from 'gsap';
 import {
     Plus,
-    Minimize,
-    Maximize,
     CalendarDays,
     Settings2,
     GitMerge,
@@ -37,11 +36,13 @@ import TaskNotesPanel from '../components/TaskNotesPanel';
 import RambleModal, { isSpeechSupported } from '../components/RambleModal';
 import QuickAddModal from '../components/QuickAddModal';
 import FilterSidebar from '../components/FilterSidebar';
+import PlacementPanel from '../components/PlacementPanel';
 
 import { getTodayDateString, isDateAnOccurrence } from '../utils/dateUtils';
 import { filterTreeByDate, filterForTodayView, filterTreeByExpression, collectFilterMatchIds } from '../utils/treeFilters';
 import { migrateLegacyFilter } from '../components/FilterSidebar';
 import { findNodeRecursive } from '../utils/treeUtils';
+import RadialMenu from '../components/RadialMenu';
 import * as api from '../api/client';
 import Fuse from 'fuse.js';
 
@@ -53,15 +54,15 @@ function RootDropZoneButton({ onClick, activeDragId }) {
         <button
             ref={setNodeRef}
             onClick={onClick}
-            className={`w-64 h-24 rounded-2xl border-2 border-dashed flex items-center justify-center transition-all ${
+            className={`min-w-80 w-80 flex-shrink-0 h-20 rounded-2xl border-2 border-dashed flex items-center justify-center transition-all ${
                 isDropTarget
                     ? 'border-accent-secondary bg-accent-subtle text-accent-secondary shadow-[0_0_15px_rgba(34,211,238,0.3)]'
                     : 'border-edge-secondary text-content-disabled hover:text-accent hover:border-accent-bold hover:bg-accent-subtle'
             }`}
         >
             <div className="flex flex-col items-center gap-2">
-                <Plus size={24} />
-                <span className="font-medium">{isDropTarget ? 'Drop as Root' : 'New Root'}</span>
+                <Plus size={20} />
+                <span className="text-sm font-medium">{isDropTarget ? 'Drop as Root' : 'New Root'}</span>
             </div>
         </button>
     );
@@ -89,10 +90,6 @@ export default function MainPage({
     const { logs, handleSaveLog, handleDeleteLog, handleUpdateLogTime, forceSync: forceSyncLogs } = useContext(LogsContext);
     const { memoryData, setMemoryData, forceSync: forceSyncMemory } = useContext(MemoryContext);
     const { isOnline, checkReachability } = useContext(OnlineContext);
-    const [scale, setScale] = useState(1);
-    const [pan, setPan] = useState({ x: 0, y: 0 });
-    const [isDragging, setIsDragging] = useState(false);
-    const dragStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
     const [simulatedToday, setSimulatedToday] = useState(getTodayDateString);
     const [selectedDate, setSelectedDate] = useState(simulatedToday);
@@ -119,6 +116,9 @@ export default function MainPage({
     const [isTimelineInteracting, setIsTimelineInteracting] = useState(false);
     const [notesTaskId, setNotesTaskId] = useState(null);
     const [activeDragId, setActiveDragId] = useState(null);
+    const [pendingPlacement, setPendingPlacement] = useState([]);
+    const [placementHighlightId, setPlacementHighlightId] = useState(null);
+    const [radialMenu, setRadialMenu] = useState(null);
     const [activeFilter, setActiveFilter] = useState({ id: 'root', type: 'group', operator: 'AND', children: [] });
     const [savedFilters, setSavedFilters] = useState(() => {
         try {
@@ -148,6 +148,7 @@ export default function MainPage({
     const canvasRef = useRef(null);
     const highlightTimeoutRef = useRef(null);
     const lastTodayRef = useRef(getTodayDateString());
+    const tabContentRef = useRef(null);
 
     // DnD sensors and handlers
     const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 8 } });
@@ -212,8 +213,47 @@ export default function MainPage({
     }, []);
 
     const handleRambleAdd = useCallback((tasks) => {
-        handleAddTree(tasks, selectedDate);
-    }, [handleAddTree, selectedDate]);
+        const flat = [];
+        const flatten = (items) => {
+            items.forEach(t => {
+                flat.push({ text: t.text, project: t.project, tags: t.tags });
+                if (t.children?.length > 0) flatten(t.children);
+            });
+        };
+        flatten(tasks);
+        if (flat.length > 0) {
+            setPendingPlacement(flat);
+            setActiveTab('today');
+            setViewMode('tree');
+        }
+    }, []);
+
+    const handlePlaceTask = useCallback((task, parentId) => {
+        const newId = handleAddSubtask(parentId, selectedDate);
+        const updates = { text: task.text };
+        if (task.project) updates.project = task.project;
+        if (task.tags?.length > 0) updates.tags = task.tags;
+        handleUpdate(newId, updates, selectedDate);
+        expandBranch(parentId);
+    }, [handleAddSubtask, handleUpdate, selectedDate, expandBranch]);
+
+    const handlePlaceAsRoot = useCallback((task) => {
+        const newId = handleAddRoot(selectedDate);
+        const updates = { text: task.text };
+        if (task.project) updates.project = task.project;
+        if (task.tags?.length > 0) updates.tags = task.tags;
+        handleUpdate(newId, updates, selectedDate);
+    }, [handleAddRoot, handleUpdate, selectedDate]);
+
+    const handlePlacementDismiss = useCallback(() => {
+        setPendingPlacement([]);
+        setPlacementHighlightId(null);
+    }, []);
+
+    const handlePlacementHighlight = useCallback((nodeId) => {
+        setPlacementHighlightId(nodeId);
+        if (nodeId) expandBranch(nodeId);
+    }, [expandBranch]);
 
     const handleSync = useCallback(async () => {
         if (isSyncing) return;
@@ -224,6 +264,35 @@ export default function MainPage({
             setIsSyncing(false);
         }
     }, [isSyncing, forceSyncTree, forceSyncLogs, forceSyncMemory]);
+
+    // Radial menu — right-click on task cards
+    useEffect(() => {
+        const handleContextMenu = (e) => {
+            const card = e.target.closest('[data-task-id]');
+            if (!card) return;
+            e.preventDefault();
+            const taskId = card.getAttribute('data-task-id');
+            setRadialMenu({ x: e.clientX, y: e.clientY, taskId });
+        };
+        document.addEventListener('contextmenu', handleContextMenu);
+        return () => document.removeEventListener('contextmenu', handleContextMenu);
+    }, []);
+
+    const handleRadialAction = useCallback((action, value) => {
+        if (!radialMenu) return;
+        const { taskId } = radialMenu;
+        if (action === 'priority') {
+            handleUpdate(taskId, { priority: value }, selectedDate);
+        } else if (action === 'schedule') {
+            handleUpdate(taskId, { scheduledDate: value }, selectedDate);
+        } else if (action === 'deadline') {
+            handleUpdate(taskId, { deadline: value }, selectedDate);
+        } else if (action === 'focus') {
+            handleStartFocus(taskId);
+        } else if (action === 'delete') {
+            setDeleteTargetId(taskId);
+        }
+    }, [radialMenu, handleUpdate, selectedDate, handleStartFocus]);
 
     // Persist saved filters to localStorage
     useEffect(() => {
@@ -252,6 +321,27 @@ export default function MainPage({
         }
         return filtered;
       }, [treeData, selectedDate, simulatedToday, activeFilter]);
+
+      // GSAP: staggered reveal of tree columns
+      useEffect(() => {
+        if (!contentRef.current || activeTab !== 'today' || viewMode !== 'tree') return;
+        if (displayedTreeData.length === 0) return;
+        const cols = contentRef.current.children;
+        if (cols.length === 0) return;
+        gsap.fromTo(cols,
+          { opacity: 0, y: 30, scale: 0.96 },
+          { opacity: 1, y: 0, scale: 1, duration: 0.45, stagger: 0.08, ease: 'back.out(1.3)', clearProps: 'transform,opacity' }
+        );
+      }, [activeTab, viewMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+      // GSAP: tab content slide on tab change
+      useEffect(() => {
+        if (!tabContentRef.current) return;
+        gsap.fromTo(tabContentRef.current,
+          { opacity: 0, y: 12 },
+          { opacity: 1, y: 0, duration: 0.3, ease: 'power2.out' }
+        );
+      }, [activeTab]);
 
       // Timeline data: full tree with only expression filter applied (no date filtering)
       const timelineTreeData = useMemo(() => {
@@ -363,8 +453,7 @@ export default function MainPage({
       }, []);
 
       useEffect(() => {
-        const isAnyDragActive = isDragging || isTimelineInteracting;
-        if (isAnyDragActive) {
+        if (isTimelineInteracting) {
           document.body.classList.add('user-select-none');
         } else {
           document.body.classList.remove('user-select-none');
@@ -372,7 +461,7 @@ export default function MainPage({
         return () => {
           document.body.classList.remove('user-select-none');
         };
-      }, [isDragging, isTimelineInteracting]);
+      }, [isTimelineInteracting]);
 
       const flattenedTree = useMemo(() => {
         const list = [];
@@ -427,26 +516,11 @@ export default function MainPage({
       }, [searchQuery, fuse, memoryFuse, activeTab]);
 
       useEffect(() => {
-        if (highlightedNodeRef.current) {
-          const canvas = canvasRef.current;
-          const nodeElement = highlightedNodeRef.current;
-          const canvasRect = canvas.getBoundingClientRect();
-          const nodeRect = nodeElement.getBoundingClientRect();
-
-          const targetX = (canvasRect.width / 2) - (nodeRect.width / 2) - (nodeRect.left - canvasRect.left);
-          const targetY = (canvasRect.height / 2) - (nodeRect.height / 2) - (nodeRect.top - canvasRect.top);
-
-          setPan(prevPan => ({
-            x: prevPan.x + targetX / scale,
-            y: prevPan.y + targetY / scale,
-          }));
-        }
-      }, [highlightedTaskId, scale]);
-
-      useEffect(() => {
-        if (viewMode === 'list' && highlightedTaskId) {
-          const listContainer = document.querySelector('[data-list-view-container]');
-          const taskElement = listContainer?.querySelector(`[data-task-id="${highlightedTaskId}"]`);
+        if (highlightedTaskId) {
+          const container = viewMode === 'list'
+            ? document.querySelector('[data-list-view-container]')
+            : canvasRef.current;
+          const taskElement = container?.querySelector(`[data-task-id="${highlightedTaskId}"]`);
           if (taskElement) {
             taskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
@@ -503,93 +577,6 @@ export default function MainPage({
         if (deleteTargetId) {
             handleDelete(deleteTargetId);
             setDeleteTargetId(null);
-        }
-    };
-
-    const clampPan = (newPan, currentScale) => {
-        if (!contentRef.current || !canvasRef.current) return newPan;
-
-        const canvas = canvasRef.current;
-        const content = contentRef.current;
-
-        const canvasWidth = canvas.offsetWidth;
-        const canvasHeight = canvas.offsetHeight;
-        const contentWidth = content.offsetWidth * currentScale;
-        const contentHeight = content.offsetHeight * currentScale;
-        const cardWidth = Math.max(250, Math.min(350, window.innerWidth * 0.15)); // Calculate card width based on vw, with min/max
-        const padding = Math.min(canvasWidth, canvasHeight) * 0.2; // Allow 20% of the smaller canvas dimension as overscroll
-        let minX, maxX, minY, maxY;
-
-        if (contentWidth < canvasWidth) {
-            minX = -contentWidth;
-            maxX = canvasWidth;
-        } else {
-            minX = canvasWidth - contentWidth - padding;
-            maxX = padding;
-        }
-
-        if (contentHeight < canvasHeight) {
-            minY = 0;
-            maxY = canvasHeight - contentHeight;
-        } else {
-            minY = -(contentHeight - canvasHeight + padding);
-            maxY = padding;
-        }
-
-        const clampedX = Math.max(minX / currentScale, Math.min(maxX / currentScale, newPan.x));
-        const clampedY = Math.max(minY / currentScale, Math.min(maxY / currentScale, newPan.y));
-
-        return { x: clampedX, y: clampedY };
-    };
-
-    const handleMouseDown = (e) => {
-        if (e.target.closest('button, input, .cursor-text, [data-drag-handle]')) return;
-        e.preventDefault();
-        setIsDragging(true);
-        dragStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
-    };
-
-    const handleMouseMove = (e) => {
-        if (!isDragging) return;
-        const dx = e.clientX - dragStartRef.current.x;
-        const dy = e.clientY - dragStartRef.current.y;
-        setPan(clampPan({
-            x: dragStartRef.current.panX + dx / scale,
-            y: dragStartRef.current.panY + dy / scale,
-        }, scale));
-    };
-
-    const handleMouseUpOrLeave = () => {
-        setIsDragging(false);
-    };
-
-    const handleWheel = (e) => {
-        if (e.altKey) {
-            const zoomSpeed = 0.002;
-            const minScale = 0.2;
-            const maxScale = 2.5;
-
-            const canvasRect = e.currentTarget.getBoundingClientRect();
-            const mouseX = e.clientX - canvasRect.left;
-            const mouseY = e.clientY - canvasRect.top;
-
-            const oldScale = scale;
-            const newScale = Math.max(minScale, Math.min(maxScale, oldScale - e.deltaY * zoomSpeed));
-
-            const worldX = (mouseX / oldScale) - pan.x;
-            const worldY = (mouseY / oldScale) - pan.y;
-
-            const newPanX = (mouseX / newScale) - worldX;
-            const newPanY = (mouseY / newScale) - worldY;
-
-            setScale(newScale);
-            setPan(clampPan({ x: newPanX, y: newPanY }, newScale));
-
-        } else {
-            setPan(prevPan => clampPan({
-                x: prevPan.x - e.deltaX / scale,
-                y: prevPan.y - e.deltaY / scale,
-            }, scale));
         }
     };
 
@@ -660,7 +647,7 @@ export default function MainPage({
                 onConfirm={confirmDelete}
             />
 
-            <div className="absolute top-0 left-0 right-0 p-6 z-50 pointer-events-none flex justify-between items-start bg-gradient-to-b from-page-base to-transparent">
+            <div className="absolute top-0 left-0 right-0 px-6 py-4 z-50 pointer-events-none flex justify-between items-center bg-gradient-to-b from-page-base via-page-base/80 to-transparent">
                 <div className="flex items-center gap-6 pointer-events-auto">
                     <div>
                         <h1 className="text-3xl font-bold bg-gradient-to-r from-brand-from to-brand-to bg-clip-text text-transparent">
@@ -668,10 +655,24 @@ export default function MainPage({
                         </h1>
                     </div>
                     <div className="flex gap-1 rounded-lg bg-surface-primary/80 p-1 border border-edge-secondary backdrop-blur-sm">
-                        <button onClick={() => setActiveTab('today')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'today' ? 'bg-surface-secondary text-content-inverse' : 'text-content-tertiary hover:text-content-inverse'}`}>Today</button>
-                        <button onClick={() => setActiveTab('logs')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'logs' ? 'bg-surface-secondary text-content-inverse' : 'text-content-tertiary hover:text-content-inverse'}`}>Logs</button>
-                        <button onClick={() => setActiveTab('memory')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'memory' ? 'bg-surface-secondary text-content-inverse' : 'text-content-tertiary hover:text-content-inverse'}`}>Memory</button>
-                        <button onClick={() => setActiveTab('insights')} className={`px-4 py-1.5 text-sm rounded-md transition-colors ${activeTab === 'insights' ? 'bg-surface-secondary text-content-inverse' : 'text-content-tertiary hover:text-content-inverse'}`}>Insights</button>
+                        {[
+                            { id: 'today', label: 'Today' },
+                            { id: 'logs', label: 'Logs' },
+                            { id: 'memory', label: 'Memory' },
+                            { id: 'insights', label: 'Insights' },
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`px-4 py-1.5 text-sm rounded-md transition-all font-medium ${
+                                    activeTab === tab.id
+                                        ? 'bg-accent-bold text-content-inverse shadow-sm'
+                                        : 'text-content-tertiary hover:text-content-primary hover:bg-surface-secondary'
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
                     </div>
                     {!isOnline && (
                         <button
@@ -709,9 +710,20 @@ export default function MainPage({
                         </div>
                     )}
                     <button
+                        onClick={() => setIsQuickAddOpen(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-content-muted hover:text-content-primary hover:bg-surface-secondary/80 border border-edge-secondary transition-all text-xs"
+                        title="Quick Add (Cmd+K)"
+                    >
+                        <Plus size={14} />
+                        <span className="hidden sm:inline">Quick Add</span>
+                        <kbd className="hidden sm:inline px-1.5 py-0.5 rounded bg-surface-secondary text-content-disabled text-[10px] font-mono border border-edge-secondary">
+                            {navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl'}K
+                        </kbd>
+                    </button>
+                    <button
                         onClick={handleSync}
                         disabled={isSyncing}
-                        className="p-2 rounded-lg text-content-tertiary hover:bg-white/10 disabled:opacity-50"
+                        className="p-2 rounded-lg text-content-tertiary hover:text-content-primary hover:bg-surface-secondary/80 disabled:opacity-50 transition-all"
                         title="Sync all data"
                     >
                         <RefreshCw size={18} className={isSyncing ? 'animate-spin' : ''} />
@@ -719,7 +731,7 @@ export default function MainPage({
                     {isSpeechSupported && (
                         <button
                             onClick={() => setIsRambleOpen(true)}
-                            className="p-2 rounded-lg text-content-tertiary hover:bg-white/10"
+                            className="p-2 rounded-lg text-content-tertiary hover:text-content-primary hover:bg-surface-secondary/80 transition-all"
                             title="Ramble — voice input"
                         >
                             <Mic size={18} />
@@ -727,7 +739,8 @@ export default function MainPage({
                     )}
                     <button
                         onClick={() => setIsSettingsOpen(true)}
-                        className="p-2 rounded-lg text-content-tertiary hover:bg-white/10"
+                        className="p-2 rounded-lg text-content-tertiary hover:text-content-primary hover:bg-surface-secondary/80 transition-all"
+                        title="Settings"
                     >
                         <Settings2 size={18} />
                     </button>
@@ -736,33 +749,35 @@ export default function MainPage({
                 {/* Centered View Mode Toggle */}
                 {activeTab === 'today' && (
                     <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-lg bg-surface-primary/80 p-1 border border-edge-secondary backdrop-blur-sm pointer-events-auto">
-                        <button onClick={() => setViewMode('tree')} className={`p-2 rounded-md transition-colors ${viewMode === 'tree' ? 'bg-surface-secondary text-content-inverse' : 'text-content-tertiary hover:text-content-inverse'}`} title="Tree View">
-                        <GitMerge size={18} />
-                        </button>
-                        <button onClick={() => setViewMode('list')} className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-surface-secondary text-content-inverse' : 'text-content-tertiary hover:text-content-inverse'}`} title="List View">
-                        <LayoutGrid size={18} />
-                        </button>
-                        <button onClick={() => setViewMode('timeline')} className={`p-2 rounded-md transition-colors ${viewMode === 'timeline' ? 'bg-surface-secondary text-content-inverse' : 'text-content-tertiary hover:text-content-inverse'}`} title="Timeline View">
-                        <GanttChart size={18} />
-                        </button>
+                        {[
+                            { mode: 'tree', icon: GitMerge, label: 'Tree View' },
+                            { mode: 'list', icon: LayoutGrid, label: 'List View' },
+                            { mode: 'timeline', icon: GanttChart, label: 'Timeline View' },
+                        ].map(({ mode, icon: Icon, label }) => (
+                            <button
+                                key={mode}
+                                onClick={() => setViewMode(mode)}
+                                className={`p-2 rounded-md transition-all ${
+                                    viewMode === mode
+                                        ? 'bg-accent-bold text-content-inverse shadow-sm'
+                                        : 'text-content-tertiary hover:text-content-primary hover:bg-surface-secondary'
+                                }`}
+                                title={label}
+                            >
+                                <Icon size={18} />
+                            </button>
+                        ))}
                     </div>
                 )}
 
                 {/* Right-aligned controls */}
-                <div className="pointer-events-auto flex items-center justify-end gap-2 bg-surface-primary/90 backdrop-blur p-2 rounded-xl border border-edge-secondary">
-                    {activeTab === 'today' && viewMode === 'tree' && (
-                        <div className="flex items-center gap-2 animate-in fade-in duration-200">
-                            <button onClick={() => setScale(s => Math.max(0.5, s - 0.1))} className="p-2 hover:bg-white/10 rounded-lg" title="Zoom Out"><Minimize size={18} /></button>
-                            <span className="flex items-center px-2 text-sm font-mono text-content-tertiary w-12 text-center justify-center">{Math.round(scale * 100)}%</span>
-                            <button onClick={() => setScale(s => Math.min(2, s + 0.1))} className="p-2 hover:bg-white/10 rounded-lg" title="Zoom In"><Maximize size={18} /></button>
-                        </div>
-                    )}
+                <div className="pointer-events-auto flex items-center justify-end gap-1 bg-surface-primary/90 backdrop-blur-md p-1.5 rounded-xl border border-edge-secondary shadow-lg">
 
                     {activeTab !== 'memory' && (
                         <div className="relative" ref={datePickerRef}>
                         <button
                         onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                        className="flex items-center gap-2 cursor-pointer rounded-lg px-3 py-2 text-sm text-content-tertiary hover:bg-white/10 transition-colors"
+                        className="flex items-center gap-2 cursor-pointer rounded-lg px-3 py-2 text-sm text-content-tertiary hover:text-content-primary hover:bg-surface-secondary transition-all"
                         >
                         <CalendarDays size={16} />
                         <span>{selectedDate === simulatedToday ? 'Today' : selectedDate}</span>
@@ -785,7 +800,8 @@ export default function MainPage({
 
             {activeTab === 'today' && <SuggestionBar suggestions={suggestedTasks} onSuggestionClick={handleSuggestionClick} />}
 
-            {activeTab === 'today' && (viewMode === 'tree' || viewMode === 'list') && (
+            <div className="pt-24 flex-1 flex flex-col min-h-0">
+              {activeTab === 'today' && (viewMode === 'tree' || viewMode === 'list') && (
                 <FilterSidebar
                     treeData={treeData}
                     activeFilter={activeFilter}
@@ -794,23 +810,16 @@ export default function MainPage({
                     onSaveFilter={handleSaveFilter}
                     onDeleteFilter={handleDeleteFilter}
                 />
-            )}
-
-            <div className="pt-24 flex-1 flex flex-col min-h-0">
+              )}
               <DndContext sensors={dndSensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
+              <div ref={tabContentRef} className="flex-1 flex flex-col min-h-0">
                 {activeTab === 'today' && viewMode === 'tree' && (
                 <div
                     data-canvas-area
                     ref={canvasRef}
-                    className={`no-scrollbar flex-1 bg-[radial-gradient(var(--color-canvas-dot)_1px,transparent_1px)] [background-size:2vmin_2vmin] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} animate-in fade-in duration-300 overflow-auto overscroll-x-contain`}
-                    onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUpOrLeave}
-                    onMouseLeave={handleMouseUpOrLeave} onWheel={handleWheel}
+                    className="flex-1 overflow-auto animate-in fade-in duration-300"
                 >
-                    <div
-                    className="min-w-max min-h-full p-[5vmin] flex justify-center items-start origin-top-left"
-                    style={{ transform: `scale(${scale}) translate(${pan.x}px, ${pan.y}px)`, transition: isDragging ? 'none' : 'transform 0.2s' }}
-                    >
-                    <div ref={contentRef} className="flex gap-16 items-start">
+                    <div ref={contentRef} className="flex gap-8 items-start p-8 min-h-full">
                         {displayedTreeData.length > 0 ? (
                         <>
                             {displayedTreeData.map(node => (
@@ -825,7 +834,7 @@ export default function MainPage({
                                 focusedTaskId={focusedTask?.id}
                                 isTimerActive={false}
                                 isSearching={isSearching}
-                                highlightedTaskId={highlightedTaskId}
+                                highlightedTaskId={radialMenu?.taskId || placementHighlightId || highlightedTaskId}
                                 treeData={treeData}
                                 highlightedRef={highlightedNodeRef}
                                 selectedDate={selectedDate}
@@ -841,8 +850,14 @@ export default function MainPage({
                             )}
                         </>
                         ) : (
-                        selectedDate < simulatedToday ? (
-                            <div className="text-content-disabled">No tasks were completed on this day.</div>
+                        <div className="flex-1 flex items-center justify-center">
+                        {selectedDate < simulatedToday ? (
+                            <div className="flex flex-col items-center gap-3 text-center">
+                                <div className="w-12 h-12 rounded-2xl bg-surface-secondary flex items-center justify-center">
+                                    <CalendarDays size={24} className="text-content-disabled" />
+                                </div>
+                                <p className="text-content-disabled text-sm">No tasks were scheduled for this day.</p>
+                            </div>
                         ) : (
                             <button
                             onClick={() => handleAddTaskAndFocus(() => handleAddRoot(selectedDate))}
@@ -853,9 +868,9 @@ export default function MainPage({
                                 <span className="font-medium">Add a Task</span>
                             </div>
                             </button>
-                        )
                         )}
-                    </div>
+                        </div>
+                        )}
                     </div>
                 </div>
                 )}
@@ -947,6 +962,7 @@ export default function MainPage({
                 onInteractionChange={setIsTimelineInteracting}
                 />}
                 {activeTab === 'insights' && <InsightsView tasks={treeData} />}
+              </div>
               <DragOverlay dropAnimation={null}>
                 {activeDragId ? (() => {
                     const dragNode = findNodeRecursive(treeData, activeDragId);
@@ -1005,6 +1021,25 @@ export default function MainPage({
                 onUpdate={handleUpdate}
                 selectedDate={selectedDate}
             />
+            {pendingPlacement.length > 0 && (
+                <PlacementPanel
+                    pendingTasks={pendingPlacement}
+                    treeData={treeData}
+                    onPlace={handlePlaceTask}
+                    onPlaceAsRoot={handlePlaceAsRoot}
+                    onDismiss={handlePlacementDismiss}
+                    onHighlightNode={handlePlacementHighlight}
+                />
+            )}
+            {radialMenu && (
+                <RadialMenu
+                    x={radialMenu.x}
+                    y={radialMenu.y}
+                    taskId={radialMenu.taskId}
+                    onAction={handleRadialAction}
+                    onClose={() => setRadialMenu(null)}
+                />
+            )}
         </div>
     );
 }
