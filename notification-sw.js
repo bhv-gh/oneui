@@ -9,6 +9,7 @@ self.addEventListener('notificationclick', (event) => {
         type: 'NOTIFICATION_ACTION',
         action: action || 'focus',
         taskId: data.taskId,
+        data,
       };
 
       for (const client of clientList) {
