@@ -1,15 +1,16 @@
 {
   "files": {
-    "main.css": "/oneui/static/css/main.497479a3.css",
-    "main.js": "/oneui/static/js/main.8934f1ba.js",
-    "static/js/453.ec1dd0c3.chunk.js": "/oneui/static/js/453.ec1dd0c3.chunk.js",
-    "index.html": "/oneui/index.html",
-    "main.497479a3.css.map": "/oneui/static/css/main.497479a3.css.map",
-    "main.8934f1ba.js.map": "/oneui/static/js/main.8934f1ba.js.map",
-    "453.ec1dd0c3.chunk.js.map": "/oneui/static/js/453.ec1dd0c3.chunk.js.map"
+    "main.css": "/oneui/static/css/main.2bd23e5d.css",
+    "main.js": "/oneui/static/js/main.f6a0c5d8.js",
+    "static/js/209.93faa10b.chunk.js": "/oneui/static/js/209.93faa10b.chunk.js",
+    "static/js/76.6aa9f2ae.chunk.js": "/oneui/static/js/76.6aa9f2ae.chunk.js",
+    "static/js/206.c683e70d.chunk.js": "/oneui/static/js/206.c683e70d.chunk.js",
+    "static/js/304.b409ae97.chunk.js": "/oneui/static/js/304.b409ae97.chunk.js",
+    "static/js/949.aa3e6efb.chunk.js": "/oneui/static/js/949.aa3e6efb.chunk.js",
+    "index.html": "/oneui/index.html"
   },
   "entrypoints": [
-    "static/css/main.497479a3.css",
-    "static/js/main.8934f1ba.js"
+    "static/css/main.2bd23e5d.css",
+    "static/js/main.f6a0c5d8.js"
   ]
 }
