@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Loader2, Youtube } from 'lucide-react';
 import { isYouTubeConfigured, uploadToYouTube } from '../utils/youtube';
+import { sendWhatsApp } from '../utils/notifyWhatsapp';
 
 function fmtDuration(ms) {
   if (!ms) return '';
@@ -85,6 +86,8 @@ const YouTubeUploadButton = ({ clip, dark = false, className = '' }) => {
       });
       setUrl(res.url);
       setState('done');
+      // The only WhatsApp trigger: notify with the uploaded video link.
+      sendWhatsApp(`🎥 Timelapse uploaded${clip.taskText ? ` — ${clip.taskText}` : ''}: ${res.url}`);
     } catch (e) {
       setErr(e.message || 'Upload failed');
       setState('error');

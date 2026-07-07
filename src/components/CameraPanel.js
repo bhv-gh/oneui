@@ -8,14 +8,6 @@ import ClipFullscreen from './ClipFullscreen';
 import { PRESENCE_COLORS, PRESENCE_LABELS } from '../utils/visualIntelligence';
 import { getNotificationSound, playNotificationSound } from '../utils/notificationSounds';
 import { saveClip } from '../utils/clipStore';
-import { sendWhatsApp } from '../utils/notifyWhatsapp';
-
-function fmtDur(ms) {
-  if (!ms) return '';
-  const s = Math.round(ms / 1000);
-  const m = Math.floor(s / 60);
-  return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
-}
 
 // Camera Visual Intelligence panel — the right half of the Focus split view.
 //
@@ -167,11 +159,7 @@ const CameraPanel = ({ focusActive, onClose, taskText, onSetFocusRunning }) => {
       focusPct: r.focusPct,
       durationMs: r.durationMs,
     })
-      .then((rec) => {
-        setActiveClipId(rec.id);
-        const task = r.taskText ? ` — ${r.taskText}` : '';
-        sendWhatsApp(`🍅 Focus done: ${r.focusPct}% focused over ${fmtDur(r.durationMs)}${task}`);
-      })
+      .then((rec) => setActiveClipId(rec.id))
       .catch(() => {});
   }, [timelapse.result]);
 
