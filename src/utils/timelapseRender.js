@@ -165,9 +165,28 @@ export function createAmbient() {
   master.gain.value = 0.0001;
   master.connect(dest);
 
+  // --- random "mood palette" so every timelapse gets a distinct piece ---
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const midiToFreq = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+  const SCALES = [
+    [0, 2, 4, 7, 9], // major pentatonic
+    [0, 3, 5, 7, 10], // minor pentatonic
+    [0, 2, 4, 6, 9, 11], // lydian-ish
+    [0, 2, 3, 7, 9], // dorian-ish
+    [0, 2, 5, 7, 10], // suspended
+  ];
+  const scale = pick(SCALES);
+  const rootMidi = Math.round(rnd(48, 60)); // C3..C4
+  const fifthMidi = rootMidi + 7;
+  const arpWave = pick(['triangle', 'sine']);
+  const noteGap = rnd(0.28, 0.5); // tempo
+  const cutoff = rnd(900, 1500);
+
   const filter = ctx.createBiquadFilter();
   filter.type = 'lowpass';
-  filter.frequency.value = 1100;
+  filter.frequency.value = cutoff;
   filter.connect(master);
 
   const padGain = ctx.createGain();
@@ -176,18 +195,18 @@ export function createAmbient() {
 
   const o1 = ctx.createOscillator();
   o1.type = 'sine';
-  o1.frequency.value = 174.61; // F3 pad root
+  o1.frequency.value = midiToFreq(rootMidi);
   const o2 = ctx.createOscillator();
   o2.type = 'sine';
-  o2.frequency.value = 261.63; // C4
-  o2.detune.value = 5;
+  o2.frequency.value = midiToFreq(fifthMidi);
+  o2.detune.value = rnd(-6, 6);
   o1.connect(padGain);
   o2.connect(padGain);
 
   const lfo = ctx.createOscillator();
-  lfo.frequency.value = 0.08;
+  lfo.frequency.value = rnd(0.05, 0.12);
   const lfoGain = ctx.createGain();
-  lfoGain.gain.value = 350;
+  lfoGain.gain.value = rnd(200, 450);
   lfo.connect(lfoGain);
   lfoGain.connect(filter.frequency);
 
@@ -198,26 +217,27 @@ export function createAmbient() {
   o2.start();
   lfo.start();
 
-  // pentatonic arpeggio scheduler
+  // arpeggio over the chosen scale, ~2 octaves above the root
   function schedule(durationSec) {
-    const scale = [523.25, 587.33, 659.25, 783.99, 880.0]; // C5 D5 E5 G5 A5
+    const notes = [];
+    for (let oct = 0; oct <= 1; oct++) for (const s of scale) notes.push(rootMidi + 24 + s + oct * 12);
     let t = now + 0.6;
     const end = now + durationSec;
     while (t < end) {
-      const f = scale[Math.floor(Math.random() * scale.length)] * (Math.random() < 0.25 ? 0.5 : 1);
+      const m = pick(notes) - (Math.random() < 0.2 ? 12 : 0); // occasional octave-down
       const g = ctx.createGain();
       g.gain.value = 0;
       g.connect(master);
       const o = ctx.createOscillator();
-      o.type = 'triangle';
-      o.frequency.value = f;
+      o.type = arpWave;
+      o.frequency.value = midiToFreq(m);
       o.connect(g);
       g.gain.setValueAtTime(0, t);
       g.gain.linearRampToValueAtTime(0.04, t + 0.02);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
       o.start(t);
       o.stop(t + 0.75);
-      t += 0.32 + Math.random() * 0.34;
+      t += noteGap + rnd(-0.06, 0.14);
     }
   }
 
