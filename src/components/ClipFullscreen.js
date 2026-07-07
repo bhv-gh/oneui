@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 import { Download, Film, Trash2, X } from 'lucide-react';
 import YouTubeUploadButton from './YouTubeUploadButton';
 
@@ -14,7 +15,9 @@ const fmtTime = (ms) => {
 // Shared by the settings gallery and the camera panel's saved-clips list.
 const ClipFullscreen = ({ clip, url, onDelete, onClose }) => {
   if (!clip || !url) return null;
-  return (
+  // Portal to <body> so `fixed` isn't trapped by a transformed/filtered ancestor
+  // (e.g. the camera panel's backdrop-blur), giving true viewport fullscreen.
+  return ReactDOM.createPortal(
     <div className="fixed inset-0 z-[400] bg-black/95 flex flex-col animate-in fade-in duration-200">
       <div className="flex items-center gap-3 px-5 py-3 text-white/90">
         <span className="flex items-center gap-2 text-sm font-medium min-w-0 truncate">
@@ -54,7 +57,8 @@ const ClipFullscreen = ({ clip, url, onDelete, onClose }) => {
         playsInline
         className="flex-1 min-h-0 w-full object-contain"
       />
-    </div>
+    </div>,
+    document.body
   );
 };
 
