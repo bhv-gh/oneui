@@ -1,12 +1,21 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Brain, Download, Film, Play, Trash2, Video, X } from 'lucide-react';
+import { Brain, Download, Film, Pause, Play, Square, Trash2, Video, X } from 'lucide-react';
 import useFaceDetection from '../hooks/useFaceDetection';
 import useTimelapse from '../hooks/useTimelapse';
 import useClips from '../hooks/useClips';
 import YouTubeUploadButton from './YouTubeUploadButton';
+import ClipFullscreen from './ClipFullscreen';
 import { PRESENCE_COLORS, PRESENCE_LABELS } from '../utils/visualIntelligence';
 import { getNotificationSound, playNotificationSound } from '../utils/notificationSounds';
 import { saveClip } from '../utils/clipStore';
+import { sendWhatsApp } from '../utils/notifyWhatsapp';
+
+function fmtDur(ms) {
+  if (!ms) return '';
+  const s = Math.round(ms / 1000);
+  const m = Math.floor(s / 60);
+  return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
+}
 
 // Camera Visual Intelligence panel — the right half of the Focus split view.
 //
@@ -18,15 +27,16 @@ import { saveClip } from '../utils/clipStore';
 // Mounted when the user hits the Record button in the timer controls: it
 // auto-starts the camera + timelapse and renders a large preview with a fancy,
 // animated presence-state highlight. `onClose` tears the whole thing down.
-const CameraPanel = ({ focusActive, onClose, taskText, onStartFocus }) => {
+const CameraPanel = ({ focusActive, onClose, taskText, onSetFocusRunning }) => {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const taskTextRef = useRef(taskText);
   taskTextRef.current = taskText;
   const focusActiveRef = useRef(focusActive);
   focusActiveRef.current = focusActive;
-  const onStartFocusRef = useRef(onStartFocus);
-  onStartFocusRef.current = onStartFocus;
+  const onSetFocusRunningRef = useRef(onSetFocusRunning);
+  onSetFocusRunningRef.current = onSetFocusRunning;
+  const setFocusRunning = (run) => onSetFocusRunningRef.current && onSetFocusRunningRef.current(run);
   const [camOn, setCamOn] = useState(false);
   const [camError, setCamError] = useState(false);
   const [nudge, setNudge] = useState(false);
@@ -104,15 +114,25 @@ const CameraPanel = ({ focusActive, onClose, taskText, onStartFocus }) => {
   const timelapseRef = useRef(timelapse);
   timelapseRef.current = timelapse;
 
-  // Record toggle: start focus (if not already running) + begin the timelapse;
-  // or stop & finalize if already recording.
-  const handleRecordToggle = useCallback(() => {
-    if (timelapseRef.current.recording) {
-      timelapseRef.current.stop();
-    } else {
-      if (onStartFocusRef.current) onStartFocusRef.current();
-      timelapseRef.current.start();
-    }
+  // Record: start focus + begin the timelapse.
+  const handleRecordStart = useCallback(() => {
+    setFocusRunning(true);
+    timelapseRef.current.start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Pause / Resume: toggle the focus timer. Capture is gated on focus, so this
+  // pauses/resumes the timelapse too — WITHOUT finalizing (one clip per session).
+  const handlePauseResume = useCallback(() => {
+    setFocusRunning(!focusActiveRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Stop: pause the timer and finalize the timelapse into a single clip.
+  const handleStop = useCallback(() => {
+    setFocusRunning(false);
+    timelapseRef.current.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Tear everything down on unmount (Record toggled off / exiting focus).
@@ -130,6 +150,7 @@ const CameraPanel = ({ focusActive, onClose, taskText, onStartFocus }) => {
   // --- Local clip library (shared, IndexedDB-backed) ------------------------
   const { clips, clipUrl, remove } = useClips();
   const [activeClipId, setActiveClipId] = useState(null);
+  const [fsClipId, setFsClipId] = useState(null);
 
   // Persist each newly-encoded clip; select it as the preview.
   const savedResultRef = useRef(null);
@@ -146,7 +167,11 @@ const CameraPanel = ({ focusActive, onClose, taskText, onStartFocus }) => {
       focusPct: r.focusPct,
       durationMs: r.durationMs,
     })
-      .then((rec) => setActiveClipId(rec.id))
+      .then((rec) => {
+        setActiveClipId(rec.id);
+        const task = r.taskText ? ` — ${r.taskText}` : '';
+        sendWhatsApp(`🍅 Focus done: ${r.focusPct}% focused over ${fmtDur(r.durationMs)}${task}`);
+      })
       .catch(() => {});
   }, [timelapse.result]);
 
@@ -164,6 +189,7 @@ const CameraPanel = ({ focusActive, onClose, taskText, onStartFocus }) => {
   );
 
   const activeClip = clips.find((c) => c.id === activeClipId) || null;
+  const fsClip = clips.find((c) => c.id === fsClipId) || null;
   const fmtTime = (ms) => {
     try {
       return new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -224,7 +250,7 @@ const CameraPanel = ({ focusActive, onClose, taskText, onStartFocus }) => {
                 <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> REC · {timelapse.frameCount}
               </>
             ) : (
-              <span className="text-amber-300">⏸ Paused · start focus to record</span>
+              <span className="text-amber-300">⏸ Paused</span>
             )}
           </span>
         )}
@@ -261,19 +287,41 @@ const CameraPanel = ({ focusActive, onClose, taskText, onStartFocus }) => {
 
       {/* control bar — wraps instead of overflowing when the panel is narrow */}
       <div className="flex flex-wrap items-center gap-2 p-3 shrink-0">
-        <button
-          onClick={handleRecordToggle}
-          disabled={!camOn && !timelapse.recording}
-          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-            timelapse.recording
-              ? 'bg-red-500/15 text-red-500'
-              : 'bg-surface-secondary text-content-secondary hover:text-content-primary'
-          }`}
-          title={timelapse.recording ? 'Stop & save timelapse' : 'Start focus + record timelapse'}
-        >
-          <Video size={16} />
-          {timelapse.recording ? 'Stop' : 'Record'}
-        </button>
+        {!timelapse.recording ? (
+          <button
+            onClick={handleRecordStart}
+            disabled={!camOn}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-surface-secondary text-content-secondary hover:text-content-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Start focus + record timelapse"
+          >
+            <Video size={16} /> Record
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={handlePauseResume}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-surface-secondary text-content-secondary hover:text-content-primary transition-colors"
+              title={focusActive ? 'Pause session (keeps recording)' : 'Resume session'}
+            >
+              {focusActive ? (
+                <>
+                  <Pause size={16} /> Pause
+                </>
+              ) : (
+                <>
+                  <Play size={16} /> Resume
+                </>
+              )}
+            </button>
+            <button
+              onClick={handleStop}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-red-500/15 text-red-500 hover:bg-red-500/25 transition-colors"
+              title="Stop session & save timelapse"
+            >
+              <Square size={15} /> Stop
+            </button>
+          </>
+        )}
         <button
           onClick={() => setTrainOpen(true)}
           disabled={!camOn}
@@ -338,9 +386,9 @@ const CameraPanel = ({ focusActive, onClose, taskText, onStartFocus }) => {
                   }`}
                 >
                   <button
-                    onClick={() => setActiveClipId(c.id)}
+                    onClick={() => setFsClipId(c.id)}
                     className="flex items-center gap-1.5 min-w-0 flex-1 text-left text-content-secondary"
-                    title="Preview this clip"
+                    title="Play fullscreen"
                   >
                     <Play size={12} className="shrink-0" />
                     <span className="truncate">
@@ -368,6 +416,13 @@ const CameraPanel = ({ focusActive, onClose, taskText, onStartFocus }) => {
           </ul>
         </div>
       )}
+
+      <ClipFullscreen
+        clip={fsClip}
+        url={fsClip ? clipUrl(fsClip) : null}
+        onDelete={removeClip}
+        onClose={() => setFsClipId(null)}
+      />
 
       {trainOpen && (
         <TrainDoroModal

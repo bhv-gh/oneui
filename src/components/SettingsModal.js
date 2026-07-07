@@ -13,12 +13,14 @@ import {
   Bug,
   UserCircle,
   Sparkles,
+  Film,
 } from 'lucide-react';
 import { SOUND_OPTIONS, playNotificationSound, getNotificationSound, setNotificationSound } from '../utils/notificationSounds';
 import { getTimerDurations, setTimerDurations, getNudgeMinutes, setNudgeMinutes, getReminderMinutes, setReminderMinutes } from '../utils/timerSettings';
 import { getBgMusicUrl, setBgMusicUrl, getBgMusicVolume, setBgMusicVolume } from '../utils/backgroundMusic';
 import ThemeContext from '../contexts/ThemeContext';
 import { PetSkinPicker } from './FlowPet';
+import ClipGallery from './ClipGallery';
 
 const SectionHeader = ({ icon: Icon, title }) => (
   <div className="flex items-center gap-2 mb-3">
@@ -256,6 +258,12 @@ const SettingsModal = ({ isOpen, onClose, onExport, onImport, simulatedToday, se
               <span className="text-xs text-content-muted w-8 text-right">{Math.round(bgMusicVol * 100)}%</span>
             </div>
             <p className="text-xs text-content-muted mt-1">Auto-plays during focus, pauses on break.</p>
+          </div>
+
+          {/* Timelapses */}
+          <div>
+            <SectionHeader icon={Film} title="Timelapses" />
+            <ClipGallery />
           </div>
 
           {/* Data */}

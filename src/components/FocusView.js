@@ -6,7 +6,6 @@ import PomodoroTimer from './PomodoroTimer';
 import PipTimerView from './PipTimerView';
 import QuickCapture from './QuickCapture';
 import CameraPanel from './CameraPanel';
-import ClipGallery from './ClipGallery';
 import { getBgMusicUrl, getBgMusicVolume, setBgMusicVolume, isBgMusicPlaying, playBgMusic, pauseBgMusic } from '../utils/backgroundMusic';
 
 // --- Component: Full Screen Focus View ---
@@ -258,8 +257,6 @@ const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onC
         <XCircle size={28} />
       </button>
 
-      <ClipGallery />
-
       <div
         className={
           cameraMode
@@ -307,9 +304,13 @@ const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onC
               focusActive={timerMode === 'pomodoro' && isTimerActive}
               onClose={() => setCameraMode(false)}
               taskText={task.text}
-              onStartFocus={() => {
-                if (timerMode !== 'pomodoro') onSetMode('pomodoro');
-                if (!isTimerActive) onStartPause();
+              onSetFocusRunning={(run) => {
+                if (run) {
+                  if (timerMode !== 'pomodoro') onSetMode('pomodoro');
+                  if (!isTimerActive) onStartPause();
+                } else if (isTimerActive) {
+                  onStartPause();
+                }
               }}
             />
           </div>
