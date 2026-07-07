@@ -5,6 +5,8 @@ import { XCircle, PictureInPicture, Volume2, VolumeX, Music } from 'lucide-react
 import PomodoroTimer from './PomodoroTimer';
 import PipTimerView from './PipTimerView';
 import QuickCapture from './QuickCapture';
+import CameraPanel from './CameraPanel';
+import ClipGallery from './ClipGallery';
 import { getBgMusicUrl, getBgMusicVolume, setBgMusicVolume, isBgMusicPlaying, playBgMusic, pauseBgMusic } from '../utils/backgroundMusic';
 
 // --- Component: Full Screen Focus View ---
@@ -14,6 +16,7 @@ const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onC
   const [isPipActive, setIsPipActive] = useState(false);
   const [musicVolume, setMusicVolume] = useState(() => getBgMusicVolume());
   const [musicMuted, setMusicMuted] = useState(false);
+  const [cameraMode, setCameraMode] = useState(false);
   const hasMusicUrl = !!getBgMusicUrl();
   const pipWindowRef = useRef(null);
   const canvasRef = useRef(null);
@@ -255,36 +258,62 @@ const FocusView = ({ task, timerProps, onExit, appState, capturedTasks = [], onC
         <XCircle size={28} />
       </button>
 
-      <div className="text-center">
-        <div data-focus-title>
-          <p className="text-content-muted text-lg mb-2">Focusing on:</p>
-          <h1 className="text-4xl font-bold text-content-primary mb-12 truncate max-w-2xl">{task.text || "Untitled Task"}</h1>
+      <ClipGallery />
+
+      <div
+        className={
+          cameraMode
+            ? 'w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-6 items-center'
+            : 'text-center'
+        }
+      >
+        <div className={cameraMode ? 'text-center lg:text-left min-w-0' : ''}>
+          <div data-focus-title>
+            <p className="text-content-muted text-lg mb-2">Focusing on:</p>
+            <h1 className="text-4xl font-bold text-content-primary mb-12 truncate max-w-2xl">{task.text || "Untitled Task"}</h1>
+          </div>
+
+          <div data-focus-timer>
+          {isPipActive ? (
+            <div className="flex flex-col items-center gap-4 animate-in fade-in duration-300">
+              <p className="text-content-tertiary">Timer is in Picture-in-Picture mode.</p>
+              <button
+                onClick={closePip}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-secondary text-content-secondary hover:bg-accent-subtle hover:text-accent transition-all"
+              >
+                <PictureInPicture size={18} />
+                <span>Bring Timer Back</span>
+              </button>
+            </div>
+          ) : (
+            <PomodoroTimer
+              timeRemaining={timeRemaining}
+              isTimerActive={isTimerActive}
+              timerMode={timerMode}
+              onStartPause={onStartPause}
+              onReset={onReset}
+              onSetMode={onSetMode}
+              onTogglePip={togglePip}
+              onToggleRecord={() => setCameraMode((m) => !m)}
+              isRecording={cameraMode}
+            />
+          )}
+          </div>
         </div>
 
-        <div data-focus-timer>
-        {isPipActive ? (
-          <div className="flex flex-col items-center gap-4 animate-in fade-in duration-300">
-            <p className="text-content-tertiary">Timer is in Picture-in-Picture mode.</p>
-            <button
-              onClick={closePip}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-secondary text-content-secondary hover:bg-accent-subtle hover:text-accent transition-all"
-            >
-              <PictureInPicture size={18} />
-              <span>Bring Timer Back</span>
-            </button>
+        {cameraMode && (
+          <div className="min-w-0 w-full flex justify-center lg:justify-start">
+            <CameraPanel
+              focusActive={timerMode === 'pomodoro' && isTimerActive}
+              onClose={() => setCameraMode(false)}
+              taskText={task.text}
+              onStartFocus={() => {
+                if (timerMode !== 'pomodoro') onSetMode('pomodoro');
+                if (!isTimerActive) onStartPause();
+              }}
+            />
           </div>
-        ) : (
-          <PomodoroTimer
-            timeRemaining={timeRemaining}
-            isTimerActive={isTimerActive}
-            timerMode={timerMode}
-            onStartPause={onStartPause}
-            onReset={onReset}
-            onSetMode={onSetMode}
-            onTogglePip={togglePip}
-          />
         )}
-        </div>
       </div>
 
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2">

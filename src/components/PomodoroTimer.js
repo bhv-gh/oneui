@@ -6,6 +6,7 @@ import {
   Play,
   Pause,
   PictureInPicture,
+  Video,
 } from 'lucide-react';
 
 const PomodoroTimer = ({
@@ -15,7 +16,9 @@ const PomodoroTimer = ({
   onStartPause,
   onReset,
   onSetMode,
-  onTogglePip
+  onTogglePip,
+  onToggleRecord,
+  isRecording,
 }) => {
 
   const formatTime = (seconds) => {
@@ -65,6 +68,19 @@ const PomodoroTimer = ({
         <button onClick={onTogglePip} className="p-2 sm:p-4 rounded-full text-content-tertiary hover:bg-surface-secondary hover:text-content-inverse transition-colors" title="Picture-in-Picture">
           <PictureInPicture size={22} />
         </button>
+        {onToggleRecord && (
+          <button
+            onClick={onToggleRecord}
+            className={`p-2 sm:p-4 rounded-full transition-colors ${
+              isRecording
+                ? 'bg-red-500/15 text-red-500 ring-2 ring-red-500/40'
+                : 'text-content-tertiary hover:bg-surface-secondary hover:text-content-inverse'
+            }`}
+            title={isRecording ? 'Close focus camera' : 'Open focus camera'}
+          >
+            <Video size={22} />
+          </button>
+        )}
       </div>
     </>
   );
