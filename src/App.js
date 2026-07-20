@@ -6,11 +6,13 @@ import 'react-day-picker/dist/style.css';
 import { useTreeData } from './hooks/useTreeData';
 import { useLogs } from './hooks/useLogs';
 import { useMemoryData } from './hooks/useMemoryData';
+import { useChangeJournal } from './hooks/useChangeJournal';
 import { useTheme } from './hooks/useTheme';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import TreeDataContext from './contexts/TreeDataContext';
 import LogsContext from './contexts/LogsContext';
 import MemoryContext from './contexts/MemoryContext';
+import ChangeJournalContext from './contexts/ChangeJournalContext';
 import ThemeContext from './contexts/ThemeContext';
 import OnlineContext from './contexts/OnlineContext';
 import { getPendingOps, clearPendingOps, savePendingOps } from './utils/offlineStorage';
@@ -163,6 +165,7 @@ function AppContent({ onLogout }) {
   const treeDataHook = useTreeData();
   const logsHook = useLogs();
   const memoryDataHook = useMemoryData();
+  const changeJournalHook = useChangeJournal();
   const themeValue = useTheme();
 
   const { treeData, handleUpdate, handleUpdateField, handleAddField } = treeDataHook;
@@ -192,6 +195,7 @@ function AppContent({ onLogout }) {
           case 'createQA': await api.createQA(op.payload); break;
           case 'updateQA': await api.updateQA(op.payload.id, op.payload.updates); break;
           case 'deleteQA': await api.deleteQA(op.payload.id); break;
+          case 'putChangeJournal': await api.putChangeJournal(op.payload); break;
           default: break;
         }
       } catch (err) {
@@ -216,6 +220,7 @@ function AppContent({ onLogout }) {
         try { await treeDataHook.forceSync(); } catch (e) { console.error('Tree sync failed:', e); }
         try { await logsHook.forceSync(); } catch (e) { console.error('Logs sync failed:', e); }
         try { await memoryDataHook.forceSync(); } catch (e) { console.error('Memory sync failed:', e); }
+        try { await changeJournalHook.forceSync(); } catch (e) { console.error('Change journal sync failed:', e); }
       };
       replay();
     }
@@ -272,13 +277,22 @@ function AppContent({ onLogout }) {
     return findNodeRecursive(treeData, focusedTaskId);
   }, [treeData, focusedTaskId]);
 
-  // Register service worker for notification actions
+  // Wire up the service worker used for notifications. In production the offline
+  // app-shell SW (src/service-worker.js, registered in index.js) also handles
+  // notificationclick, so we just grab its registration once it's ready. In dev
+  // that SW isn't registered, so fall back to the lightweight notification-sw.js.
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
 
-    navigator.serviceWorker.register(`${process.env.PUBLIC_URL}/notification-sw.js`)
-      .then(reg => { swRegistrationRef.current = reg; })
-      .catch(err => console.error('Notification SW registration failed:', err));
+    if (process.env.NODE_ENV === 'production') {
+      navigator.serviceWorker.ready
+        .then(reg => { swRegistrationRef.current = reg; })
+        .catch(err => console.error('Service worker not ready:', err));
+    } else {
+      navigator.serviceWorker.register(`${process.env.PUBLIC_URL}/notification-sw.js`)
+        .then(reg => { swRegistrationRef.current = reg; })
+        .catch(err => console.error('Notification SW registration failed:', err));
+    }
 
     const handleMessage = (event) => {
       if (event.data?.type === 'NOTIFICATION_ACTION') {
@@ -726,6 +740,7 @@ function AppContent({ onLogout }) {
     <TreeDataContext.Provider value={treeDataHook}>
       <LogsContext.Provider value={logsHook}>
         <MemoryContext.Provider value={memoryDataHook}>
+          <ChangeJournalContext.Provider value={changeJournalHook}>
           <style>{scrollbarHideStyle}</style>
           <style>{quillStyle}</style>
           {!treeDataHook.isLoading && !focusedTask && !isMobile && (
@@ -806,6 +821,7 @@ function AppContent({ onLogout }) {
               onLogout={onLogout}
             />
           )}
+          </ChangeJournalContext.Provider>
         </MemoryContext.Provider>
       </LogsContext.Provider>
     </TreeDataContext.Provider>

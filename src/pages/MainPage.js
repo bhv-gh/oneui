@@ -31,7 +31,6 @@ import SettingsModal from '../components/SettingsModal';
 import DeleteModal from '../components/DeleteModal';
 import MemorySearchBar from '../components/MemorySearchBar';
 import CollapsiblePanels from '../components/CollapsiblePanels';
-import InsightsView from '../components/InsightsView';
 import ChangeView from '../components/ChangeView';
 import TaskNotesPanel from '../components/TaskNotesPanel';
 import RambleModal, { isSpeechSupported } from '../components/RambleModal';
@@ -44,7 +43,7 @@ import { filterTreeByDate, filterForTodayView, filterTreeByExpression, collectFi
 import { migrateLegacyFilter } from '../components/FilterSidebar';
 import { findNodeRecursive } from '../utils/treeUtils';
 import RadialMenu from '../components/RadialMenu';
-import { useChangeJournal } from '../hooks/useChangeJournal';
+import ChangeJournalContext from '../contexts/ChangeJournalContext';
 import * as api from '../api/client';
 import Fuse from 'fuse.js';
 
@@ -91,7 +90,7 @@ export default function MainPage({
     } = useContext(TreeDataContext);
     const { logs, handleSaveLog, handleDeleteLog, handleUpdateLogTime, forceSync: forceSyncLogs } = useContext(LogsContext);
     const { memoryData, setMemoryData, forceSync: forceSyncMemory } = useContext(MemoryContext);
-    const { journal: changeJournal, updateJournal: updateChangeJournal, forceSync: forceSyncChange } = useChangeJournal();
+    const { journal: changeJournal, updateJournal: updateChangeJournal, forceSync: forceSyncChange } = useContext(ChangeJournalContext);
     const { isOnline, checkReachability } = useContext(OnlineContext);
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
     const [simulatedToday, setSimulatedToday] = useState(getTodayDateString);
@@ -753,7 +752,6 @@ export default function MainPage({
                             { id: 'today', label: 'Today' },
                             { id: 'logs', label: 'Logs' },
                             { id: 'memory', label: 'Memory' },
-                            { id: 'insights', label: 'Insights' },
                             { id: 'change', label: 'Change' },
                         ].map(tab => (
                             <button
@@ -1066,7 +1064,6 @@ export default function MainPage({
                 onUpdateLogTime={handleUpdateLogTime}
                 onInteractionChange={setIsTimelineInteracting}
                 />}
-                {activeTab === 'insights' && <InsightsView tasks={treeData} />}
                 {activeTab === 'change' && (
                   <ChangeView
                     journal={changeJournal}

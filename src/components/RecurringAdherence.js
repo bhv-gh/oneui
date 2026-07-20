@@ -1,8 +1,10 @@
 import React, { useMemo } from 'react';
 import { subDays, format, eachDayOfInterval, getDay } from 'date-fns';
-import { BarChart3, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { isDateAnOccurrence } from '../utils/dateUtils';
 
+// Per-recurring-task 90-day adherence heatmap. (Previously the body of the
+// standalone Insights tab; now embedded in the Change tab.)
 const RecurringTask = ({ task }) => {
   const { data, firstDayOffset, stats } = useMemo(() => {
     const today = new Date();
@@ -25,7 +27,7 @@ const RecurringTask = ({ task }) => {
         if (isCompleted) {
           status = 'completed';
           completed++;
-        } else if (date < today && date.setHours(0,0,0,0) < today.setHours(0,0,0,0)) {
+        } else if (date < today && date.setHours(0, 0, 0, 0) < today.setHours(0, 0, 0, 0)) {
           status = 'missed';
           missed++;
         } else {
@@ -94,26 +96,19 @@ const RecurringTask = ({ task }) => {
           <span className="text-xs text-content-tertiary">{stats.pending} upcoming</span>
         </div>
       </div>
-
-      <div className="flex items-center gap-3 mt-2 text-[10px] text-content-disabled">
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-accent-bold inline-block" /> Completed</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-danger/80 inline-block" /> Missed</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-warning/40 inline-block" /> Upcoming</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-surface-secondary/50 inline-block" /> N/A</span>
-      </div>
     </div>
   );
 };
 
-const InsightsView = ({ tasks }) => {
+// Embeddable "Habit consistency" section: overall adherence stats + a heatmap
+// per recurring task. Renders a compact hint when there are no recurring tasks.
+const RecurringAdherence = ({ tasks }) => {
   const recurringTasks = useMemo(() => {
     const allTasks = [];
     const flatten = (nodes) => {
-      for (const node of nodes) {
+      for (const node of nodes || []) {
         allTasks.push(node);
-        if (node.children) {
-          flatten(node.children);
-        }
+        if (node.children) flatten(node.children);
       }
     };
     flatten(tasks);
@@ -148,12 +143,12 @@ const InsightsView = ({ tasks }) => {
   }, [recurringTasks]);
 
   return (
-    <div className="flex-1 overflow-y-auto px-8 md:px-12 pb-8 animate-in fade-in duration-300">
-      <h1 className="text-2xl font-bold text-content-primary mb-6">Insights</h1>
+    <div>
+      <h2 className="text-sm font-semibold text-content-tertiary uppercase tracking-wider mb-4">Habit consistency</h2>
 
       {recurringTasks.length > 0 ? (
         <>
-          <div className="grid grid-cols-4 gap-3 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <div className="bg-surface-secondary/60 border border-edge-secondary rounded-xl px-4 py-3" style={{ borderLeft: '3px solid #818cf8' }}>
               <p className="text-[10px] text-content-muted uppercase tracking-wider mb-1">Habits Tracked</p>
               <p className="text-2xl font-bold" style={{ color: '#818cf8' }}>{overallStats.taskCount}</p>
@@ -174,7 +169,6 @@ const InsightsView = ({ tasks }) => {
             </div>
           </div>
 
-          <h2 className="text-sm font-semibold text-content-tertiary uppercase tracking-wider mb-4">Recurring Task Consistency</h2>
           <div className="space-y-4">
             {recurringTasks.map(task => (
               <RecurringTask key={task.id} task={task} />
@@ -182,18 +176,12 @@ const InsightsView = ({ tasks }) => {
           </div>
         </>
       ) : (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-surface-secondary mb-4">
-            <BarChart3 size={28} className="text-content-disabled" />
-          </div>
-          <p className="text-content-tertiary text-sm mb-1">No recurring tasks yet</p>
-          <p className="text-content-disabled text-xs max-w-xs">
-            Add recurrence to your tasks (daily, weekly, monthly) to see adherence heatmaps and consistency insights here.
-          </p>
+        <div className="bg-surface-secondary/60 border border-edge-secondary rounded-xl p-5 text-sm text-content-muted">
+          Add recurrence to a task (daily, weekly, monthly) to track its adherence heatmap here.
         </div>
       )}
     </div>
   );
 };
 
-export default InsightsView;
+export default RecurringAdherence;

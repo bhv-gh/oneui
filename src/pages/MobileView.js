@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useContext, useCallback, useRef } from 'react';
-import { Plus, CalendarDays, Settings2, Mic, RefreshCw } from 'lucide-react';
+import { Plus, CalendarDays, Settings2, Mic, RefreshCw, ListTodo, Sparkles } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors, pointerWithin } from '@dnd-kit/core';
 import { useDroppable } from '@dnd-kit/core';
@@ -8,8 +8,10 @@ import TreeDataContext from '../contexts/TreeDataContext';
 import LogsContext from '../contexts/LogsContext';
 import MemoryContext from '../contexts/MemoryContext';
 import OnlineContext from '../contexts/OnlineContext';
+import ChangeJournalContext from '../contexts/ChangeJournalContext';
 import CustomDatePicker from '../components/CustomDatePicker';
 import MobileTaskItem from '../components/MobileTaskItem';
+import ChangeView from '../components/ChangeView';
 import SettingsModal from '../components/SettingsModal';
 import DeleteModal from '../components/DeleteModal';
 import TaskNotesPanel from '../components/TaskNotesPanel';
@@ -50,10 +52,12 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
     syncStatus,
     forceSync: forceSyncTree,
   } = useContext(TreeDataContext);
-  const { forceSync: forceSyncLogs } = useContext(LogsContext);
+  const { logs, forceSync: forceSyncLogs } = useContext(LogsContext);
   const { forceSync: forceSyncMemory } = useContext(MemoryContext);
+  const { journal: changeJournal, updateJournal: updateChangeJournal, forceSync: forceSyncChange } = useContext(ChangeJournalContext);
   const { isOnline, checkReachability } = useContext(OnlineContext);
 
+  const [mobileTab, setMobileTab] = useState('tasks'); // 'tasks' | 'change'
   const [simulatedToday, setSimulatedToday] = useState(getTodayDateString);
   const [selectedDate, setSelectedDate] = useState(simulatedToday);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -165,11 +169,11 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
     if (isSyncing) return;
     setIsSyncing(true);
     try {
-      await Promise.all([forceSyncTree(), forceSyncLogs(), forceSyncMemory()]);
+      await Promise.all([forceSyncTree(), forceSyncLogs(), forceSyncMemory(), forceSyncChange()]);
     } finally {
       setIsSyncing(false);
     }
-  }, [isSyncing, forceSyncTree, forceSyncLogs, forceSyncMemory]);
+  }, [isSyncing, forceSyncTree, forceSyncLogs, forceSyncMemory, forceSyncChange]);
 
   const confirmDelete = () => {
     if (deleteTargetId) {
@@ -251,7 +255,26 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
         </div>
       </div>
 
+      {/* Tasks ⇄ Change toggle */}
+      <div className="flex-shrink-0 flex items-center gap-1 px-4 py-2 bg-page-base border-b border-edge-secondary">
+        {[
+          { id: 'tasks', label: 'Tasks', icon: ListTodo },
+          { id: 'change', label: 'Change', icon: Sparkles },
+        ].map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setMobileTab(id)}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              mobileTab === id ? 'bg-accent-bold text-content-inverse' : 'text-content-tertiary active:bg-surface-secondary'
+            }`}
+          >
+            <Icon size={15} /> {label}
+          </button>
+        ))}
+      </div>
+
       {/* Scrollable task list */}
+      {mobileTab === 'tasks' && (
       <DndContext sensors={dndSensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
       <div className="flex-1 overflow-y-auto overscroll-y-contain no-scrollbar">
         {flattenedTasks.length === 0 ? (
@@ -311,9 +334,22 @@ export default function MobileView({ handleStartFocus, handleExport, handleImpor
         })() : null}
       </DragOverlay>
       </DndContext>
+      )}
+
+      {/* Change journal */}
+      {mobileTab === 'change' && (
+        <div className="flex-1 overflow-y-auto no-scrollbar">
+          <ChangeView
+            journal={changeJournal}
+            updateJournal={updateChangeJournal}
+            treeData={treeData}
+            logs={logs}
+          />
+        </div>
+      )}
 
       {/* FAB — quick add */}
-      {!isPastDate && (
+      {mobileTab === 'tasks' && !isPastDate && (
         <button
           onClick={() => setIsQuickAddOpen(true)}
           className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-accent-bold active:bg-accent-boldest text-content-inverse shadow-lg shadow-accent-bold/30 flex items-center justify-center z-30 transition-transform active:scale-95"

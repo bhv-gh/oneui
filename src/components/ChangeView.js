@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useDebounce } from '../hooks/useDebounce';
 import { getTodayDateString } from '../utils/dateUtils';
+import RecurringAdherence from './RecurringAdherence';
 import { CHANGE_STEPS } from '../data/changeSteps';
 import {
   getEffectiveStep,
@@ -512,6 +513,11 @@ export default function ChangeView({ journal, updateJournal, treeData, logs }) {
             </div>
           </Card>
         </div>
+      </div>
+
+      {/* Habit consistency (recurring-task adherence, folded in from the old Insights tab) */}
+      <div className="mt-8">
+        <RecurringAdherence tasks={treeData} />
       </div>
 
       {libraryOpen && (
