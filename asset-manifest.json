@@ -1,16 +1,17 @@
 {
   "files": {
-    "main.css": "/oneui/static/css/main.38642bd5.css",
-    "main.js": "/oneui/static/js/main.74da3d00.js",
+    "main.css": "/oneui/static/css/main.f2b91d49.css",
+    "main.js": "/oneui/static/js/main.48819189.js",
     "static/js/209.93faa10b.chunk.js": "/oneui/static/js/209.93faa10b.chunk.js",
     "static/js/76.6aa9f2ae.chunk.js": "/oneui/static/js/76.6aa9f2ae.chunk.js",
     "static/js/206.c683e70d.chunk.js": "/oneui/static/js/206.c683e70d.chunk.js",
     "static/js/304.b409ae97.chunk.js": "/oneui/static/js/304.b409ae97.chunk.js",
     "static/js/949.aa3e6efb.chunk.js": "/oneui/static/js/949.aa3e6efb.chunk.js",
+    "service-worker.js": "/oneui/service-worker.js",
     "index.html": "/oneui/index.html"
   },
   "entrypoints": [
-    "static/css/main.38642bd5.css",
-    "static/js/main.74da3d00.js"
+    "static/css/main.f2b91d49.css",
+    "static/js/main.48819189.js"
   ]
 }
