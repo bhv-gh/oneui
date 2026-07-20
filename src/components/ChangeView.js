@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { format, parseISO } from 'date-fns';
 import {
-  Flame, Check, ChevronRight, Plus, Pencil, Trash2, X, Sparkles,
+  Flame, Check, ChevronRight, ChevronDown, Circle, Plus, Pencil, Trash2, X, Sparkles,
   Droplet, Minus, CalendarDays, CheckCircle2, Timer, Trophy, ListChecks,
 } from 'lucide-react';
 import { useDebounce } from '../hooks/useDebounce';
@@ -182,6 +182,7 @@ export default function ChangeView({ journal, updateJournal, treeData, logs }) {
   const [viewedDate, setViewedDate] = useState(today);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [editingStepId, setEditingStepId] = useState(null);
+  const [stepMenuOpen, setStepMenuOpen] = useState(false); // mobile step dropdown
 
   const isToday = viewedDate === today;
   const activeStepId = journal.program.activeStepId;
@@ -294,6 +295,70 @@ export default function ChangeView({ journal, updateJournal, treeData, logs }) {
         </div>
       )}
 
+      {/* Mobile step selector — desktop uses the Program rail on the right instead */}
+      <div className="lg:hidden mb-4 relative">
+        <button
+          onClick={() => setStepMenuOpen(o => !o)}
+          className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg bg-surface-secondary/60 border border-edge-secondary"
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="text-xs text-content-muted flex-shrink-0">{progress.position}/{progress.total}</span>
+            <span className="truncate text-content-primary font-medium">{step ? step.title : 'Program complete'}</span>
+          </span>
+          <ChevronDown size={16} className={`text-content-tertiary transition-transform flex-shrink-0 ${stepMenuOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {stepMenuOpen && (
+          <>
+            <div className="fixed inset-0 z-20" onClick={() => setStepMenuOpen(false)} />
+            <div className="absolute z-30 mt-1 w-full max-h-72 overflow-y-auto rounded-lg bg-surface-primary border border-edge-primary shadow-xl py-1">
+              {journal.program.order.map((id) => {
+                const s = getEffectiveStep(journal, id);
+                if (!s) return null;
+                const state = journal.program.steps[id] || {};
+                const isActive = id === activeStepId;
+                const isDone = state.status === 'done';
+                return (
+                  <button
+                    key={id}
+                    onClick={() => { handleSetActive(id); setStepMenuOpen(false); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-left ${isActive ? 'bg-accent-subtle' : 'active:bg-surface-secondary'}`}
+                  >
+                    <span className="w-4 flex-shrink-0 flex items-center justify-center">
+                      {isDone
+                        ? <Check size={15} className="text-accent" />
+                        : isActive
+                          ? <span className="w-2.5 h-2.5 rounded-full bg-warning inline-block" />
+                          : <Circle size={13} className="text-content-disabled" />}
+                    </span>
+                    <span className={`text-sm truncate ${isActive ? 'text-content-primary font-medium' : isDone ? 'text-content-muted line-through' : 'text-content-tertiary'}`}>
+                      {s.title}
+                    </span>
+                  </button>
+                );
+              })}
+              <div className="border-t border-edge-secondary mt-1 pt-1">
+                <button
+                  onClick={() => { setLibraryOpen(true); setStepMenuOpen(false); }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-content-tertiary active:bg-surface-secondary"
+                >
+                  <Plus size={15} /> Add from library
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {step && (
+          <button
+            onClick={handleAdvance}
+            className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-accent-bold text-content-inverse text-sm font-medium active:bg-accent-bolder"
+          >
+            Mark done & next <ChevronRight size={15} />
+          </button>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main column */}
         <div className="lg:col-span-2 space-y-6">
@@ -312,7 +377,8 @@ export default function ChangeView({ journal, updateJournal, treeData, logs }) {
                   <button onClick={() => setEditingStepId(step.id)} className="p-1.5 text-content-muted hover:text-accent" title="Edit step text"><Pencil size={15} /></button>
                 </div>
                 <p className="text-sm text-content-secondary leading-relaxed mb-4">{step.method}</p>
-                <p className="text-sm italic text-content-tertiary border-l-2 border-accent-bold pl-3 mb-4">{step.prompt}</p>
+                <p className="text-sm italic text-content-tertiary border-l-2 border-accent-bold pl-3 mb-1">{step.prompt}</p>
+                <p className="text-xs text-content-muted mb-4">✎ Answer this in your Reflection below.</p>
 
                 {/* Practiced toggle */}
                 <button
@@ -410,10 +476,13 @@ export default function ChangeView({ journal, updateJournal, treeData, logs }) {
 
           {/* Reflection + mood */}
           <Card className="p-5">
-            <h3 className="text-sm font-semibold text-content-primary uppercase tracking-wider mb-3">Reflection</h3>
+            <h3 className="text-sm font-semibold text-content-primary uppercase tracking-wider mb-1">Reflection</h3>
+            {step?.prompt && (
+              <p className="text-sm text-content-secondary mb-3">{step.prompt}</p>
+            )}
             <textarea
               className={`${inputCls} min-h-[120px] resize-y`}
-              placeholder={step?.prompt || 'How did today go?'}
+              placeholder="Write your answer here…"
               value={reflection}
               onChange={(e) => setReflection(e.target.value)}
             />
@@ -437,7 +506,7 @@ export default function ChangeView({ journal, updateJournal, treeData, logs }) {
 
         {/* Side column: program rail */}
         <div className="space-y-6">
-          <Card className="p-5">
+          <Card className="p-5 hidden lg:block">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-content-primary uppercase tracking-wider">Program</h3>
               <span className="text-xs text-content-muted">{progress.doneCount}/{progress.total}</span>
