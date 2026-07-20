@@ -8,6 +8,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { getTodayDateString } from '../utils/dateUtils';
 import RecurringAdherence from './RecurringAdherence';
 import { CHANGE_STEPS } from '../data/changeSteps';
+import { MOOD_KEY } from '../data/changePresets';
 import {
   getEffectiveStep,
   setActiveStep,
@@ -23,11 +24,11 @@ import {
 } from '../utils/changeJournal';
 
 const MOODS = [
-  { value: 1, emoji: '😞', label: 'Rough' },
-  { value: 2, emoji: '🙁', label: 'Meh' },
-  { value: 3, emoji: '😐', label: 'Okay' },
+  { value: 1, emoji: '😞', label: 'Worst' },
+  { value: 2, emoji: '🙁', label: 'Bad' },
+  { value: 3, emoji: '😐', label: 'Decent' },
   { value: 4, emoji: '🙂', label: 'Good' },
-  { value: 5, emoji: '😄', label: 'Great' },
+  { value: 5, emoji: '😄', label: 'Best' },
 ];
 
 // Short, step-aware nudge drawn from the day's closed tasks / focus sessions.
@@ -69,6 +70,13 @@ function StepEditModal({ journal, stepId, onSave, onClose }) {
   const [subtitle, setSubtitle] = useState(step?.subtitle || '');
   const [method, setMethod] = useState(step?.method || '');
   const [prompt, setPrompt] = useState(step?.prompt || '');
+  const [presets, setPresets] = useState(() => ({
+    best: step?.presets?.best || '',
+    good: step?.presets?.good || '',
+    decent: step?.presets?.decent || '',
+    bad: step?.presets?.bad || '',
+    worst: step?.presets?.worst || '',
+  }));
   if (!step) return null;
 
   const inputCls =
@@ -104,11 +112,30 @@ function StepEditModal({ journal, stepId, onSave, onClose }) {
             <label className="block text-[10px] uppercase tracking-wider text-content-muted mb-1">Daily prompt</label>
             <textarea className={`${inputCls} min-h-[60px] resize-y`} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
           </div>
+          <div>
+            <label className="block text-[10px] uppercase tracking-wider text-content-muted mb-1">Reflection presets (tapping a mood prefills these)</label>
+            <div className="space-y-2">
+              {[['best', 'Best'], ['good', 'Good'], ['decent', 'Decent'], ['bad', 'Bad'], ['worst', 'Worst']].map(([key, label]) => (
+                <div key={key} className="flex items-start gap-2">
+                  <span className="w-14 flex-shrink-0 text-xs text-content-tertiary pt-2">{label}</span>
+                  <textarea
+                    className={`${inputCls} min-h-[42px] resize-y`}
+                    value={presets[key]}
+                    onChange={(e) => setPresets(p => ({ ...p, [key]: e.target.value }))}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
         <div className="flex justify-end gap-3 p-5 border-t border-edge-secondary">
           <button onClick={onClose} className="px-4 py-2 rounded-lg text-content-secondary hover:bg-surface-secondary transition-colors">Cancel</button>
           <button
-            onClick={() => { onSave(stepId, { title, subtitle, method, prompt }); onClose(); }}
+            onClick={() => {
+              const presetOverride = Object.fromEntries(Object.entries(presets).filter(([, v]) => v.trim()));
+              onSave(stepId, { title, subtitle, method, prompt, presets: presetOverride });
+              onClose();
+            }}
             className="px-4 py-2 rounded-lg bg-accent-bold text-content-inverse hover:bg-accent-bolder transition-colors"
           >
             Save
@@ -251,6 +278,21 @@ export default function ChangeView({ journal, updateJournal, treeData, logs }) {
   const handleSaveOverride = (id, overrides) => updateJournal(prev => ({ ...prev, program: setStepOverride(prev.program, id, overrides) }));
 
   const appendReflection = (text) => setReflection(r => (r ? `${r.replace(/\s+$/, '')}\n- ${text}` : `- ${text}`));
+
+  // Set the mood and prefill the reflection with this step's preset for that
+  // mood — but only when the box is empty or still holds an unedited preset, so
+  // we never clobber something the user actually wrote.
+  const applyMood = (value) => {
+    updateEntry({ mood: value });
+    const presets = step?.presets || {};
+    const presetText = (presets[MOOD_KEY[value]] || '').trim();
+    if (!presetText) return;
+    const current = reflection.trim();
+    const presetSet = new Set(Object.values(presets).map(v => (v || '').trim()).filter(Boolean));
+    if (!current || presetSet.has(current)) {
+      setReflection(presetText);
+    }
+  };
 
   const counter = step?.type === 'counter' ? (entry.stepData?.count || 0) : 0;
   const counterTarget = step?.config?.target || 8;
@@ -486,21 +528,23 @@ export default function ChangeView({ journal, updateJournal, treeData, logs }) {
               value={reflection}
               onChange={(e) => setReflection(e.target.value)}
             />
-            <div className="flex items-center gap-2 mt-4">
+            <div className="flex items-center gap-2 mt-4 flex-wrap">
               <span className="text-xs text-content-muted mr-1">Mood</span>
               {MOODS.map((m) => (
                 <button
                   key={m.value}
-                  onClick={() => updateEntry({ mood: entry.mood === m.value ? undefined : m.value })}
-                  title={m.label}
-                  className={`w-9 h-9 rounded-lg text-lg transition-all ${
+                  onClick={() => applyMood(m.value)}
+                  title={`${m.label} — prefill reflection`}
+                  className={`flex flex-col items-center justify-center w-12 h-12 rounded-lg transition-all ${
                     entry.mood === m.value ? 'bg-accent-subtle ring-2 ring-accent-bold scale-105' : 'hover:bg-surface-secondary opacity-70 hover:opacity-100'
                   }`}
                 >
-                  {m.emoji}
+                  <span className="text-lg leading-none">{m.emoji}</span>
+                  <span className="text-[9px] text-content-muted mt-0.5">{m.label}</span>
                 </button>
               ))}
             </div>
+            <p className="text-xs text-content-muted mt-2">Tap a mood to prefill a reflection — then tweak it.</p>
           </Card>
         </div>
 

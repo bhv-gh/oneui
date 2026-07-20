@@ -6,6 +6,12 @@
   user-select: none;
 }
 
+/* While actively panning the canvas, force the grabbing cursor everywhere. */
+.canvas-panning,
+.canvas-panning * {
+  cursor: grabbing !important;
+}
+
 /* Custom Scrollbar Styles */
 ::-webkit-scrollbar {
   width: 8px;

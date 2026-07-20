@@ -3,6 +3,7 @@
 
 import { parseISO, subDays, format } from 'date-fns';
 import { STEP_BY_ID, DEFAULT_PROGRAM_ORDER } from '../data/changeSteps';
+import { STEP_PRESETS, GENERIC_PRESETS } from '../data/changePresets';
 
 export const JOURNAL_VERSION = 1;
 
@@ -48,7 +49,14 @@ export function getEffectiveStep(journal, stepId) {
   const seed = STEP_BY_ID[stepId];
   if (!seed) return null;
   const overrides = journal?.program?.steps?.[stepId]?.overrides || {};
-  return { ...seed, ...overrides, id: stepId, config: { ...(seed.config || {}), ...(overrides.config || {}) } };
+  const presets = { ...GENERIC_PRESETS, ...(STEP_PRESETS[stepId] || {}), ...(overrides.presets || {}) };
+  return {
+    ...seed,
+    ...overrides,
+    id: stepId,
+    config: { ...(seed.config || {}), ...(overrides.config || {}) },
+    presets,
+  };
 }
 
 export function getStepState(journal, stepId) {

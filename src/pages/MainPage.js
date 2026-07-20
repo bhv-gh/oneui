@@ -154,7 +154,6 @@ export default function MainPage({
 
     // Canvas pan (click-drag) + zoom (Ctrl/Cmd + wheel) state
     const [zoom, setZoom] = useState(1);
-    const [isPanning, setIsPanning] = useState(false);
     const zoomRef = useRef(1);
     const isPanningRef = useRef(false);
     const panStartRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
@@ -172,8 +171,8 @@ export default function MainPage({
             scrollLeft: canvasRef.current.scrollLeft,
             scrollTop: canvasRef.current.scrollTop,
         };
-        document.body.classList.add('user-select-none');
-        setIsPanning(true);
+        // Force the grabbing cursor everywhere only while actively dragging.
+        document.body.classList.add('user-select-none', 'canvas-panning');
     }, []);
 
     const resetZoom = useCallback(() => {
@@ -214,8 +213,7 @@ export default function MainPage({
         const handleUp = () => {
             if (!isPanningRef.current) return;
             isPanningRef.current = false;
-            document.body.classList.remove('user-select-none');
-            setIsPanning(false);
+            document.body.classList.remove('user-select-none', 'canvas-panning');
         };
         window.addEventListener('mousemove', handleMove);
         window.addEventListener('mouseup', handleUp);
@@ -920,9 +918,9 @@ export default function MainPage({
                     data-canvas-area
                     ref={canvasRef}
                     onMouseDown={handleCanvasMouseDown}
-                    className={`flex-1 overflow-auto animate-in fade-in duration-300 ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+                    className="flex-1 overflow-auto animate-in fade-in duration-300"
                 >
-                    <div ref={contentRef} style={{ zoom }} className="flex gap-8 items-start p-8 min-h-full">
+                    <div ref={contentRef} style={{ zoom }} className="flex gap-8 items-start p-8 min-h-full cursor-grab">
                         {displayedTreeData.length > 0 ? (
                         <>
                             {displayedTreeData.map(node => (

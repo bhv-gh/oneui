@@ -54,7 +54,7 @@ const TreeNode = ({ node, onUpdate, onAdd, onRequestDelete, allFieldKeys, onStar
   const isFilterMatch = filterMatchIds ? filterMatchIds.has(node.id) : null;
 
   return (
-    <div className={depth === 0 ? 'w-80 flex-shrink-0' : 'w-full'}>
+    <div className={`cursor-default ${depth === 0 ? 'w-80 flex-shrink-0' : 'w-full'}`}>
       <TaskCard
         node={node}
         onUpdate={onUpdate}

@@ -52,6 +52,20 @@ describe('getEffectiveStep', () => {
   test('returns null for unknown step', () => {
     expect(getEffectiveStep(createDefaultJournal(), 'xyz')).toBeNull();
   });
+
+  test('includes mood presets, overridable per key', () => {
+    const j = createDefaultJournal();
+    const water = getEffectiveStep(j, 'water');
+    expect(Object.keys(water.presets)).toEqual(
+      expect.arrayContaining(['best', 'good', 'decent', 'bad', 'worst'])
+    );
+    expect(water.presets.best).toMatch(/hydration|target|drank/i);
+
+    j.program.steps = { water: { overrides: { presets: { best: 'Custom best' } } } };
+    const edited = getEffectiveStep(j, 'water');
+    expect(edited.presets.best).toBe('Custom best');       // override wins
+    expect(edited.presets.worst.length).toBeGreaterThan(0); // untouched keys keep defaults
+  });
 });
 
 describe('program transitions', () => {
