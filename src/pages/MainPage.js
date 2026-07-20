@@ -32,6 +32,7 @@ import DeleteModal from '../components/DeleteModal';
 import MemorySearchBar from '../components/MemorySearchBar';
 import CollapsiblePanels from '../components/CollapsiblePanels';
 import InsightsView from '../components/InsightsView';
+import ChangeView from '../components/ChangeView';
 import TaskNotesPanel from '../components/TaskNotesPanel';
 import RambleModal, { isSpeechSupported } from '../components/RambleModal';
 import QuickAddModal from '../components/QuickAddModal';
@@ -43,6 +44,7 @@ import { filterTreeByDate, filterForTodayView, filterTreeByExpression, collectFi
 import { migrateLegacyFilter } from '../components/FilterSidebar';
 import { findNodeRecursive } from '../utils/treeUtils';
 import RadialMenu from '../components/RadialMenu';
+import { useChangeJournal } from '../hooks/useChangeJournal';
 import * as api from '../api/client';
 import Fuse from 'fuse.js';
 
@@ -89,6 +91,7 @@ export default function MainPage({
     } = useContext(TreeDataContext);
     const { logs, handleSaveLog, handleDeleteLog, handleUpdateLogTime, forceSync: forceSyncLogs } = useContext(LogsContext);
     const { memoryData, setMemoryData, forceSync: forceSyncMemory } = useContext(MemoryContext);
+    const { journal: changeJournal, updateJournal: updateChangeJournal, forceSync: forceSyncChange } = useChangeJournal();
     const { isOnline, checkReachability } = useContext(OnlineContext);
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
     const [simulatedToday, setSimulatedToday] = useState(getTodayDateString);
@@ -150,6 +153,35 @@ export default function MainPage({
     const lastTodayRef = useRef(getTodayDateString());
     const tabContentRef = useRef(null);
 
+    // Canvas pan (click-drag) + zoom (Ctrl/Cmd + wheel) state
+    const [zoom, setZoom] = useState(1);
+    const [isPanning, setIsPanning] = useState(false);
+    const zoomRef = useRef(1);
+    const isPanningRef = useRef(false);
+    const panStartRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
+
+    // Start panning: left-drag on empty canvas background, or middle-mouse anywhere.
+    const handleCanvasMouseDown = useCallback((e) => {
+        const isBackground = e.target === canvasRef.current || e.target === contentRef.current;
+        const isMiddle = e.button === 1;
+        if (!(isMiddle || (e.button === 0 && isBackground))) return;
+        if (isMiddle) e.preventDefault();
+        isPanningRef.current = true;
+        panStartRef.current = {
+            x: e.clientX,
+            y: e.clientY,
+            scrollLeft: canvasRef.current.scrollLeft,
+            scrollTop: canvasRef.current.scrollTop,
+        };
+        document.body.classList.add('user-select-none');
+        setIsPanning(true);
+    }, []);
+
+    const resetZoom = useCallback(() => {
+        zoomRef.current = 1;
+        setZoom(1);
+    }, []);
+
     // DnD sensors and handlers
     const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 8 } });
     const dndSensors = useSensors(pointerSensor);
@@ -169,6 +201,68 @@ export default function MainPage({
     const handleDragCancel = useCallback(() => {
         setActiveDragId(null);
     }, []);
+
+    // Drag-to-pan: update scroll offset while dragging, end on mouse up (listeners on window
+    // so a drag that leaves the canvas still tracks / releases correctly).
+    useEffect(() => {
+        const handleMove = (e) => {
+            if (!isPanningRef.current || !canvasRef.current) return;
+            const dx = e.clientX - panStartRef.current.x;
+            const dy = e.clientY - panStartRef.current.y;
+            canvasRef.current.scrollLeft = panStartRef.current.scrollLeft - dx;
+            canvasRef.current.scrollTop = panStartRef.current.scrollTop - dy;
+        };
+        const handleUp = () => {
+            if (!isPanningRef.current) return;
+            isPanningRef.current = false;
+            document.body.classList.remove('user-select-none');
+            setIsPanning(false);
+        };
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleUp);
+        return () => {
+            window.removeEventListener('mousemove', handleMove);
+            window.removeEventListener('mouseup', handleUp);
+        };
+    }, []);
+
+    // Zoom with Ctrl/Cmd + wheel, anchored to the cursor. Uses a non-passive native listener
+    // so we can preventDefault (which stops the browser's own page zoom).
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const handleWheel = (e) => {
+            if (!(e.ctrlKey || e.metaKey)) return;
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const cursorX = e.clientX - rect.left;
+            const cursorY = e.clientY - rect.top;
+            const prevZoom = zoomRef.current;
+            const delta = -e.deltaY * 0.0015;
+            const newZoom = Math.min(2.5, Math.max(0.3, prevZoom * (1 + delta)));
+            if (newZoom === prevZoom) return;
+            const ratio = newZoom / prevZoom;
+            // Keep the point under the cursor fixed while scaling.
+            canvas.scrollLeft = (cursorX + canvas.scrollLeft) * ratio - cursorX;
+            canvas.scrollTop = (cursorY + canvas.scrollTop) * ratio - cursorY;
+            zoomRef.current = newZoom;
+            setZoom(newZoom);
+        };
+        canvas.addEventListener('wheel', handleWheel, { passive: false });
+        return () => canvas.removeEventListener('wheel', handleWheel);
+    }, [activeTab, viewMode]);
+
+    // Reset zoom with Ctrl/Cmd + 0.
+    useEffect(() => {
+        const handleResetKey = (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === '0') {
+                e.preventDefault();
+                resetZoom();
+            }
+        };
+        window.addEventListener('keydown', handleResetKey);
+        return () => window.removeEventListener('keydown', handleResetKey);
+    }, [resetZoom]);
 
     useEffect(() => {
         const checkForDayChange = () => {
@@ -259,11 +353,11 @@ export default function MainPage({
         if (isSyncing) return;
         setIsSyncing(true);
         try {
-            await Promise.all([forceSyncTree(), forceSyncLogs(), forceSyncMemory()]);
+            await Promise.all([forceSyncTree(), forceSyncLogs(), forceSyncMemory(), forceSyncChange()]);
         } finally {
             setIsSyncing(false);
         }
-    }, [isSyncing, forceSyncTree, forceSyncLogs, forceSyncMemory]);
+    }, [isSyncing, forceSyncTree, forceSyncLogs, forceSyncMemory, forceSyncChange]);
 
     // Radial menu — right-click on task cards
     useEffect(() => {
@@ -660,6 +754,7 @@ export default function MainPage({
                             { id: 'logs', label: 'Logs' },
                             { id: 'memory', label: 'Memory' },
                             { id: 'insights', label: 'Insights' },
+                            { id: 'change', label: 'Change' },
                         ].map(tab => (
                             <button
                                 key={tab.id}
@@ -773,7 +868,7 @@ export default function MainPage({
                 {/* Right-aligned controls */}
                 <div className="pointer-events-auto flex items-center justify-end gap-1 bg-surface-primary/90 backdrop-blur-md p-1.5 rounded-xl border border-edge-secondary shadow-lg">
 
-                    {activeTab !== 'memory' && (
+                    {activeTab !== 'memory' && activeTab !== 'change' && (
                         <div className="relative" ref={datePickerRef}>
                         <button
                         onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
@@ -812,14 +907,24 @@ export default function MainPage({
                 />
               )}
               <DndContext sensors={dndSensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
-              <div ref={tabContentRef} className="flex-1 flex flex-col min-h-0">
+              <div ref={tabContentRef} className="flex-1 flex flex-col min-h-0 relative">
+                {activeTab === 'today' && viewMode === 'tree' && zoom !== 1 && (
+                <button
+                    onClick={resetZoom}
+                    title="Reset zoom (Ctrl/Cmd + 0)"
+                    className="absolute bottom-4 right-4 z-10 px-3 py-1.5 rounded-full bg-surface-secondary/90 backdrop-blur border border-edge-secondary text-content-secondary text-xs font-medium hover:text-accent hover:border-accent-bold transition-all shadow-lg"
+                >
+                    {Math.round(zoom * 100)}% · Reset
+                </button>
+                )}
                 {activeTab === 'today' && viewMode === 'tree' && (
                 <div
                     data-canvas-area
                     ref={canvasRef}
-                    className="flex-1 overflow-auto animate-in fade-in duration-300"
+                    onMouseDown={handleCanvasMouseDown}
+                    className={`flex-1 overflow-auto animate-in fade-in duration-300 ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
                 >
-                    <div ref={contentRef} className="flex gap-8 items-start p-8 min-h-full">
+                    <div ref={contentRef} style={{ zoom }} className="flex gap-8 items-start p-8 min-h-full">
                         {displayedTreeData.length > 0 ? (
                         <>
                             {displayedTreeData.map(node => (
@@ -962,6 +1067,14 @@ export default function MainPage({
                 onInteractionChange={setIsTimelineInteracting}
                 />}
                 {activeTab === 'insights' && <InsightsView tasks={treeData} />}
+                {activeTab === 'change' && (
+                  <ChangeView
+                    journal={changeJournal}
+                    updateJournal={updateChangeJournal}
+                    treeData={treeData}
+                    logs={logs}
+                  />
+                )}
               </div>
               <DragOverlay dropAnimation={null}>
                 {activeDragId ? (() => {

@@ -293,6 +293,41 @@ export async function deleteSavedFilter(id) {
   if (error) throw error;
 }
 
+// ── Change Journal ─────────────────────────────────────────
+
+export async function getChangeJournal() {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const userHash = getUserHash();
+  const { data, error } = await supabase
+    .from('change_journal')
+    .select('id, data')
+    .eq('user_hash', userHash)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function putChangeJournal(journalData) {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const userHash = getUserHash();
+  const existing = await getChangeJournal();
+  if (existing) {
+    const { error } = await supabase
+      .from('change_journal')
+      .update({ data: journalData, updated_at: new Date().toISOString() })
+      .eq('id', existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from('change_journal')
+      .insert({ data: journalData, user_hash: userHash });
+    if (error) throw error;
+  }
+}
+
 // ── Bulk Export / Import ───────────────────────────────────
 
 export async function bulkExport() {
