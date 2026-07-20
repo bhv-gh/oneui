@@ -225,6 +225,22 @@ export default function ChangeView({ journal, updateJournal, treeData, logs }) {
   const wins = useMemo(() => extractWinsForDate(treeData, logs, viewedDate), [treeData, logs, viewedDate]);
   const heatmap = useMemo(() => buildHeatmap(journal.entries, today, 90), [journal.entries, today]);
 
+  // Every preset string across all steps. Used to tell an unedited (auto-filled)
+  // reflection apart from something the user actually wrote — across steps, so a
+  // preset carried over from a previous step is still treated as replaceable.
+  const allPresetTexts = useMemo(() => {
+    const set = new Set();
+    CHANGE_STEPS.forEach(s => {
+      const eff = getEffectiveStep(journal, s.id);
+      if (!eff) return;
+      Object.values(eff.presets || {}).forEach(v => {
+        const t = (v || '').trim();
+        if (t) set.add(t);
+      });
+    });
+    return set;
+  }, [journal]);
+
   // ── Entry mutations ──
   const updateEntry = useCallback((patch) => {
     updateJournal(prev => {
@@ -284,12 +300,12 @@ export default function ChangeView({ journal, updateJournal, treeData, logs }) {
   // we never clobber something the user actually wrote.
   const applyMood = (value) => {
     updateEntry({ mood: value });
-    const presets = step?.presets || {};
-    const presetText = (presets[MOOD_KEY[value]] || '').trim();
+    const presetText = ((step?.presets || {})[MOOD_KEY[value]] || '').trim();
     if (!presetText) return;
     const current = reflection.trim();
-    const presetSet = new Set(Object.values(presets).map(v => (v || '').trim()).filter(Boolean));
-    if (!current || presetSet.has(current)) {
+    // Overwrite only if the box is empty or still holds an auto-filled preset
+    // (from this or any step) — never custom text the user typed.
+    if (!current || allPresetTexts.has(current)) {
       setReflection(presetText);
     }
   };

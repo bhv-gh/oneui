@@ -45,3 +45,39 @@ test('program rail renders later default steps', () => {
   expect(screen.getByText('Pomodoro Technique')).toBeInTheDocument();
   expect(screen.getByText('Journaling')).toBeInTheDocument();
 });
+
+// Stateful harness so step switching + reflection state behave like the real app.
+function StatefulHarness() {
+  const [journal, setJournal] = React.useState(createDefaultJournal());
+  const updateJournal = (updater) =>
+    setJournal(prev => {
+      const base = typeof updater === 'function' ? updater(prev) : updater;
+      return { ...base, updatedAt: '2026-07-20T00:00:00Z' };
+    });
+  return <ChangeView journal={journal} updateJournal={updateJournal} treeData={[]} logs={[]} />;
+}
+
+test('mood prefill keeps working after switching steps (regression)', () => {
+  render(<StatefulHarness />);
+  const textarea = screen.getByPlaceholderText('Write your answer here…');
+
+  // Prefill for the active step (Goals)
+  fireEvent.click(screen.getByRole('button', { name: /Best/ }));
+  expect(textarea.value).toMatch(/Crystal clear on my top goal/);
+
+  // Switch active step to Pomodoro via the program rail
+  fireEvent.click(screen.getByText('Pomodoro Technique'));
+
+  // Clicking a mood must now replace the carried-over preset with Pomodoro's,
+  // not treat it as custom text (the bug: only the first step worked).
+  fireEvent.click(screen.getByRole('button', { name: /Best/ }));
+  expect(textarea.value).toMatch(/Strong focus blocks/);
+});
+
+test('mood does NOT overwrite text the user actually typed', () => {
+  render(<StatefulHarness />);
+  const textarea = screen.getByPlaceholderText('Write your answer here…');
+  fireEvent.change(textarea, { target: { value: 'my own words' } });
+  fireEvent.click(screen.getByRole('button', { name: /Worst/ }));
+  expect(textarea.value).toBe('my own words');
+});
