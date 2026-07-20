@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "/oneui/static/css/main.b4c5d0f3.css",
-    "main.js": "/oneui/static/js/main.4d792485.js",
+    "main.js": "/oneui/static/js/main.f9df6ba4.js",
     "static/js/209.93faa10b.chunk.js": "/oneui/static/js/209.93faa10b.chunk.js",
     "static/js/76.6aa9f2ae.chunk.js": "/oneui/static/js/76.6aa9f2ae.chunk.js",
     "static/js/206.c683e70d.chunk.js": "/oneui/static/js/206.c683e70d.chunk.js",
@@ -12,6 +12,6 @@
   },
   "entrypoints": [
     "static/css/main.b4c5d0f3.css",
-    "static/js/main.4d792485.js"
+    "static/js/main.f9df6ba4.js"
   ]
 }
